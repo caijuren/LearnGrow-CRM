@@ -7,7 +7,8 @@ import {
 import { useStore } from '@/store';
 import {
   SOURCE_LABELS, IMPORTANCE_LABELS, IMPORTANCE_COLORS, COMMON_TAGS,
-  type Importance, type CustomerSource,
+  STAGE_LABELS, STAGE_COLORS, WECHAT_ACCOUNT_LABELS,
+  type Importance, type CustomerSource, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
 
@@ -16,6 +17,17 @@ const IMPORTANCE_FILTERS: { value: Importance | ''; label: string }[] = [
   { value: 'vip', label: '⭐重点' },
   { value: 'normal', label: '普通' },
   { value: 'watch', label: '观察中' },
+];
+
+const STAGE_FILTERS: { value: CustomerStage | ''; label: string }[] = [
+  { value: '', label: '全部阶段' },
+  { value: 'new_friend', label: '新好友' },
+  { value: 'initial_chat', label: '初步沟通' },
+  { value: 'interested', label: '意向客户' },
+  { value: 'purchased', label: '已成交' },
+  { value: 'in_group', label: '已进群' },
+  { value: 'repurchased', label: '复购客户' },
+  { value: 'silent', label: '沉默客户' },
 ];
 
 const AVATAR_COLORS = [
@@ -30,22 +42,34 @@ interface CustomerForm {
   name: string;
   nickname: string;
   phone: string;
+  wechat_id: string;
+  wechat_remark: string;
+  wechat_add_date: string;
+  wechat_account: WechatAccount;
   douyin_nickname: string;
   source: CustomerSource | '';
   importance: Importance;
+  stage: CustomerStage;
   tags: string[];
   remark: string;
+  next_talk_topic: string;
 }
 
 const emptyForm: CustomerForm = {
   name: '',
   nickname: '',
   phone: '',
+  wechat_id: '',
+  wechat_remark: '',
+  wechat_add_date: new Date().toISOString().split('T')[0],
+  wechat_account: 'main',
   douyin_nickname: '',
   source: '',
   importance: 'normal',
+  stage: 'new_friend',
   tags: [],
   remark: '',
+  next_talk_topic: '',
 };
 
 function CustomerCard({ customer, onClick }: { customer: any; onClick: () => void }) {
@@ -84,22 +108,37 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
           <span className="text-lg font-bold text-white">{customer.name[0]}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 className="text-base font-bold text-slate-900 truncate group-hover:text-rose-600 transition-colors">
               {customer.name}
             </h3>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 border ${IMPORTANCE_COLORS[customer.importance]}`}>
-              {IMPORTANCE_LABELS[customer.importance]}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${STAGE_COLORS[customer.stage]}`}>
+              {STAGE_LABELS[customer.stage as CustomerStage]}
             </span>
           </div>
-          {customer.nickname && (
-            <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
-              <MessageCircle className="w-3 h-3" />
+          <div className="flex items-center gap-2 mb-1">
+            {customer.wechat_remark && (
+              <div className="flex items-center gap-1 text-xs text-emerald-600">
+                <MessageCircle className="w-3 h-3" />
+                <span className="truncate">{customer.wechat_remark}</span>
+              </div>
+            )}
+            {customer.wechat_account === 'assistant' && (
+              <span className="px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded text-[10px] font-medium">助理号</span>
+            )}
+          </div>
+          {customer.nickname && !customer.wechat_remark && (
+            <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
               <span className="truncate">{customer.nickname}</span>
             </div>
           )}
+          {customer.next_talk_topic && (
+            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg mt-1 line-clamp-1">
+              💬 {customer.next_talk_topic}
+            </div>
+          )}
           {customer.tags && customer.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
+            <div className="flex flex-wrap gap-1 mt-2">
               {customer.tags.slice(0, 3).map((tag: string) => (
                 <span key={tag} className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-medium">
                   {tag}
@@ -165,6 +204,10 @@ export default function CustomerList() {
     setCustomerFilters({ importance: importance || undefined });
   };
 
+  const handleStageFilter = (stage: CustomerStage | '') => {
+    setCustomerFilters({ stage: stage || undefined });
+  };
+
   const toggleTag = (tag: string) => {
     setForm(prev => ({
       ...prev,
@@ -190,11 +233,17 @@ export default function CustomerList() {
         name: form.name,
         nickname: form.nickname || null,
         phone: form.phone || null,
+        wechat_id: form.wechat_id || null,
+        wechat_remark: form.wechat_remark || null,
+        wechat_add_date: form.wechat_add_date || null,
+        wechat_account: form.wechat_account,
         douyin_nickname: form.douyin_nickname || null,
         source: form.source || null,
         importance: form.importance,
+        stage: form.stage,
         tags: form.tags,
         remark: form.remark || null,
+        next_talk_topic: form.next_talk_topic || null,
       });
       setShowAdd(false);
       setForm(emptyForm);
@@ -206,6 +255,7 @@ export default function CustomerList() {
   };
 
   const currentImportance = customerFilters.importance || '';
+  const currentStage = customerFilters.stage || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
@@ -215,7 +265,7 @@ export default function CustomerList() {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">
               我的客户
             </h1>
-            <p className="text-sm text-slate-500 mt-1">管理您的私域客户，记录每一次跟进</p>
+            <p className="text-sm text-slate-500 mt-1">管理您的微信私域客户，记录每一次沟通</p>
           </div>
           <button
             onClick={() => { setForm(emptyForm); setShowAdd(true); }}
@@ -232,7 +282,7 @@ export default function CustomerList() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                placeholder="搜索备注名/微信名/手机/抖音名/备注"
+                placeholder="搜索备注名/微信号/微信备注/手机/抖音名/下次聊啥"
                 value={searchValue}
                 onChange={e => setSearchValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -247,23 +297,41 @@ export default function CustomerList() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <span className="text-xs text-slate-500 font-medium mr-1">重要程度:</span>
-            {IMPORTANCE_FILTERS.map(filter => (
-              <button
-                key={filter.value}
-                onClick={() => handleImportanceFilter(filter.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  currentImportance === filter.value
-                    ? filter.value === 'vip'
-                      ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                      : 'bg-rose-100 text-rose-700 border border-rose-200'
-                    : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 font-medium mr-1">重要程度:</span>
+              {IMPORTANCE_FILTERS.map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => handleImportanceFilter(filter.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    currentImportance === filter.value
+                      ? filter.value === 'vip'
+                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                        : 'bg-rose-100 text-rose-700 border border-rose-200'
+                      : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 font-medium mr-1">客户阶段:</span>
+              {STAGE_FILTERS.map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => handleStageFilter(filter.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    currentStage === filter.value
+                      ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                      : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -286,9 +354,9 @@ export default function CustomerList() {
           <Empty
             icon={<User className="w-10 h-10 text-rose-300" />}
             title="暂无客户"
-            description={customerFilters.search || customerFilters.importance
+            description={customerFilters.search || customerFilters.importance || customerFilters.stage
               ? '没有找到匹配的客户，试试调整筛选条件'
-              : '开始添加您的第一位客户吧'}
+              : '开始添加您的第一位微信好友吧'}
             action={
               <button
                 onClick={() => { setForm(emptyForm); setShowAdd(true); }}
@@ -311,7 +379,7 @@ export default function CustomerList() {
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-rose-500" />
-                添加客户
+                添加微信好友
               </h2>
               <button
                 onClick={() => setShowAdd(false)}
@@ -324,11 +392,11 @@ export default function CustomerList() {
             <div className="p-5 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                  备注名 <span className="text-rose-500">*</span>
+                  客户备注名 <span className="text-rose-500">*</span>
                 </label>
                 <input
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                  placeholder="给客户起个备注名"
+                  placeholder="例如：轩轩妈妈-三年级"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 />
@@ -336,36 +404,71 @@ export default function CustomerList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信名</label>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信号</label>
                   <input
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                    placeholder="微信号/昵称"
-                    value={form.nickname}
-                    onChange={e => setForm(f => ({ ...f, nickname: e.target.value }))}
+                    placeholder="微信号"
+                    value={form.wechat_id}
+                    onChange={e => setForm(f => ({ ...f, wechat_id: e.target.value }))}
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信备注名</label>
+                  <input
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    placeholder="微信上的备注"
+                    value={form.wechat_remark}
+                    onChange={e => setForm(f => ({ ...f, wechat_remark: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">添加微信日期</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    value={form.wechat_add_date}
+                    onChange={e => setForm(f => ({ ...f, wechat_add_date: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">在哪个微信号</label>
+                  <select
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    value={form.wechat_account}
+                    onChange={e => setForm(f => ({ ...f, wechat_account: e.target.value as WechatAccount }))}
+                  >
+                    {Object.entries(WECHAT_ACCOUNT_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">手机号</label>
                   <input
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                    placeholder="手机号码"
+                    placeholder="手机号码（选填）"
                     value={form.phone}
                     onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">抖音昵称</label>
+                  <input
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    placeholder="抖音昵称（选填）"
+                    value={form.douyin_nickname}
+                    onChange={e => setForm(f => ({ ...f, douyin_nickname: e.target.value }))}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">抖音昵称</label>
-                <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                  placeholder="抖音上的昵称"
-                  value={form.douyin_nickname}
-                  onChange={e => setForm(f => ({ ...f, douyin_nickname: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">来源</label>
                   <select
@@ -391,6 +494,28 @@ export default function CustomerList() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">客户阶段</label>
+                  <select
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    value={form.stage}
+                    onChange={e => setForm(f => ({ ...f, stage: e.target.value as CustomerStage }))}
+                  >
+                    {Object.entries(STAGE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">下次聊啥/关注点</label>
+                <input
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  placeholder="例如：等发工资买作文、孩子要小升初、问过自然拼读"
+                  value={form.next_talk_topic}
+                  onChange={e => setForm(f => ({ ...f, next_talk_topic: e.target.value }))}
+                />
               </div>
 
               <div>
@@ -448,7 +573,7 @@ export default function CustomerList() {
                 <textarea
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm resize-none"
                   rows={3}
-                  placeholder="记录一些关于这个客户的备注信息..."
+                  placeholder="记录一些关于这个客户的信息，比如家庭情况、谁管孩子学习、预算多少..."
                   value={form.remark}
                   onChange={e => setForm(f => ({ ...f, remark: e.target.value }))}
                 />

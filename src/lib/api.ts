@@ -1,4 +1,4 @@
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress } from '../../shared/types';
+import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress, CheckinEvent, CheckinEventDetail, CheckinParticipant, CheckinRecord, Material } from '../../shared/types';
 
 const API_BASE = '/api';
 
@@ -41,10 +41,11 @@ export async function fetchTodos() {
   return request<TodoItem[]>('/actions/todos');
 }
 
-export async function fetchCustomers(params: { search?: string; importance?: string; tag?: string; page?: number; limit?: number } = {}) {
+export async function fetchCustomers(params: { search?: string; importance?: string; stage?: string; tag?: string; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
   if (params.search) qs.set('search', params.search);
   if (params.importance) qs.set('importance', params.importance);
+  if (params.stage) qs.set('stage', params.stage);
   if (params.tag) qs.set('tag', params.tag);
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
@@ -198,6 +199,13 @@ export async function deleteGroupMember(groupId: number, memberId: number) {
   return request<null>(`/wechat-groups/${groupId}/members/${memberId}`, { method: 'DELETE' });
 }
 
+export async function batchAddGroupMembers(groupId: number, names: string[], role: string = 'new') {
+  return request<{ added: number; skipped: number; total: number }>(`/wechat-groups/${groupId}/members/batch`, {
+    method: 'POST',
+    body: JSON.stringify({ names, role }),
+  });
+}
+
 export async function fetchChildren(customerId: number) {
   return request<Child[]>(`/children?customer_id=${customerId}`);
 }
@@ -257,4 +265,84 @@ export async function fetchTextbooks(params: { region?: string } = {}) {
 
 export async function fetchTextbookRegions() {
   return request<string[]>('/textbooks/regions');
+}
+
+export async function fetchCheckinEvents(params: { status?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  return request<{ events: CheckinEvent[]; total: number }>(`/checkin-events?${qs.toString()}`);
+}
+
+export async function fetchCheckinEvent(id: number) {
+  return request<CheckinEventDetail>(`/checkin-events/${id}`);
+}
+
+export async function createCheckinEvent(data: Partial<CheckinEvent> & { name: string; start_date: string; end_date: string }) {
+  return request<CheckinEvent>('/checkin-events', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateCheckinEvent(id: number, data: Partial<CheckinEvent>) {
+  return request<CheckinEvent>(`/checkin-events/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteCheckinEvent(id: number) {
+  return request<null>(`/checkin-events/${id}`, { method: 'DELETE' });
+}
+
+export async function addCheckinParticipant(eventId: number, data: Partial<CheckinParticipant> & { nickname: string }) {
+  return request<CheckinParticipant>(`/checkin-events/${eventId}/participants`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function removeCheckinParticipant(eventId: number, participantId: number) {
+  return request<null>(`/checkin-events/${eventId}/participants/${participantId}`, { method: 'DELETE' });
+}
+
+export async function checkin(eventId: number, participant_id: number, checkin_date: string, note?: string) {
+  return request<CheckinRecord>(`/checkin-events/${eventId}/checkin`, { method: 'POST', body: JSON.stringify({ participant_id, checkin_date, note: note || null }) });
+}
+
+export async function uncheckin(eventId: number, recordId: number) {
+  return request<null>(`/checkin-events/${eventId}/checkin/${recordId}`, { method: 'DELETE' });
+}
+
+export async function batchCheckin(eventId: number, checkin_date: string, participant_ids: number[], note?: string) {
+  return request<{ checked_count: number }>(`/checkin-events/${eventId}/batch-checkin`, { method: 'POST', body: JSON.stringify({ checkin_date, participant_ids, note: note || null }) });
+}
+
+export async function fetchMaterials(params: { category?: string; search?: string; product_id?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (params.category) qs.set('category', params.category);
+  if (params.search) qs.set('search', params.search);
+  if (params.product_id) qs.set('product_id', String(params.product_id));
+  return request<Material[]>(`/materials?${qs.toString()}`);
+}
+
+export async function uploadMaterial(file: File, data: { category: string; description?: string; tags?: string[]; product_id?: number | null }) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('category', data.category);
+  if (data.description) formData.append('description', data.description);
+  if (data.tags) formData.append('tags', JSON.stringify(data.tags));
+  if (data.product_id) formData.append('product_id', String(data.product_id));
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/materials/upload`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const resData = await res.json();
+  if (!res.ok || resData.success === false) throw new Error(resData.error || '上传失败');
+  return resData.data as Material;
+}
+
+export async function updateMaterial(id: number, data: Partial<Material>) {
+  return request<Material>(`/materials/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+
+export async function deleteMaterial(id: number) {
+  return request<null>(`/materials/${id}`, { method: 'DELETE' });
+}
+
+export async function recordMaterialDownload(id: number) {
+  return request<{ download_count: number }>(`/materials/${id}/download`, { method: 'POST' });
 }

@@ -2,13 +2,16 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import fastifyStatic from '@fastify/static';
+import multipart from '@fastify/multipart';
 import { z } from 'zod';
 import { authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
 import db from './db.js';
 import bcrypt from 'bcryptjs';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
-import type { Customer, Product, FollowUp, TodoItem, CustomerSuggestion, Customer360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithCustomer, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook } from '../shared/types.js';
+import { randomUUID } from 'crypto';
+import type { Customer, Product, FollowUp, TodoItem, CustomerSuggestion, Customer360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithCustomer, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinParticipant, CheckinRecord, CheckinParticipantStats, CheckinEventDetail, CustomerStage, Material, MaterialCategory } from '../shared/types.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -20,7 +23,12 @@ function ok<T>(data: T) {
 }
 
 function mapCustomer(c: any): Customer {
-  return { ...c, tags: parseJson(c.tags, [] as string[]) };
+  return {
+    ...c,
+    tags: parseJson(c.tags, [] as string[]),
+    stage: c.stage || 'new_friend',
+    wechat_account: c.wechat_account || 'main',
+  };
 }
 
 function mapProduct(p: any): Product {
@@ -126,13 +134,23 @@ function updateProductSales(productId: number) {
   db.prepare("UPDATE products SET sales_count = ? WHERE id = ?").run(count, productId);
 }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
 const app = Fastify({ logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' } } } });
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
+await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
+
+await app.register(fastifyStatic, {
+  root: uploadsDir,
+  prefix: '/uploads/',
+  decorateReply: false,
+});
 
 if (process.env.NODE_ENV === 'production') {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
   const distPath = path.join(__dirname, '..', 'dist');
   await app.register(fastifyStatic, {
     root: distPath,
@@ -161,11 +179,16 @@ app.get('/api/auth/me', { preHandler: [authMiddleware] }, async (request, reply)
 
 app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const today = new Date().toISOString().split('T')[0];
+  const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
   const thisMonth = today.slice(0, 7);
   const todayRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE date(purchase_date) = ?").get(today) as any).s;
   const monthRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE substr(purchase_date, 1, 7) = ?").get(thisMonth) as any).s;
   const totalCustomers = (db.prepare('SELECT COUNT(*) as c FROM customers').get() as any).c;
   const todayNewCustomers = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE date(created_at) = ?").get(today) as any).c;
+  const newFriendsCount = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE wechat_add_date >= ?").get(threeDaysAgo) as any).c;
+  const silentCount = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE (last_follow_date IS NULL OR last_follow_date < ?) AND (last_order_date IS NULL OR last_order_date < ?) AND stage != 'purchased' AND stage != 'repurchased'").get(thirtyDaysAgo, thirtyDaysAgo) as any).c;
   const todos = getTodos();
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
@@ -174,25 +197,68 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
     last7Days.push({ date: dateStr.slice(5), revenue: rev || 0 });
   }
   const recentOrdersRaw = db.prepare(`SELECT o.*, c.name as customer_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN customers c ON o.customer_id = c.id JOIN products p ON o.product_id = p.id ORDER BY o.created_at DESC LIMIT 10`).all() as any[];
-  return ok({ stats: { today_revenue: todayRevenue || 0, month_revenue: monthRevenue || 0, total_customers: totalCustomers, today_new_customers: todayNewCustomers, pending_todos: todos.length }, revenueTrend: last7Days, todos: todos.slice(0, 20), recentOrders: recentOrdersRaw as OrderWithCustomer[] } satisfies DashboardData);
+
+  const stageStatsRaw = db.prepare("SELECT stage, COUNT(*) as count FROM customers GROUP BY stage").all() as any[];
+  const allStages: CustomerStage[] = ['new_friend', 'initial_chat', 'interested', 'purchased', 'in_group', 'repurchased', 'silent'];
+  const stageStats = allStages.map(s => {
+    const found = stageStatsRaw.find(r => r.stage === s);
+    return { stage: s, count: found ? found.count : 0 };
+  });
+
+  const needFollowRaw = db.prepare(`
+    SELECT id, name, stage, wechat_id, wechat_account, importance, last_follow_date, next_talk_topic
+    FROM customers
+    WHERE next_talk_topic IS NOT NULL AND next_talk_topic != ''
+       OR last_follow_date IS NULL
+       OR last_follow_date < ?
+       OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?))
+    ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+             last_follow_date IS NULL DESC,
+             last_follow_date ASC
+    LIMIT 20
+  `).all(sevenDaysAgo, today) as any[];
+
+  return ok({
+    stats: {
+      today_revenue: todayRevenue || 0,
+      month_revenue: monthRevenue || 0,
+      total_customers: totalCustomers,
+      today_new_customers: todayNewCustomers,
+      pending_todos: todos.length,
+      need_follow_count: needFollowRaw.length,
+      new_friends_count: newFriendsCount,
+      silent_count: silentCount,
+    },
+    stageStats,
+    needFollowCustomers: needFollowRaw.map(c => ({
+      ...c,
+      stage: c.stage || 'new_friend',
+      wechat_account: c.wechat_account || 'main',
+    })),
+    revenueTrend: last7Days,
+    todos: todos.slice(0, 20),
+    recentOrders: recentOrdersRaw as OrderWithCustomer[]
+  } satisfies DashboardData);
 });
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
 
   router.get('/', async (request: any) => {
-    const { search, importance, tag, page = '1', limit = '20' } = request.query as any;
+    const { search, importance, stage, tag, page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
     let sql = 'SELECT * FROM customers WHERE 1=1', params: any[] = [];
-    if (search) { sql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
+    if (search) { sql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
     if (importance) { sql += ' AND importance = ?'; params.push(importance); }
+    if (stage) { sql += ' AND stage = ?'; params.push(stage); }
     if (tag) { sql += ' AND tags LIKE ?'; params.push(`%"${tag}"%`); }
     sql += " ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, last_follow_date IS NULL, last_follow_date DESC LIMIT ? OFFSET ?";
     params.push(limitNum, offset);
     const customers = (db.prepare(sql).all(...params) as any[]).map(mapCustomer);
     let countSql = 'SELECT COUNT(*) as total FROM customers WHERE 1=1', cparams: any[] = [];
-    if (search) { countSql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ?)'; cparams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
+    if (search) { countSql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; cparams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
     if (importance) { countSql += ' AND importance = ?'; cparams.push(importance); }
+    if (stage) { countSql += ' AND stage = ?'; cparams.push(stage); }
     if (tag) { countSql += ' AND tags LIKE ?'; cparams.push(`%"${tag}"%`); }
     const total = (db.prepare(countSql).get(...cparams) as any).total;
     return ok({ customers, total });
@@ -220,25 +286,33 @@ app.register(async function (router) {
   });
 
   router.post('/', async (request: any, reply: any) => {
-    const { name, nickname, phone, douyin_nickname, source, importance = 'normal', tags = [], remark } = request.body;
+    const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account = 'main', douyin_nickname, source, importance = 'normal', stage = 'new_friend', tags = [], remark, next_talk_topic } = request.body;
     if (!name) return reply.status(400).send({ success: false, error: '备注名不能为空' });
-    const r = db.prepare('INSERT INTO customers (name, nickname, phone, douyin_nickname, source, importance, tags, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(name, nickname || null, phone || null, douyin_nickname || null, source || 'other', importance, JSON.stringify(tags), remark || null);
+    const r = db.prepare('INSERT INTO customers (name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      name, nickname || null, phone || null, wechat_id || null, wechat_remark || null, wechat_add_date || null, wechat_account, douyin_nickname || null, source || 'other', importance, stage, JSON.stringify(tags), remark || null, next_talk_topic || null
+    );
     return reply.status(201).send(ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '客户不存在' });
-    const { name, nickname, phone, douyin_nickname, source, importance, tags, remark } = request.body;
+    const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
     if (nickname !== undefined) { fields.push('nickname = ?'); params.push(nickname); }
     if (phone !== undefined) { fields.push('phone = ?'); params.push(phone); }
+    if (wechat_id !== undefined) { fields.push('wechat_id = ?'); params.push(wechat_id); }
+    if (wechat_remark !== undefined) { fields.push('wechat_remark = ?'); params.push(wechat_remark); }
+    if (wechat_add_date !== undefined) { fields.push('wechat_add_date = ?'); params.push(wechat_add_date); }
+    if (wechat_account !== undefined) { fields.push('wechat_account = ?'); params.push(wechat_account); }
     if (douyin_nickname !== undefined) { fields.push('douyin_nickname = ?'); params.push(douyin_nickname); }
     if (source !== undefined) { fields.push('source = ?'); params.push(source); }
     if (importance !== undefined) { fields.push('importance = ?'); params.push(importance); }
+    if (stage !== undefined) { fields.push('stage = ?'); params.push(stage); }
     if (tags !== undefined) { fields.push('tags = ?'); params.push(JSON.stringify(tags)); }
     if (remark !== undefined) { fields.push('remark = ?'); params.push(remark); }
+    if (next_talk_topic !== undefined) { fields.push('next_talk_topic = ?'); params.push(next_talk_topic); }
     fields.push("updated_at = datetime('now')");
     params.push(id);
     db.prepare(`UPDATE customers SET ${fields.join(', ')} WHERE id = ?`).run(...params);
@@ -519,6 +593,35 @@ app.register(async function (router) {
     return ok(null);
   });
 
+  router.post('/:id/members/batch', async (request: any, reply: any) => {
+    const groupId = parseInt(request.params.id);
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.status(404).send({ success: false, error: '群不存在' });
+    const { names, role = 'new' } = request.body;
+    if (!names || !Array.isArray(names) || names.length === 0) return reply.status(400).send({ success: false, error: '请输入要导入的昵称列表' });
+    
+    const insertMember = db.prepare(`
+      INSERT OR IGNORE INTO wechat_group_members (group_id, wechat_name, role, tags, activity_score)
+      VALUES (?, ?, ?, '[]', 50)
+    `);
+    
+    let added = 0, skipped = 0;
+    const insertMany = db.transaction(() => {
+      for (const name of names) {
+        const trimmed = String(name).trim();
+        if (!trimmed) { skipped++; continue; }
+        const existing = db.prepare('SELECT id FROM wechat_group_members WHERE group_id = ? AND wechat_name = ?').get(groupId, trimmed);
+        if (existing) { skipped++; continue; }
+        insertMember.run(groupId, trimmed, role);
+        added++;
+      }
+    });
+    insertMany();
+    
+    db.prepare("UPDATE wechat_groups SET updated_at = datetime('now'), member_count = (SELECT COUNT(*) FROM wechat_group_members WHERE group_id = ?) WHERE id = ?").run(groupId, groupId);
+    
+    return ok({ added, skipped, total: names.length });
+  });
+
   router.post('/:id/members', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.status(404).send({ success: false, error: '群不存在' });
@@ -579,6 +682,14 @@ function mapProgress(pr: any): ChildLearningProgress {
 
 function mapTextbook(t: any): Textbook {
   return { ...t, is_default: !!t.is_default };
+}
+
+function mapMaterial(m: any): Material {
+  return {
+    ...m,
+    tags: parseJson(m.tags, [] as string[]),
+    url: `/uploads/${m.filename}`,
+  };
 }
 
 app.register(async function (router) {
@@ -806,6 +917,347 @@ app.register(async function (router) {
     return ok((db.prepare(sql).all(...params) as any[]).map(mapTextbook));
   });
 }, { prefix: '/api/textbooks' });
+
+function calculateStreaks(records: { checkin_date: string }[], startDate: string, endDate: string) {
+  const dateSet = new Set(records.map(r => r.checkin_date));
+  const checkedDates = Array.from(dateSet).sort();
+  
+  let currentStreak = 0;
+  let maxStreak = 0;
+  let tempStreak = 0;
+  
+  const today = new Date().toISOString().split('T')[0];
+  const end = endDate < today ? endDate : today;
+  
+  let d = new Date(startDate);
+  const endD = new Date(end);
+  const allDates: string[] = [];
+  while (d <= endD) {
+    allDates.push(d.toISOString().split('T')[0]);
+    d.setDate(d.getDate() + 1);
+  }
+  
+  for (let i = allDates.length - 1; i >= 0; i--) {
+    if (dateSet.has(allDates[i])) {
+      tempStreak++;
+      if (i === allDates.length - 1 || currentStreak > 0) {
+        currentStreak = tempStreak;
+      }
+    } else {
+      if (currentStreak === 0 && i === allDates.length - 1) {
+      } else {
+        break;
+      }
+      tempStreak = 0;
+    }
+  }
+  
+  tempStreak = 0;
+  for (const dateStr of allDates) {
+    if (dateSet.has(dateStr)) {
+      tempStreak++;
+      maxStreak = Math.max(maxStreak, tempStreak);
+    } else {
+      tempStreak = 0;
+    }
+  }
+  
+  return { checkin_days: checkedDates.length, current_streak: currentStreak, max_streak: maxStreak, checked_dates: checkedDates };
+}
+
+function mapCheckinEvent(e: any): CheckinEvent {
+  return { ...e };
+}
+
+function mapCheckinParticipant(p: any): CheckinParticipant {
+  return { ...p };
+}
+
+app.register(async function (router) {
+  router.addHook('preHandler', authMiddleware);
+
+  router.get('/', async (request: any) => {
+    const { status } = request.query as any;
+    let sql = `SELECT e.*, g.name as group_name, 
+      (SELECT COUNT(*) FROM checkin_participants WHERE event_id = e.id) as participant_count,
+      CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
+      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE 1=1`;
+    const params: any[] = [];
+    if (status) { sql += ' AND e.status = ?'; params.push(status); }
+    sql += ' ORDER BY e.created_at DESC';
+    const events = db.prepare(sql).all(...params) as any[];
+    return ok({ events, total: events.length });
+  });
+
+  router.get('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const event = db.prepare(`SELECT e.*, g.name as group_name,
+      CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
+      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.id = ?`).get(id) as any;
+    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+
+    const participantsRaw = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(id) as any[];
+    const recordsRaw = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(id) as any[];
+    
+    const calendar: { date: string; count: number }[] = [];
+    const calendarMap = new Map<string, number>();
+    for (const r of recordsRaw) {
+      calendarMap.set(r.checkin_date, (calendarMap.get(r.checkin_date) || 0) + 1);
+    }
+    
+    let d = new Date(event.start_date);
+    const endD = new Date(event.end_date);
+    while (d <= endD) {
+      const dateStr = d.toISOString().split('T')[0];
+      calendar.push({ date: dateStr, count: calendarMap.get(dateStr) || 0 });
+      d.setDate(d.getDate() + 1);
+    }
+
+    const participants: CheckinParticipantStats[] = participantsRaw.map(p => {
+      const pRecords = recordsRaw.filter(r => r.participant_id === p.id);
+      const stats = calculateStreaks(pRecords, event.start_date, event.end_date);
+      const lastRecord = pRecords.sort((a, b) => b.checkin_date.localeCompare(a.checkin_date))[0];
+      return {
+        participant: {
+          ...mapCheckinParticipant(p),
+          checkin_days: stats.checkin_days,
+          current_streak: stats.current_streak,
+          max_streak: stats.max_streak,
+          last_checkin_date: lastRecord?.checkin_date || null,
+        },
+        records: pRecords as CheckinRecord[],
+        ...stats,
+      };
+    });
+
+    participants.sort((a, b) => b.checkin_days - a.checkin_days);
+
+    return ok({
+      ...mapCheckinEvent(event),
+      group_name: event.group_name,
+      participant_count: participantsRaw.length,
+      total_days: event.total_days,
+      participants,
+      calendar,
+    } satisfies CheckinEventDetail);
+  });
+
+  router.post('/', async (request: any, reply: any) => {
+    const { name, group_id, start_date, end_date, required_text, reward_rules, status = 'active' } = request.body;
+    if (!name || !start_date || !end_date) return reply.status(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const r = db.prepare(`
+      INSERT INTO checkin_events (name, group_id, start_date, end_date, required_text, reward_rules, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(name, group_id || null, start_date, end_date, required_text || null, reward_rules || null, status, now, now);
+    
+    if (group_id) {
+      const members = db.prepare('SELECT id, wechat_name, nickname, customer_id FROM wechat_group_members WHERE group_id = ?').all(group_id) as any[];
+      const insertParticipant = db.prepare(`
+        INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      const insertMembers = db.transaction((mems: any[]) => {
+        for (const m of mems) {
+          insertParticipant.run(r.lastInsertRowid, m.id, m.customer_id || null, m.nickname || m.wechat_name, null);
+        }
+      });
+      insertMembers(members);
+    }
+    
+    return reply.status(201).send(ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(r.lastInsertRowid))));
+  });
+
+  router.put('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    const { name, group_id, start_date, end_date, required_text, reward_rules, status } = request.body;
+    const fields: string[] = [], params: any[] = [];
+    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
+    if (group_id !== undefined) { fields.push('group_id = ?'); params.push(group_id); }
+    if (start_date !== undefined) { fields.push('start_date = ?'); params.push(start_date); }
+    if (end_date !== undefined) { fields.push('end_date = ?'); params.push(end_date); }
+    if (required_text !== undefined) { fields.push('required_text = ?'); params.push(required_text); }
+    if (reward_rules !== undefined) { fields.push('reward_rules = ?'); params.push(reward_rules); }
+    if (status !== undefined) { fields.push('status = ?'); params.push(status); }
+    fields.push("updated_at = datetime('now')");
+    params.push(id);
+    db.prepare(`UPDATE checkin_events SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(id)));
+  });
+
+  router.delete('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    db.prepare('DELETE FROM checkin_records WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM checkin_participants WHERE event_id = ?').run(id);
+    db.prepare('DELETE FROM checkin_events WHERE id = ?').run(id);
+    return ok(null);
+  });
+
+  router.post('/:id/participants', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(eventId)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    const { member_id, customer_id, nickname, child_name } = request.body;
+    if (!nickname) return reply.status(400).send({ success: false, error: '昵称不能为空' });
+    const r = db.prepare(`
+      INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(eventId, member_id || null, customer_id || null, nickname, child_name || null);
+    return reply.status(201).send(ok(mapCheckinParticipant(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid))));
+  });
+
+  router.delete('/:id/participants/:pid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const pid = parseInt(request.params.pid);
+    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(pid, eventId)) return reply.status(404).send({ success: false, error: '参与者不存在' });
+    db.prepare('DELETE FROM checkin_records WHERE participant_id = ?').run(pid);
+    db.prepare('DELETE FROM checkin_participants WHERE id = ?').run(pid);
+    return ok(null);
+  });
+
+  router.post('/:id/checkin', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    const { participant_id, checkin_date, note } = request.body;
+    if (!participant_id || !checkin_date) return reply.status(400).send({ success: false, error: '参与者和日期不能为空' });
+    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(participant_id, eventId)) return reply.status(404).send({ success: false, error: '参与者不存在' });
+    
+    const existing = db.prepare('SELECT id FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(eventId, participant_id, checkin_date);
+    if (existing) {
+      db.prepare('UPDATE checkin_records SET note = ? WHERE id = ?').run(note || null, (existing as any).id);
+      return ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get((existing as any).id));
+    }
+    
+    const r = db.prepare(`
+      INSERT INTO checkin_records (event_id, participant_id, checkin_date, note)
+      VALUES (?, ?, ?, ?)
+    `).run(eventId, participant_id, checkin_date, note || null);
+    return reply.status(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
+  });
+
+  router.delete('/:id/checkin/:rid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const rid = parseInt(request.params.rid);
+    const record = db.prepare('SELECT * FROM checkin_records WHERE id = ? AND event_id = ?').get(rid, eventId) as any;
+    if (!record) return reply.status(404).send({ success: false, error: '打卡记录不存在' });
+    db.prepare('DELETE FROM checkin_records WHERE id = ?').run(rid);
+    return ok(null);
+  });
+
+  router.post('/:id/batch-checkin', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    const { checkin_date, participant_ids, note } = request.body;
+    if (!checkin_date || !participant_ids || !Array.isArray(participant_ids)) return reply.status(400).send({ success: false, error: '日期和参与者列表不能为空' });
+    
+    const insertRecord = db.prepare(`
+      INSERT OR IGNORE INTO checkin_records (event_id, participant_id, checkin_date, note)
+      VALUES (?, ?, ?, ?)
+    `);
+    const insertBatch = db.transaction((pids: number[]) => {
+      for (const pid of pids) {
+        insertRecord.run(eventId, pid, checkin_date, note || null);
+      }
+    });
+    insertBatch(participant_ids);
+    return ok({ checked_count: participant_ids.length });
+  });
+}, { prefix: '/api/checkin-events' });
+
+app.register(async function (router) {
+  router.addHook('preHandler', authMiddleware);
+
+  router.get('/', async (request: any) => {
+    const { category, search, product_id } = request.query as any;
+    let sql = `SELECT m.*, p.name as product_name, u.display_name as uploader_name FROM materials m LEFT JOIN products p ON m.product_id = p.id LEFT JOIN users u ON m.uploaded_by = u.id WHERE 1=1`;
+    const params: any[] = [];
+    if (category && category !== 'all') { sql += ' AND m.category = ?'; params.push(category); }
+    if (product_id) { sql += ' AND m.product_id = ?'; params.push(product_id); }
+    if (search) { sql += ' AND (m.original_name LIKE ? OR m.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+    sql += ' ORDER BY m.created_at DESC';
+    return ok((db.prepare(sql).all(...params) as any[]).map(mapMaterial));
+  });
+
+  router.get('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const m = db.prepare(`SELECT m.*, p.name as product_name, u.display_name as uploader_name FROM materials m LEFT JOIN products p ON m.product_id = p.id LEFT JOIN users u ON m.uploaded_by = u.id WHERE m.id = ?`).get(id) as any;
+    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    return ok(mapMaterial(m));
+  });
+
+  router.post('/upload', async (request: any, reply: any) => {
+    const data = await request.file();
+    if (!data) return reply.status(400).send({ success: false, error: '未收到文件' });
+
+    const { category = 'other', description, tags: tagsStr, product_id } = data.fields as any;
+    const cat = (category?.value || 'other') as MaterialCategory;
+    const validCats: MaterialCategory[] = ['sales', 'internal', 'product', 'planning', 'other'];
+    if (!validCats.includes(cat)) return reply.status(400).send({ success: false, error: '无效的分类' });
+
+    const ext = path.extname(data.filename).toLowerCase();
+    const uniqueName = `${randomUUID()}${ext}`;
+    const filePath = path.join(uploadsDir, uniqueName);
+
+    const writeStream = fs.createWriteStream(filePath);
+    await new Promise<void>((resolve, reject) => {
+      data.file.pipe(writeStream);
+      data.file.on('end', resolve);
+      data.file.on('error', reject);
+      writeStream.on('error', reject);
+    });
+
+    const stats = fs.statSync(filePath);
+    const tags = tagsStr?.value ? JSON.parse(tagsStr.value) : [];
+    const pid = product_id?.value ? parseInt(product_id.value) : null;
+    const userId = (request.user as AuthUser).id;
+
+    const result = db.prepare(`
+      INSERT INTO materials (filename, original_name, file_path, file_size, mime_type, category, tags, description, product_id, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(uniqueName, data.filename, filePath, stats.size, data.mimetype, cat, JSON.stringify(tags), description?.value || null, pid, userId);
+
+    const material = db.prepare(`SELECT m.*, p.name as product_name, u.display_name as uploader_name FROM materials m LEFT JOIN products p ON m.product_id = p.id LEFT JOIN users u ON m.uploaded_by = u.id WHERE m.id = ?`).get(result.lastInsertRowid) as any;
+    return ok(mapMaterial(material));
+  });
+
+  router.patch('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    if (!db.prepare('SELECT id FROM materials WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '资料不存在' });
+    const { category, description, tags, product_id } = request.body as any;
+    const updates: string[] = [];
+    const params: any[] = [];
+    if (category !== undefined) { updates.push('category = ?'); params.push(category); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (tags !== undefined) { updates.push('tags = ?'); params.push(JSON.stringify(tags)); }
+    if (product_id !== undefined) { updates.push('product_id = ?'); params.push(product_id || null); }
+    if (updates.length === 0) return ok(null);
+    updates.push('updated_at = datetime(\'now\')');
+    params.push(id);
+    db.prepare(`UPDATE materials SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    const m = db.prepare(`SELECT m.*, p.name as product_name, u.display_name as uploader_name FROM materials m LEFT JOIN products p ON m.product_id = p.id LEFT JOIN users u ON m.uploaded_by = u.id WHERE m.id = ?`).get(id) as any;
+    return ok(mapMaterial(m));
+  });
+
+  router.post('/:id/download', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(id) as any;
+    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    db.prepare('UPDATE materials SET download_count = download_count + 1 WHERE id = ?').run(id);
+    return ok({ download_count: m.download_count + 1 });
+  });
+
+  router.delete('/:id', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(id) as any;
+    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    try { fs.unlinkSync(m.file_path); } catch {}
+    db.prepare('DELETE FROM materials WHERE id = ?').run(id);
+    return ok(null);
+  });
+}, { prefix: '/api/materials' });
 
 app.setErrorHandler((error: any, _request, reply) => {
   if (error.statusCode === 401 || error.statusCode === 403) return reply.status(error.statusCode).send({ success: false, error: error.message });

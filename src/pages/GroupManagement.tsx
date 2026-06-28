@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Plus, Search, Users, MessageSquare, Edit2, Trash2, X, UserPlus,
   Flame, Star, Crown, Moon, Lock, Hammer, ChevronRight,
-  FileText, Tag, TrendingUp, Hash,
+  FileText, Tag, TrendingUp, Hash, Upload, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import {
@@ -277,7 +277,7 @@ export default function GroupManagement() {
   const {
     groups, loadGroups, addGroup, editGroup, removeGroup,
     selectedGroup, loadGroup, clearSelectedGroup,
-    addGroupMember, editGroupMember, removeGroupMember,
+    addGroupMember, batchAddGroupMembers, editGroupMember, removeGroupMember,
     groupFilters, setGroupFilters, loading, error,
   } = useStore();
 
@@ -289,6 +289,10 @@ export default function GroupManagement() {
   const [editingMember, setEditingMember] = useState<any>(null);
   const [memberForm, setMemberForm] = useState<MemberForm>(emptyMemberForm);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'group' | 'member'; id: number; memberId?: number } | null>(null);
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [batchText, setBatchText] = useState('');
+  const [batchResult, setBatchResult] = useState<{ added: number; skipped: number } | null>(null);
+  const [batchImporting, setBatchImporting] = useState(false);
 
   useEffect(() => {
     loadGroups();
@@ -340,6 +344,34 @@ export default function GroupManagement() {
     setMemberForm(emptyMemberForm);
     setEditingMember(null);
     setShowMemberForm(true);
+  };
+
+  const openBatchImport = () => {
+    setBatchText('');
+    setBatchResult(null);
+    setShowBatchImport(true);
+  };
+
+  const handleBatchImport = async () => {
+    if (!selectedGroup) return;
+    const names = batchText
+      .split(/[\n,，]/)
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+    if (names.length === 0) {
+      alert('请输入至少一个昵称');
+      return;
+    }
+    setBatchImporting(true);
+    try {
+      const result = await batchAddGroupMembers(selectedGroup.id, names, 'new');
+      setBatchResult({ added: result.added, skipped: result.skipped });
+      setBatchText('');
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setBatchImporting(false);
+    }
   };
 
   const openEditMember = (member: any) => {
@@ -467,12 +499,18 @@ export default function GroupManagement() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Users className="w-5 h-5 text-rose-500" />
-                  活跃成员管理
+                  群成员管理
                 </h3>
-                <button onClick={openAddMember} className="btn-primary btn-sm">
-                  <UserPlus className="w-4 h-4" />
-                  添加成员
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={openBatchImport} className="btn-secondary btn-sm">
+                    <Upload className="w-4 h-4" />
+                    批量导入
+                  </button>
+                  <button onClick={openAddMember} className="btn-primary btn-sm">
+                    <UserPlus className="w-4 h-4" />
+                    添加成员
+                  </button>
+                </div>
               </div>
 
               {!selectedGroup.active_members || selectedGroup.active_members.length === 0 ? (
@@ -667,6 +705,71 @@ export default function GroupManagement() {
                 placeholder="记录TA的特点、喜好、注意事项等..."
               />
             </div>
+          </div>
+        </Modal>
+
+        <Modal
+          isOpen={showBatchImport}
+          onClose={() => setShowBatchImport(false)}
+          title="批量导入群成员"
+          footer={
+            <>
+              <button onClick={() => setShowBatchImport(false)} className="btn-secondary">关闭</button>
+              {!batchResult && (
+                <button onClick={handleBatchImport} disabled={batchImporting} className="btn-primary disabled:opacity-50">
+                  {batchImporting ? '导入中...' : '开始导入'}
+                </button>
+              )}
+            </>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                使用方法
+              </h4>
+              <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                <li>打开微信群聊 → 点右上角"..." → 查看全部群成员</li>
+                <li>把群成员昵称复制下来（或截图OCR识别）</li>
+                <li>粘贴到下面的输入框，每行一个昵称，或用逗号分隔</li>
+                <li>点击"开始导入"即可批量添加，已存在的成员会自动跳过</li>
+              </ol>
+            </div>
+
+            {batchResult ? (
+              <div className={`rounded-xl p-6 text-center ${batchResult.added > 0 ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
+                <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${batchResult.added > 0 ? 'bg-green-100' : 'bg-amber-100'}`}>
+                  {batchResult.added > 0 ? (
+                    <CheckCircle className="w-7 h-7 text-green-600" />
+                  ) : (
+                    <AlertCircle className="w-7 h-7 text-amber-600" />
+                  )}
+                </div>
+                <h4 className="text-lg font-bold text-slate-900 mb-1">导入完成</h4>
+                <p className="text-sm text-slate-600">
+                  成功新增 <span className="font-bold text-green-600">{batchResult.added}</span> 人
+                  {batchResult.skipped > 0 && (
+                    <>，跳过已存在/空行 <span className="font-bold text-amber-600">{batchResult.skipped}</span> 个</>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                  群成员昵称列表 <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={batchText}
+                  onChange={e => setBatchText(e.target.value)}
+                  className="input min-h-[200px] resize-none font-mono text-sm"
+                  placeholder={'轩轩妈妈\n朵朵爸爸\n萌萌妈妈\n浩浩外婆\n...'}
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  支持换行或逗号/中文逗号分隔，导入后统一标记为"🆕 新粉"，你可以后续逐个编辑角色和标签
+                </p>
+              </div>
+            )}
           </div>
         </Modal>
       </div>

@@ -10,9 +10,10 @@ import { useStore } from '@/store';
 import {
   SOURCE_LABELS, IMPORTANCE_LABELS, IMPORTANCE_COLORS, COMMON_TAGS,
   ORDER_TYPE_LABELS, ORDER_TYPE_COLORS, FOLLOW_UP_METHOD_LABELS, FOLLOW_UP_RESULT_LABELS,
+  STAGE_LABELS, STAGE_COLORS, WECHAT_ACCOUNT_LABELS,
   GRADES, GENDERS, SUBJECTS,
   type Importance, type CustomerSource, type FollowUpMethod, type FollowUpResult,
-  type OrderType, type Child,
+  type OrderType, type Child, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
 
@@ -59,11 +60,17 @@ interface EditForm {
   name: string;
   nickname: string;
   phone: string;
+  wechat_id: string;
+  wechat_remark: string;
+  wechat_add_date: string;
+  wechat_account: WechatAccount;
   douyin_nickname: string;
   source: CustomerSource | '';
   importance: Importance;
+  stage: CustomerStage;
   tags: string[];
   remark: string;
+  next_talk_topic: string;
 }
 
 interface ChildForm {
@@ -141,8 +148,10 @@ export default function CustomerDetail() {
   const [followUpForm, setFollowUpForm] = useState<FollowUpForm>(emptyFollowUpForm);
   const [orderForm, setOrderForm] = useState<OrderForm>(emptyOrderForm);
   const [editForm, setEditForm] = useState<EditForm>({
-    name: '', nickname: '', phone: '', douyin_nickname: '',
-    source: '', importance: 'normal', tags: [], remark: '',
+    name: '', nickname: '', phone: '', wechat_id: '', wechat_remark: '',
+    wechat_add_date: '', wechat_account: 'main', douyin_nickname: '',
+    source: '', importance: 'normal', stage: 'new_friend', tags: [], remark: '',
+    next_talk_topic: '',
   });
   const [customTag, setCustomTag] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -166,11 +175,17 @@ export default function CustomerDetail() {
         name: customer.name,
         nickname: customer.nickname || '',
         phone: customer.phone || '',
+        wechat_id: customer.wechat_id || '',
+        wechat_remark: customer.wechat_remark || '',
+        wechat_add_date: customer.wechat_add_date || '',
+        wechat_account: customer.wechat_account || 'main',
         douyin_nickname: customer.douyin_nickname || '',
         source: customer.source || '',
         importance: customer.importance,
+        stage: customer.stage || 'new_friend',
         tags: customer.tags || [],
         remark: customer.remark || '',
+        next_talk_topic: customer.next_talk_topic || '',
       });
     }
   }, [customer]);
@@ -275,11 +290,17 @@ export default function CustomerDetail() {
         name: editForm.name,
         nickname: editForm.nickname || null,
         phone: editForm.phone || null,
+        wechat_id: editForm.wechat_id || null,
+        wechat_remark: editForm.wechat_remark || null,
+        wechat_add_date: editForm.wechat_add_date || null,
+        wechat_account: editForm.wechat_account,
         douyin_nickname: editForm.douyin_nickname || null,
         source: editForm.source || null,
         importance: editForm.importance,
+        stage: editForm.stage,
         tags: editForm.tags,
         remark: editForm.remark || null,
+        next_talk_topic: editForm.next_talk_topic || null,
       });
       setShowEdit(false);
     } catch (e) {
@@ -436,31 +457,17 @@ export default function CustomerDetail() {
               <ArrowLeft className="w-5 h-5 text-slate-600" />
             </button>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900">{customer.name}</h1>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${IMPORTANCE_COLORS[customer.importance]}`}>
-                  {IMPORTANCE_LABELS[customer.importance]}
-                </span>
-              </div>
-              <p className="text-sm text-slate-500 mt-0.5">客户详情</p>
+              <h1 className="text-lg font-bold text-slate-900">客户详情</h1>
+              <p className="text-sm text-slate-500 mt-0.5">微信私域客户管理</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md hover:bg-rose-50 flex items-center justify-center transition-all text-slate-600 hover:text-rose-600"
-              title="编辑"
-            >
-              <Edit2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowDelete(true)}
-              className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md hover:bg-red-50 flex items-center justify-center transition-all text-slate-600 hover:text-red-600"
-              title="删除"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={() => setShowDelete(true)}
+            className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md hover:bg-red-50 flex items-center justify-center transition-all text-slate-600 hover:text-red-600"
+            title="删除"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4">
@@ -471,8 +478,15 @@ export default function CustomerDetail() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STAGE_COLORS[customer.stage]}`}>
+                  {STAGE_LABELS[customer.stage]}
+                </span>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${IMPORTANCE_COLORS[customer.importance]}`}>
                   {IMPORTANCE_LABELS[customer.importance]}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <Users className="w-3 h-3" />
+                  {WECHAT_ACCOUNT_LABELS[customer.wechat_account]}
                 </span>
                 {customer.source && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
@@ -480,11 +494,12 @@ export default function CustomerDetail() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
-                {customer.nickname && (
-                  <span className="flex items-center gap-1">
+              <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
+                {customer.wechat_id && (
+                  <span className="flex items-center gap-1 text-emerald-600 font-medium">
                     <MessageCircle className="w-4 h-4" />
-                    {customer.nickname}
+                    {customer.wechat_id}
+                    {customer.wechat_remark && <span className="text-slate-400">({customer.wechat_remark})</span>}
                   </span>
                 )}
                 {customer.phone && (
@@ -493,13 +508,21 @@ export default function CustomerDetail() {
                     {customer.phone}
                   </span>
                 )}
-                {customer.douyin_nickname && (
-                  <span className="flex items-center gap-1">
-                    <Tag className="w-4 h-4" />
-                    {customer.douyin_nickname}
+                {customer.wechat_add_date && (
+                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {customer.wechat_add_date} 添加
                   </span>
                 )}
               </div>
+              {customer.next_talk_topic && (
+                <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100 flex items-start gap-2">
+                  <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">
+                    <span className="font-semibold">下次聊:</span> {customer.next_talk_topic}
+                  </p>
+                </div>
+              )}
               {customer.tags && customer.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {customer.tags.map(tag => (
@@ -517,7 +540,41 @@ export default function CustomerDetail() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
+          <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-slate-100">
+            <button
+              onClick={() => setShowEdit(true)}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-slate-50 transition-colors text-slate-600 hover:text-rose-600"
+            >
+              <Edit2 className="w-5 h-5" />
+              <span className="text-xs">编辑</span>
+            </button>
+            <button
+              onClick={() => {
+                setEditForm(f => ({ ...f, stage: customer.stage }));
+                setShowEdit(true);
+              }}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-slate-50 transition-colors text-slate-600 hover:text-emerald-600"
+            >
+              <ChevronRight className="w-5 h-5" />
+              <span className="text-xs">推进阶段</span>
+            </button>
+            <button
+              onClick={() => setShowFollowUp(true)}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-rose-50 transition-colors text-slate-600 hover:text-rose-600"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="text-xs">记跟进</span>
+            </button>
+            <button
+              onClick={() => setShowOrder(true)}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-amber-50 transition-colors text-slate-600 hover:text-amber-600"
+            >
+              <ShoppingBag className="w-5 h-5" />
+              <span className="text-xs">记订单</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-100">
             <div className="text-center p-3 bg-rose-50/50 rounded-xl">
               <div className="text-xl font-bold text-rose-600">¥{customer.total_spent?.toLocaleString() || 0}</div>
               <div className="text-xs text-slate-500 mt-0.5">累计消费</div>
@@ -538,8 +595,8 @@ export default function CustomerDetail() {
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div className="text-left">
-              <div className="text-sm font-bold text-slate-800">记跟进</div>
-              <div className="text-xs text-slate-500">记录沟通内容</div>
+              <div className="text-sm font-bold text-slate-800">快速记录跟进</div>
+              <div className="text-xs text-slate-500">微信聊天/电话/群聊</div>
             </div>
           </button>
           <button
@@ -550,8 +607,8 @@ export default function CustomerDetail() {
               <ShoppingBag className="w-5 h-5 text-white" />
             </div>
             <div className="text-left">
-              <div className="text-sm font-bold text-slate-800">记订单</div>
-              <div className="text-xs text-slate-500">记录购买</div>
+              <div className="text-sm font-bold text-slate-800">记录订单</div>
+              <div className="text-xs text-slate-500">购买转化</div>
             </div>
           </button>
         </div>
@@ -1013,10 +1070,93 @@ export default function CustomerDetail() {
       )}
 
       {showEdit && (
-        <Modal title="编辑客户" onClose={() => setShowEdit(false)}>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+        <Modal title="编辑客户信息" onClose={() => setShowEdit(false)}>
+          <div className="space-y-4 max-h-[65vh] overflow-y-auto">
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+              <h4 className="text-xs font-bold text-emerald-700 mb-3 flex items-center gap-1">
+                <Users className="w-3.5 h-3.5" />
+                微信私域信息
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">微信号</label>
+                  <input
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    value={editForm.wechat_id}
+                    onChange={e => setEditForm(f => ({ ...f, wechat_id: e.target.value }))}
+                    placeholder="客户微信号"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">微信备注名</label>
+                  <input
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    value={editForm.wechat_remark}
+                    onChange={e => setEditForm(f => ({ ...f, wechat_remark: e.target.value }))}
+                    placeholder="你的微信备注"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">添加日期</label>
+                  <input
+                    type="date"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    value={editForm.wechat_add_date}
+                    onChange={e => setEditForm(f => ({ ...f, wechat_add_date: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 mb-1 block">所属微信</label>
+                  <select
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm bg-white"
+                    value={editForm.wechat_account}
+                    onChange={e => setEditForm(f => ({ ...f, wechat_account: e.target.value as WechatAccount }))}
+                  >
+                    {Object.entries(WECHAT_ACCOUNT_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-xl border border-rose-100">
+              <h4 className="text-xs font-bold text-rose-700 mb-3 flex items-center gap-1">
+                <ChevronRight className="w-3.5 h-3.5" />
+                客户阶段管理
+              </h4>
+              <div className="grid grid-cols-4 gap-2 mb-3">
+                {Object.entries(STAGE_LABELS).map(([k, v]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setEditForm(f => ({ ...f, stage: k as CustomerStage }))}
+                    className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      editForm.stage === k
+                        ? 'bg-white border-rose-300 text-rose-700 shadow-sm'
+                        : 'bg-rose-50/50 border-transparent text-slate-600 hover:bg-white'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1 block flex items-center gap-1">
+                  <Lightbulb className="w-3 h-3 text-amber-500" />
+                  下次聊什么话题
+                </label>
+                <input
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none transition-all text-sm"
+                  value={editForm.next_talk_topic}
+                  onChange={e => setEditForm(f => ({ ...f, next_talk_topic: e.target.value }))}
+                  placeholder="记录下次聊天的切入点"
+                />
+              </div>
+            </div>
+
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注名 *</label>
+              <label className="text-xs font-medium text-slate-600 mb-1.5 block">客户称呼 *</label>
               <input
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
                 value={editForm.name}
@@ -1025,7 +1165,7 @@ export default function CustomerDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信名</label>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信昵称</label>
                 <input
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
                   value={editForm.nickname}
@@ -1051,7 +1191,7 @@ export default function CustomerDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">来源</label>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 block">来源渠道</label>
                 <select
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
                   value={editForm.source}
@@ -1129,7 +1269,7 @@ export default function CustomerDetail() {
               <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注</label>
               <textarea
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm resize-none"
-                rows={3}
+                rows={2}
                 value={editForm.remark}
                 onChange={e => setEditForm(f => ({ ...f, remark: e.target.value }))}
               />

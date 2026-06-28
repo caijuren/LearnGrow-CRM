@@ -5,7 +5,9 @@ export type FollowUpMethod = 'wechat' | 'phone' | 'group' | 'live' | 'moments';
 export type FollowUpResult = 'closed' | 'considering' | 'no_need' | 'follow_up';
 export type TodoType = 'vip_follow' | 'reminder' | 'considering' | 'long_time_no_talk' | 'stage_progress';
 export type TodoPriority = 'high' | 'medium' | 'low';
-export type CustomerSource = 'douyin_live' | 'douyin_dm' | 'referral' | 'other';
+export type CustomerSource = 'douyin_live' | 'douyin_dm' | 'referral' | 'wechat_group' | 'moments' | 'other';
+export type CustomerStage = 'new_friend' | 'initial_chat' | 'interested' | 'purchased' | 'in_group' | 'repurchased' | 'silent';
+export type WechatAccount = 'main' | 'assistant';
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paused';
 
 export interface Child {
@@ -86,12 +88,18 @@ export interface Customer {
   name: string;
   nickname: string | null;
   phone: string | null;
+  wechat_id: string | null;
+  wechat_remark: string | null;
+  wechat_add_date: string | null;
+  wechat_account: WechatAccount;
   douyin_nickname: string | null;
   avatar: string | null;
   source: CustomerSource | null;
+  stage: CustomerStage;
   importance: Importance;
   tags: string[];
   remark: string | null;
+  next_talk_topic: string | null;
   total_spent: number;
   order_count: number;
   last_order_date: string | null;
@@ -178,12 +186,18 @@ export interface Customer360 {
   name: string;
   nickname: string | null;
   phone: string | null;
+  wechat_id: string | null;
+  wechat_remark: string | null;
+  wechat_add_date: string | null;
+  wechat_account: WechatAccount;
   douyin_nickname: string | null;
   avatar: string | null;
   source: CustomerSource | null;
+  stage: CustomerStage;
   importance: Importance;
   tags: string[];
   remark: string | null;
+  next_talk_topic: string | null;
   total_spent: number;
   order_count: number;
   last_order_date: string | null;
@@ -225,7 +239,12 @@ export interface DashboardData {
     total_customers: number;
     today_new_customers: number;
     pending_todos: number;
+    need_follow_count: number;
+    new_friends_count: number;
+    silent_count: number;
   };
+  stageStats: { stage: CustomerStage; count: number }[];
+  needFollowCustomers: Pick<Customer, 'id' | 'name' | 'stage' | 'wechat_id' | 'wechat_account' | 'last_follow_date' | 'next_talk_topic' | 'importance'>[];
   revenueTrend: { date: string; revenue: number }[];
   todos: TodoItem[];
   recentOrders: OrderWithCustomer[];
@@ -291,7 +310,34 @@ export const SOURCE_LABELS: Record<CustomerSource, string> = {
   douyin_live: '抖音直播',
   douyin_dm: '抖音私信',
   referral: '转介绍',
+  wechat_group: '微信群',
+  moments: '朋友圈',
   other: '其他',
+};
+
+export const STAGE_LABELS: Record<CustomerStage, string> = {
+  new_friend: '新好友',
+  initial_chat: '初步沟通',
+  interested: '意向客户',
+  purchased: '已成交',
+  in_group: '已进群',
+  repurchased: '复购客户',
+  silent: '沉默客户',
+};
+
+export const STAGE_COLORS: Record<CustomerStage, string> = {
+  new_friend: 'bg-blue-100 text-blue-700',
+  initial_chat: 'bg-sky-100 text-sky-700',
+  interested: 'bg-amber-100 text-amber-700',
+  purchased: 'bg-emerald-100 text-emerald-700',
+  in_group: 'bg-teal-100 text-teal-700',
+  repurchased: 'bg-rose-100 text-rose-700',
+  silent: 'bg-slate-100 text-slate-500',
+};
+
+export const WECHAT_ACCOUNT_LABELS: Record<WechatAccount, string> = {
+  main: '主播号',
+  assistant: '助理号',
 };
 
 export const TODO_TYPE_LABELS: Record<TodoType, string> = {
@@ -389,4 +435,109 @@ export const GROUP_MEMBER_ROLE_COLORS: Record<GroupMemberRole, string> = {
   assistant: 'bg-emerald-100 text-emerald-700',
 };
 
+export type CheckinEventStatus = 'active' | 'ended';
+
+export interface CheckinEvent {
+  id: number;
+  name: string;
+  group_id: number | null;
+  group_name?: string;
+  start_date: string;
+  end_date: string;
+  required_text: string | null;
+  reward_rules: string | null;
+  status: CheckinEventStatus;
+  participant_count?: number;
+  total_days?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CheckinParticipant {
+  id: number;
+  event_id: number;
+  member_id: number | null;
+  customer_id: number | null;
+  nickname: string;
+  child_name: string | null;
+  joined_at: string;
+  checkin_days?: number;
+  current_streak?: number;
+  max_streak?: number;
+  last_checkin_date?: string | null;
+}
+
+export interface CheckinRecord {
+  id: number;
+  event_id: number;
+  participant_id: number;
+  checkin_date: string;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CheckinParticipantStats {
+  participant: CheckinParticipant;
+  records: CheckinRecord[];
+  checkin_days: number;
+  current_streak: number;
+  max_streak: number;
+  checked_dates: string[];
+}
+
+export interface CheckinEventDetail extends CheckinEvent {
+  participants: CheckinParticipantStats[];
+  calendar: { date: string; count: number }[];
+}
+
+export const CHECKIN_STATUS_LABELS: Record<CheckinEventStatus, string> = {
+  active: '进行中',
+  ended: '已结束',
+};
+
+export const CHECKIN_STATUS_COLORS: Record<CheckinEventStatus, string> = {
+  active: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  ended: 'bg-slate-100 text-slate-600 border-slate-200',
+};
+
 export const GROUP_COMMON_TAGS = ['转化群', '服务群', '宝妈群', '高年级', '低年级', 'VIP群', '体验群', '刷题群', '预习群', '升学群'];
+
+export type MaterialCategory = 'sales' | 'internal' | 'product' | 'planning' | 'other';
+
+export interface Material {
+  id: number;
+  filename: string;
+  original_name: string;
+  file_path: string;
+  file_size: number;
+  mime_type: string | null;
+  category: MaterialCategory;
+  tags: string[];
+  description: string | null;
+  product_id: number | null;
+  uploaded_by: number | null;
+  download_count: number;
+  created_at: string;
+  updated_at: string;
+  product_name?: string;
+  uploader_name?: string;
+  url?: string;
+}
+
+export const MATERIAL_CATEGORY_LABELS: Record<MaterialCategory, string> = {
+  sales: '销售资料',
+  internal: '内部文档',
+  product: '商品资料',
+  planning: '规划路径',
+  other: '其他',
+};
+
+export const MATERIAL_CATEGORY_COLORS: Record<MaterialCategory, string> = {
+  sales: 'bg-rose-100 text-rose-700 border-rose-200',
+  internal: 'bg-blue-100 text-blue-700 border-blue-200',
+  product: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  planning: 'bg-violet-100 text-violet-700 border-violet-200',
+  other: 'bg-slate-100 text-slate-600 border-slate-200',
+};
+
+export const MATERIAL_COMMON_TAGS = ['PDF', '话术', '家长沟通', '试卷', '讲义', '视频', '图片', '规划表', 'SOP', '培训'];

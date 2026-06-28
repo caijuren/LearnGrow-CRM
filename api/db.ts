@@ -119,6 +119,26 @@ if (!existingFollowUpCols.includes('child_id')) {
   sqlite.exec("ALTER TABLE follow_ups ADD COLUMN child_id INTEGER");
 }
 
+const existingCustomerCols = (sqlite.prepare("PRAGMA table_info(customers)").all() as any[]).map(c => c.name);
+if (!existingCustomerCols.includes('wechat_id')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_id TEXT");
+}
+if (!existingCustomerCols.includes('wechat_remark')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_remark TEXT");
+}
+if (!existingCustomerCols.includes('wechat_add_date')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_add_date TEXT");
+}
+if (!existingCustomerCols.includes('wechat_account')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_account TEXT DEFAULT 'main'");
+}
+if (!existingCustomerCols.includes('stage')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN stage TEXT NOT NULL DEFAULT 'new_friend'");
+}
+if (!existingCustomerCols.includes('next_talk_topic')) {
+  sqlite.exec("ALTER TABLE customers ADD COLUMN next_talk_topic TEXT");
+}
+
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS wechat_groups (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -421,6 +441,20 @@ if (customerCount === 0) {
       [customerIds[10], '2026-06-22', 'wechat', '琪琪妈妈说试卷好用，问有没有二年级的预习资料，告诉她7月上新', 'closed', null],
     ];
     for (const f of followUps) insertFollowUp.run(...f);
+
+    const updateStage = sqlite.prepare(`UPDATE customers SET stage = ?, wechat_add_date = ?, wechat_remark = ? WHERE id = ?`);
+    updateStage.run('purchased', '2026-04-20', '轩轩妈妈-三年级', customerIds[0]);
+    updateStage.run('purchased', '2026-05-10', '朵朵爸爸-五年级', customerIds[1]);
+    updateStage.run('silent', '2026-05-20', '萌萌妈妈-初一', customerIds[2]);
+    updateStage.run('repurchased', '2026-04-01', '浩浩外婆-转介绍', customerIds[3]);
+    updateStage.run('purchased', '2026-06-01', '阳阳爸爸-程序员', customerIds[4]);
+    updateStage.run('repurchased', '2026-05-01', '甜甜妈妈-英语老师', customerIds[5]);
+    updateStage.run('purchased', '2026-05-15', '磊磊奶奶-退休', customerIds[6]);
+    updateStage.run('repurchased', '2026-05-20', '芊芊妈妈-主播同行', customerIds[7]);
+    updateStage.run('silent', '2026-03-20', '宇宇爸爸-薅羊毛', customerIds[8]);
+    updateStage.run('interested', '2026-06-20', '航航妈妈-新粉', customerIds[9]);
+    updateStage.run('repurchased', '2026-05-01', '琪琪妈妈-全职太太', customerIds[10]);
+    updateStage.run('initial_chat', '2026-05-10', '然然妈妈-二年级', customerIds[11]);
   });
   seedCustomers();
 }
@@ -448,6 +482,29 @@ if (childCount === 0) {
   insertChildren(children);
 }
 
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL DEFAULT 0,
+    mime_type TEXT,
+    category TEXT NOT NULL DEFAULT 'sales' CHECK(category IN ('sales', 'internal', 'product', 'planning', 'other')),
+    tags TEXT DEFAULT '[]',
+    description TEXT,
+    product_id INTEGER,
+    uploaded_by INTEGER,
+    download_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_materials_category ON materials(category);
+  CREATE INDEX IF NOT EXISTS idx_materials_product_id ON materials(product_id);
+`);
+
 const userCount = (sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
 if (userCount === 0) {
   const hash = bcrypt.hashSync('admin123', 10);
@@ -456,3 +513,51 @@ if (userCount === 0) {
   sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
     .run('assistant', bcrypt.hashSync('assist123', 10), 'assistant', '小助理');
 }
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS checkin_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    group_id INTEGER,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    required_text TEXT,
+    reward_rules TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'ended')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (group_id) REFERENCES wechat_groups(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS checkin_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    member_id INTEGER,
+    customer_id INTEGER,
+    nickname TEXT NOT NULL,
+    child_name TEXT,
+    joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES wechat_group_members(id) ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS checkin_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    participant_id INTEGER NOT NULL,
+    checkin_date TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant_id) REFERENCES checkin_participants(id) ON DELETE CASCADE,
+    UNIQUE(event_id, participant_id, checkin_date)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_checkin_events_status ON checkin_events(status);
+  CREATE INDEX IF NOT EXISTS idx_checkin_events_group_id ON checkin_events(group_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_participants_event_id ON checkin_participants(event_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_records_event_id ON checkin_records(event_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_records_participant_id ON checkin_records(participant_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_records_date ON checkin_records(checkin_date);
+`);

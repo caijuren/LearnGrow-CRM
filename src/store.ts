@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, WechatGroup, WechatGroupMember, Child, ChildWithProgress, LearningPath, Textbook } from '../shared/types';
+import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, WechatGroup, WechatGroupMember, Child, ChildWithProgress, LearningPath, Textbook, CheckinEvent, CheckinEventDetail, Material } from '../shared/types';
 import * as api from './lib/api';
 
 interface AppState {
@@ -12,7 +12,7 @@ interface AppState {
   totalCustomers: number;
   customerPage: number;
   selectedCustomer: Customer360 | null;
-  customerFilters: { search?: string; importance?: string; tag?: string };
+  customerFilters: { search?: string; importance?: string; stage?: string; tag?: string };
   allTags: string[];
 
   products: Product[];
@@ -38,6 +38,14 @@ interface AppState {
   selectedGroup: WechatGroup | null;
   groupFilters: { status?: string; search?: string };
 
+  checkinEvents: CheckinEvent[];
+  selectedCheckinEvent: CheckinEventDetail | null;
+  checkinFilter: { status?: string };
+
+  materials: Material[];
+  materialCategory: string;
+  materialSearch: string;
+
   loading: boolean;
   error: string | null;
 
@@ -49,7 +57,7 @@ interface AppState {
   loadDashboard: () => Promise<void>;
   loadTodos: () => Promise<void>;
 
-  loadCustomers: (params?: { search?: string; importance?: string; tag?: string; page?: number; limit?: number }) => Promise<void>;
+  loadCustomers: (params?: { search?: string; importance?: string; stage?: string; tag?: string; page?: number; limit?: number }) => Promise<void>;
   loadCustomer: (id: number) => Promise<void>;
   addCustomer: (data: Partial<Customer>) => Promise<void>;
   editCustomer: (id: number, data: Partial<Customer>) => Promise<void>;
@@ -105,8 +113,23 @@ interface AppState {
   clearSelectedGroup: () => void;
 
   addGroupMember: (groupId: number, data: Partial<WechatGroupMember>) => Promise<void>;
+  batchAddGroupMembers: (groupId: number, names: string[], role?: string) => Promise<{ added: number; skipped: number; total: number }>;
   editGroupMember: (groupId: number, memberId: number, data: Partial<WechatGroupMember>) => Promise<void>;
   removeGroupMember: (groupId: number, memberId: number) => Promise<void>;
+
+  loadCheckinEvents: (params?: { status?: string }) => Promise<void>;
+  loadCheckinEvent: (id: number) => Promise<void>;
+  addCheckinEvent: (data: Partial<CheckinEvent> & { name: string; start_date: string; end_date: string }) => Promise<void>;
+  editCheckinEvent: (id: number, data: Partial<CheckinEvent>) => Promise<void>;
+  removeCheckinEvent: (id: number) => Promise<void>;
+  setCheckinFilter: (filter: Partial<AppState['checkinFilter']>) => void;
+  clearSelectedCheckinEvent: () => void;
+
+  addCheckinParticipant: (eventId: number, data: { nickname: string; child_name?: string; member_id?: number; customer_id?: number }) => Promise<void>;
+  removeCheckinParticipant: (eventId: number, participantId: number) => Promise<void>;
+  doCheckin: (eventId: number, participantId: number, date: string, note?: string) => Promise<void>;
+  doUncheckin: (eventId: number, recordId: number) => Promise<void>;
+  doBatchCheckin: (eventId: number, date: string, participantIds: number[], note?: string) => Promise<void>;
 
   clearError: () => void;
 }
@@ -138,6 +161,9 @@ export const useStore = create<AppState>((set, get) => ({
   groups: [],
   selectedGroup: null,
   groupFilters: {},
+  checkinEvents: [],
+  selectedCheckinEvent: null,
+  checkinFilter: {},
   loading: false,
   error: null,
 
@@ -429,6 +455,16 @@ export const useStore = create<AppState>((set, get) => ({
       set({ loading: false });
     } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
   },
+  batchAddGroupMembers: async (groupId, names, role = 'new') => {
+    set({ loading: true, error: null });
+    try {
+      const result = await api.batchAddGroupMembers(groupId, names, role);
+      await get().loadGroup(groupId);
+      await get().loadGroups();
+      set({ loading: false });
+      return result;
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
   editGroupMember: async (groupId, memberId, data) => {
     set({ loading: true, error: null });
     try {
@@ -541,6 +577,89 @@ export const useStore = create<AppState>((set, get) => ({
       const data = await api.fetchTextbookRegions();
       set({ textbookRegions: data });
     } catch (e: any) { set({ error: e.message }); }
+  },
+
+  loadCheckinEvents: async (params) => {
+    set({ loading: true, error: null });
+    try {
+      const filters = { ...get().checkinFilter, ...params };
+      const data = await api.fetchCheckinEvents(filters);
+      set({ checkinEvents: data.events, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  loadCheckinEvent: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      const data = await api.fetchCheckinEvent(id);
+      set({ selectedCheckinEvent: data, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  addCheckinEvent: async (data) => {
+    set({ loading: true, error: null });
+    try {
+      await api.createCheckinEvent(data);
+      await get().loadCheckinEvents();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  editCheckinEvent: async (id, data) => {
+    set({ loading: true, error: null });
+    try {
+      await api.updateCheckinEvent(id, data);
+      await get().loadCheckinEvent(id);
+      await get().loadCheckinEvents();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  removeCheckinEvent: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await api.deleteCheckinEvent(id);
+      await get().loadCheckinEvents();
+      set({ selectedCheckinEvent: null, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  setCheckinFilter: (filter) => {
+    set({ checkinFilter: { ...get().checkinFilter, ...filter } });
+    get().loadCheckinEvents();
+  },
+  clearSelectedCheckinEvent: () => set({ selectedCheckinEvent: null }),
+
+  addCheckinParticipant: async (eventId, data) => {
+    set({ loading: true, error: null });
+    try {
+      await api.addCheckinParticipant(eventId, data);
+      await get().loadCheckinEvent(eventId);
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  removeCheckinParticipant: async (eventId, participantId) => {
+    set({ loading: true, error: null });
+    try {
+      await api.removeCheckinParticipant(eventId, participantId);
+      await get().loadCheckinEvent(eventId);
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  doCheckin: async (eventId, participantId, date, note) => {
+    try {
+      await api.checkin(eventId, participantId, date, note);
+      await get().loadCheckinEvent(eventId);
+    } catch (e: any) { set({ error: e.message }); throw e; }
+  },
+  doUncheckin: async (eventId, recordId) => {
+    try {
+      await api.uncheckin(eventId, recordId);
+      await get().loadCheckinEvent(eventId);
+    } catch (e: any) { set({ error: e.message }); throw e; }
+  },
+  doBatchCheckin: async (eventId, date, participantIds, note) => {
+    set({ loading: true, error: null });
+    try {
+      await api.batchCheckin(eventId, date, participantIds, note);
+      await get().loadCheckinEvent(eventId);
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
   },
 
   clearError: () => set({ error: null }),
