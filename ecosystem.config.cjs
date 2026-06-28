@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'learngrow-crm',
-      script: 'tsx',
-      args: 'api/server.ts',
+      script: 'npm',
+      args: 'run start',
       cwd: '/var/www/learngrow-crm',
       instances: 1,
       autorestart: true,

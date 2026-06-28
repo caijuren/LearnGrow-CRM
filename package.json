@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "tsx api/server.ts",
     "check": "tsc --noEmit",
     "server:dev": "nodemon",
     "dev": "concurrently \"npm run client:dev\" \"npm run server:dev\"",
