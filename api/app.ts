@@ -1,10 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import fastifyStatic from '@fastify/static';
 import { z } from 'zod';
 import { authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
 import db from './db.js';
 import bcrypt from 'bcryptjs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import type { Customer, Product, FollowUp, TodoItem, CustomerSuggestion, Customer360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithCustomer, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook } from '../shared/types.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -126,6 +129,16 @@ function updateProductSales(productId: number) {
 const app = Fastify({ logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' } } } });
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
+
+if (process.env.NODE_ENV === 'production') {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const distPath = path.join(__dirname, '..', 'dist');
+  await app.register(fastifyStatic, {
+    root: distPath,
+    prefix: '/',
+  });
+}
 
 app.get('/api/health', async () => ({ success: true, message: 'ok' }));
 
@@ -800,6 +813,18 @@ app.setErrorHandler((error: any, _request, reply) => {
   reply.status(500).send({ success: false, error: '服务器内部错误' });
 });
 
-app.setNotFoundHandler((_request, reply) => { reply.status(404).send({ success: false, error: 'API不存在' }); });
+if (process.env.NODE_ENV === 'production') {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.setNotFoundHandler((request, reply) => {
+    if (request.url.startsWith('/api/')) {
+      return reply.status(404).send({ success: false, error: 'API不存在' });
+    }
+    return reply.sendFile('index.html', distPath);
+  });
+} else {
+  app.setNotFoundHandler((_request, reply) => { reply.status(404).send({ success: false, error: 'API不存在' }); });
+}
 
 export default app;

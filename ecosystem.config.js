@@ -11,7 +11,7 @@ module.exports = {
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3001
+        PORT: 3456
       },
       error_file: '/var/log/learngrow-crm/error.log',
       out_file: '/var/log/learngrow-crm/out.log',
