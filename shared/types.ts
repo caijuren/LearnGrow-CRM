@@ -541,3 +541,59 @@ export const MATERIAL_CATEGORY_COLORS: Record<MaterialCategory, string> = {
 };
 
 export const MATERIAL_COMMON_TAGS = ['PDF', '话术', '家长沟通', '试卷', '讲义', '视频', '图片', '规划表', 'SOP', '培训'];
+
+export interface WxUser {
+  id: number;
+  openid: string;
+  nickname: string | null;
+  avatar_url: string | null;
+  child_name: string | null;
+  customer_id: number | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WxCheckinEvent {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  required_text: string | null;
+  reward_rules: string | null;
+  status: CheckinEventStatus;
+  participant_count: number;
+  total_days: number;
+  days_left: number;
+  is_joined: boolean;
+  my_checkin_days: number;
+  my_current_streak: number;
+  today_checked: boolean;
+}
+
+export interface WxCheckinRecord {
+  id: number;
+  checkin_date: string;
+  note: string | null;
+  image_url: string | null;
+  created_at: string;
+}
+
+export interface WxMyCheckin {
+  event: CheckinEvent;
+  participant: CheckinParticipant;
+  records: WxCheckinRecord[];
+  checkin_days: number;
+  current_streak: number;
+  max_streak: number;
+  calendar: { date: string; checked: boolean }[];
+}
+
+export interface WxRankingItem {
+  rank: number;
+  nickname: string;
+  child_name: string | null;
+  checkin_days: number;
+  current_streak: number;
+  is_me: boolean;
+}

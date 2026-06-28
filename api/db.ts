@@ -534,12 +534,14 @@ sqlite.exec(`
     event_id INTEGER NOT NULL,
     member_id INTEGER,
     customer_id INTEGER,
+    wx_user_id INTEGER,
     nickname TEXT NOT NULL,
     child_name TEXT,
     joined_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
     FOREIGN KEY (member_id) REFERENCES wechat_group_members(id) ON DELETE SET NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (wx_user_id) REFERENCES wx_users(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS checkin_records (
@@ -548,6 +550,7 @@ sqlite.exec(`
     participant_id INTEGER NOT NULL,
     checkin_date TEXT NOT NULL,
     note TEXT,
+    image_url TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
     FOREIGN KEY (participant_id) REFERENCES checkin_participants(id) ON DELETE CASCADE,
@@ -560,4 +563,31 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_checkin_records_event_id ON checkin_records(event_id);
   CREATE INDEX IF NOT EXISTS idx_checkin_records_participant_id ON checkin_records(participant_id);
   CREATE INDEX IF NOT EXISTS idx_checkin_records_date ON checkin_records(checkin_date);
+`);
+
+const existingCheckinRecordCols = (sqlite.prepare("PRAGMA table_info(checkin_records)").all() as any[]).map(c => c.name);
+if (!existingCheckinRecordCols.includes('image_url')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN image_url TEXT");
+}
+
+const existingCheckinParticipantCols = (sqlite.prepare("PRAGMA table_info(checkin_participants)").all() as any[]).map(c => c.name);
+if (!existingCheckinParticipantCols.includes('wx_user_id')) {
+  sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN wx_user_id INTEGER");
+}
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS wx_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    openid TEXT NOT NULL UNIQUE,
+    nickname TEXT,
+    avatar_url TEXT,
+    child_name TEXT,
+    customer_id INTEGER,
+    last_login_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_wx_users_openid ON wx_users(openid);
+  CREATE INDEX IF NOT EXISTS idx_wx_users_customer_id ON wx_users(customer_id);
 `);

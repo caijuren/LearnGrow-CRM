@@ -131,6 +131,14 @@ interface AppState {
   doUncheckin: (eventId: number, recordId: number) => Promise<void>;
   doBatchCheckin: (eventId: number, date: string, participantIds: number[], note?: string) => Promise<void>;
 
+  loadMaterials: (params?: { category?: string; search?: string; product_id?: number }) => Promise<void>;
+  uploadMaterial: (file: File, data: { category: string; description?: string; tags?: string[]; product_id?: number | null }) => Promise<void>;
+  editMaterial: (id: number, data: Partial<Material>) => Promise<void>;
+  removeMaterial: (id: number) => Promise<void>;
+  recordMaterialDownload: (id: number) => Promise<void>;
+  setMaterialCategory: (category: string) => void;
+  setMaterialSearch: (search: string) => void;
+
   clearError: () => void;
 }
 
@@ -164,6 +172,9 @@ export const useStore = create<AppState>((set, get) => ({
   checkinEvents: [],
   selectedCheckinEvent: null,
   checkinFilter: {},
+  materials: [],
+  materialCategory: 'all',
+  materialSearch: '',
   loading: false,
   error: null,
 
@@ -660,6 +671,53 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCheckinEvent(eventId);
       set({ loading: false });
     } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+
+  loadMaterials: async (params) => {
+    set({ loading: true, error: null });
+    try {
+      const category = params?.category ?? get().materialCategory;
+      const search = params?.search ?? get().materialSearch;
+      const data = await api.fetchMaterials({ category: category === 'all' ? undefined : category, search, product_id: params?.product_id });
+      set({ materials: data, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  uploadMaterial: async (file, data) => {
+    set({ loading: true, error: null });
+    try {
+      await api.uploadMaterial(file, data);
+      await get().loadMaterials();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  editMaterial: async (id, data) => {
+    set({ loading: true, error: null });
+    try {
+      await api.updateMaterial(id, data);
+      await get().loadMaterials();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  removeMaterial: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await api.deleteMaterial(id);
+      await get().loadMaterials();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  recordMaterialDownload: async (id) => {
+    try {
+      const result = await api.recordMaterialDownload(id);
+      set({ materials: get().materials.map(m => m.id === id ? { ...m, download_count: result.download_count } : m) });
+    } catch (e: any) { /* silent */ }
+  },
+  setMaterialCategory: (category) => {
+    set({ materialCategory: category });
+    get().loadMaterials({ category });
+  },
+  setMaterialSearch: (search) => {
+    set({ materialSearch: search });
   },
 
   clearError: () => set({ error: null }),

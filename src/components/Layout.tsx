@@ -3,7 +3,8 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Package, ShoppingCart, Radio,
   Settings, ChevronLeft, ChevronRight, LogOut, Search, Bell,
-  ChevronsUpDown, Store, MessagesSquare, GraduationCap,
+  ChevronsUpDown, Store, MessagesSquare, GraduationCap, CalendarCheck,
+  FolderOpen,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import type { TodoItem } from '@/../shared/types';
@@ -12,9 +13,11 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: '驾驶舱' },
   { to: '/customers', icon: Users, label: '客户管理' },
   { to: '/groups', icon: MessagesSquare, label: '微信群管理' },
+  { to: '/checkin', icon: CalendarCheck, label: '群打卡' },
   { to: '/products', icon: Package, label: '商品管理' },
   { to: '/orders', icon: ShoppingCart, label: '订单记录' },
   { to: '/learning-paths', icon: GraduationCap, label: '学习路径' },
+  { to: '/materials', icon: FolderOpen, label: '资料库' },
   { to: '/live', icon: Radio, label: '直播台' },
 ];
 
@@ -67,9 +70,11 @@ export default function Layout() {
     '/': '驾驶舱',
     '/customers': '客户管理',
     '/groups': '微信群管理',
+    '/checkin': '群打卡统计',
     '/products': '商品管理',
     '/orders': '订单记录',
     '/learning-paths': '学习路径配置',
+    '/materials': '资料库',
     '/live': '直播工作台',
     '/users': '用户管理',
   };

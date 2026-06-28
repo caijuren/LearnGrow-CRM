@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store';
 import {
   CHECKIN_STATUS_LABELS, CHECKIN_STATUS_COLORS,
-  type CheckinEventStatus, type WechatGroup,
+  type CheckinEventStatus,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
 
@@ -131,10 +131,18 @@ export default function CheckinList() {
 
       {checkinEvents.length === 0 ? (
         <Empty
-          icon={Calendar}
+          icon={<Calendar className="w-9 h-9 text-slate-300" />}
           title="暂无打卡活动"
           description="点击右上角按钮创建第一个打卡活动吧"
-          action={{ label: '创建打卡活动', onClick: () => setShowForm(true) }}
+          action={
+            <button
+              onClick={() => setShowForm(true)}
+              className="btn-primary"
+            >
+              <Plus className="w-4 h-4" />
+              创建打卡活动
+            </button>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

@@ -11,7 +11,10 @@ import OrderList from '@/pages/OrderList';
 import LearningPathConfig from '@/pages/LearningPathConfig';
 import LiveDesk from '@/pages/LiveDesk';
 import UserManagement from '@/pages/UserManagement';
+import MaterialLibrary from '@/pages/MaterialLibrary';
 import Login from '@/pages/Login';
+import CheckinList from '@/pages/CheckinList';
+import CheckinDetail from '@/pages/CheckinDetail';
 import { useStore } from '@/store';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -60,6 +63,9 @@ export default function App() {
           <Route path="learning-paths" element={<LearningPathConfig />} />
           <Route path="live" element={<LiveDesk />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="materials" element={<MaterialLibrary />} />
+          <Route path="checkin" element={<CheckinList />} />
+          <Route path="checkin/:id" element={<CheckinDetail />} />
         </Route>
       </Routes>
     </Router>

@@ -8,10 +8,14 @@ export interface AuthUser {
   role: 'admin' | 'assistant';
 }
 
+export interface WxAuthUser {
+  wxUserId: number;
+}
+
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { id: number; username: string; role: string };
-    user: AuthUser;
+    payload: { id?: number; username?: string; role?: string; wxUserId?: number };
+    user: AuthUser | WxAuthUser;
   }
 }
 
