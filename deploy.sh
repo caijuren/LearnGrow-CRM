@@ -70,7 +70,7 @@ echo ""
 echo "[7/7] 启动服务..."
 cd $APP_DIR
 sudo pm2 delete learngrow-crm 2>/dev/null || true
-sudo pm2 start ecosystem.config.js
+sudo pm2 start ecosystem.config.cjs
 sudo pm2 save
 
 echo ""
