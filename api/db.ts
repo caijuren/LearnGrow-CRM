@@ -321,29 +321,6 @@ if (textbookCount === 0) {
   insertTextbooks(textbooks);
 }
 
-const childCount = (sqlite.prepare('SELECT COUNT(*) as count FROM children').get() as any).count;
-if (childCount === 0) {
-  const insertChild = sqlite.prepare(`
-    INSERT INTO children (customer_id, nickname, gender, grade, region, textbook_version, weak_subjects, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const customerIds = (sqlite.prepare('SELECT id FROM customers ORDER BY id').all() as { id: number }[]).map(c => c.id);
-  const children = [
-    [customerIds[0], '轩轩', 'boy', '三年级', '人教版', '部编版', '["语文"]', '语文阅读理解差，作文也不太会写'],
-    [customerIds[1], '朵朵', 'girl', '五年级', '人教版', '人教版', '["数学"]', '数学思维不太好，应用题容易错'],
-    [customerIds[2], '萌萌', 'girl', '初一', '人教版', '人教版', '["数学","英语"]', '基础比较弱，需要从简单内容开始'],
-    [customerIds[3], '浩浩', 'boy', '四年级', '人教版', '部编版', '[]', '成绩不错，想拔高'],
-    [customerIds[5], '甜甜', 'girl', '二年级', '人教版', 'PEP版', '["英语"]', '英语启蒙阶段，妈妈自己是老师'],
-    [customerIds[7], '芊芊', 'girl', '四年级', '人教版', '部编版', '[]', '成绩不错，妈妈购买力强，什么都愿意尝试'],
-    [customerIds[9], '航航', 'boy', '一年级', '人教版', '人教版', '["数学"]', '计算总是粗心出错'],
-    [customerIds[10], '琪琪', 'girl', '六年级', '人教版', '部编版', '[]', '成绩好，准备小升初，需要拔高和预习'],
-  ];
-  const insertChildren = sqlite.transaction((kids: any[][]) => {
-    for (const c of kids) insertChild.run(...c);
-  });
-  insertChildren(children);
-}
-
 const productCount = (sqlite.prepare('SELECT COUNT(*) as count FROM products').get() as any).count;
 if (productCount === 0) {
   const insertProduct = sqlite.prepare(`
@@ -446,6 +423,29 @@ if (customerCount === 0) {
     for (const f of followUps) insertFollowUp.run(...f);
   });
   seedCustomers();
+}
+
+const childCount = (sqlite.prepare('SELECT COUNT(*) as count FROM children').get() as any).count;
+if (childCount === 0) {
+  const insertChild = sqlite.prepare(`
+    INSERT INTO children (customer_id, nickname, gender, grade, region, textbook_version, weak_subjects, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const customerIds = (sqlite.prepare('SELECT id FROM customers ORDER BY id').all() as { id: number }[]).map(c => c.id);
+  const children = [
+    [customerIds[0], '轩轩', 'boy', '三年级', '人教版', '部编版', '["语文"]', '语文阅读理解差，作文也不太会写'],
+    [customerIds[1], '朵朵', 'girl', '五年级', '人教版', '人教版', '["数学"]', '数学思维不太好，应用题容易错'],
+    [customerIds[2], '萌萌', 'girl', '初一', '人教版', '人教版', '["数学","英语"]', '基础比较弱，需要从简单内容开始'],
+    [customerIds[3], '浩浩', 'boy', '四年级', '人教版', '部编版', '[]', '成绩不错，想拔高'],
+    [customerIds[5], '甜甜', 'girl', '二年级', '人教版', 'PEP版', '["英语"]', '英语启蒙阶段，妈妈自己是老师'],
+    [customerIds[7], '芊芊', 'girl', '四年级', '人教版', '部编版', '[]', '成绩不错，妈妈购买力强，什么都愿意尝试'],
+    [customerIds[9], '航航', 'boy', '一年级', '人教版', '人教版', '["数学"]', '计算总是粗心出错'],
+    [customerIds[10], '琪琪', 'girl', '六年级', '人教版', '部编版', '[]', '成绩好，准备小升初，需要拔高和预习'],
+  ];
+  const insertChildren = sqlite.transaction((kids: any[][]) => {
+    for (const c of kids) insertChild.run(...c);
+  });
+  insertChildren(children);
 }
 
 const userCount = (sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
