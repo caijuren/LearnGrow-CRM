@@ -10,6 +10,27 @@
   color: #1e293b;
 }
 
+.login-banner {
+  background: linear-gradient(135deg, #fef2f2, #fff1f2);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 2rpx solid #fecdd3;
+}
+
+.login-banner-text {
+  display: flex;
+  align-items: center;
+}
+
+.login-banner-arrow {
+  font-size: 36rpx;
+  color: #f43f5e;
+  font-weight: bold;
+}
+
 .event-card {
   background: white;
   border-radius: 24rpx;

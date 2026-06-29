@@ -3,28 +3,29 @@ const app = getApp();
 
 Page({
   data: {
-    nickname: '',
-    childName: '',
-    loading: false
+    loading: false,
+    agreed: false
   },
 
   onLoad() {
     if (app.checkLogin()) {
-      wx.switchTab ? wx.switchTab({ url: '/pages/index/index' }) : wx.reLaunch({ url: '/pages/index/index' });
+      wx.navigateBack().catch(() => {
+        wx.reLaunch({ url: '/pages/index/index' });
+      });
     }
   },
 
-  onNicknameInput(e) {
-    this.setData({ nickname: e.detail.value });
+  toggleAgree() {
+    this.setData({ agreed: !this.data.agreed });
   },
 
-  onChildNameInput(e) {
-    this.setData({ childName: e.detail.value });
+  goToPrivacy() {
+    wx.navigateTo({ url: '/pages/privacy/privacy' });
   },
 
-  async handleLogin() {
-    if (!this.data.nickname.trim()) {
-      wx.showToast({ title: '请输入昵称', icon: 'none' });
+  async handleWxLogin() {
+    if (!this.data.agreed) {
+      wx.showToast({ title: '请先同意隐私协议', icon: 'none' });
       return;
     }
 
@@ -43,8 +44,9 @@ Page({
 
       const result = await api.login({
         code,
-        nickname: this.data.nickname.trim(),
-        child_name: this.data.childName.trim() || null
+        nickname: '微信用户',
+        avatar_url: null,
+        child_name: null
       });
 
       app.setLogin(result.token, result.user);
@@ -52,10 +54,16 @@ Page({
       wx.showToast({ title: '登录成功', icon: 'success' });
       
       setTimeout(() => {
-        wx.reLaunch({ url: '/pages/index/index' });
+        const pages = getCurrentPages();
+        if (pages.length > 1) {
+          wx.navigateBack();
+        } else {
+          wx.reLaunch({ url: '/pages/index/index' });
+        }
       }, 1000);
     } catch (e) {
       console.error(e);
+      wx.showToast({ title: '登录失败，请重试', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }

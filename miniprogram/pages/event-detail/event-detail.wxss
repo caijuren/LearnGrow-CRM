@@ -164,3 +164,39 @@
 .calendar-day.disabled {
   color: #e2e8f0;
 }
+
+.checkin-card {
+  border: 2rpx solid #fecdd3;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffffff 30%);
+}
+
+.quick-photo {
+  display: flex;
+  align-items: center;
+  padding: 32rpx;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 20rpx;
+  margin-bottom: 8rpx;
+}
+
+.quick-photo-icon {
+  font-size: 64rpx;
+  margin-right: 24rpx;
+}
+
+.quick-photo-text {
+  flex: 1;
+}
+
+.quick-photo-arrow {
+  font-size: 40rpx;
+  color: #92400e;
+  font-weight: bold;
+}
+
+.btn-large {
+  height: 96rpx;
+  line-height: 96rpx;
+  font-size: 34rpx;
+  border-radius: 48rpx;
+}

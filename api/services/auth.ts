@@ -23,14 +23,14 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   try {
     await request.jwtVerify();
   } catch (err) {
-    reply.status(401).send({ success: false, error: '登录已过期，请重新登录' });
+    reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
   }
 }
 
 export async function adminOnly(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const user = request.user as AuthUser | undefined;
   if (!user || user.role !== 'admin') {
-    reply.status(403).send({ success: false, error: '权限不足，仅管理员可操作' });
+    reply.code(403).send({ success: false, error: '权限不足，仅管理员可操作' });
   }
 }
 

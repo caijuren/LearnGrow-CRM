@@ -1,33 +1,35 @@
 <view class="login-container">
   <view class="login-header">
     <view class="logo">📚</view>
-    <view class="title text-2xl font-bold">学习打卡</view>
+    <view class="title text-2xl font-bold">乐学长打卡</view>
     <view class="subtitle text-secondary mt-2">每天坚持，养成好习惯</view>
   </view>
 
   <view class="login-form card">
-    <view class="form-item">
-      <view class="label">昵称</view>
-      <input class="input" placeholder="请输入您的昵称（如：轩轩妈妈）" value="{{nickname}}" bindinput="onNicknameInput" />
+    <view class="welcome-section">
+      <view class="welcome-text text-lg font-bold">欢迎使用</view>
+      <view class="text-secondary mt-2" style="font-size: 28rpx;">
+        点击下方按钮，使用微信账号快速登录
+      </view>
     </view>
 
-    <view class="form-item">
-      <view class="label">孩子昵称（选填）</view>
-      <input class="input" placeholder="请输入孩子昵称" value="{{childName}}" bindinput="onChildNameInput" />
-    </view>
-
-    <button class="btn-primary mt-4" bindtap="handleLogin" loading="{{loading}}">
-      微信一键登录
+    <button class="btn-wechat mt-6" bindtap="handleWxLogin" loading="{{loading}}">
+      <text class="btn-icon">微信</text>
+      <text class="btn-text">微信一键登录</text>
     </button>
 
-    <view class="agreement mt-3 text-muted text-sm">
-      登录即表示同意《用户协议》和《隐私政策》
+    <view class="agreement mt-4" bindtap="toggleAgree">
+      <text class="checkbox {{agreed ? 'checked' : ''}}">{{agreed ? '✓' : ''}}</text>
+      <text class="agreement-text">
+        我已阅读并同意
+        <text class="link" catchtap="goToPrivacy">《用户隐私保护指引》</text>
+      </text>
     </view>
   </view>
 
   <view class="tips mt-4">
     <view class="tip-item text-secondary">
-      💡 首次登录后昵称可以在个人中心修改
+      💡 登录后可在"个人中心"设置昵称和孩子名字
     </view>
   </view>
 </view>

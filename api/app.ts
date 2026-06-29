@@ -162,18 +162,18 @@ app.get('/api/health', async () => ({ success: true, message: 'ok' }));
 
 app.post('/api/auth/login', async (request, reply) => {
   const parsed = z.object({ username: z.string().min(1), password: z.string().min(1) }).safeParse(request.body);
-  if (!parsed.success) return reply.status(400).send({ success: false, error: '用户名和密码不能为空' });
+  if (!parsed.success) return reply.code(400).send({ success: false, error: '用户名和密码不能为空' });
   const { username, password } = parsed.data;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
-  if (!user) return reply.status(401).send({ success: false, error: '用户名或密码错误' });
-  if (!bcrypt.compareSync(password, user.password)) return reply.status(401).send({ success: false, error: '用户名或密码错误' });
+  if (!user) return reply.code(401).send({ success: false, error: '用户名或密码错误' });
+  if (!bcrypt.compareSync(password, user.password)) return reply.code(401).send({ success: false, error: '用户名或密码错误' });
   const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role });
   return ok({ token, user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name } });
 });
 
 app.get('/api/auth/me', { preHandler: [authMiddleware] }, async (request, reply) => {
   const user = db.prepare('SELECT id, username, role, display_name, created_at FROM users WHERE id = ?').get((request.user as AuthUser).id) as any;
-  if (!user) return reply.status(404).send({ success: false, error: '用户不存在' });
+  if (!user) return reply.code(404).send({ success: false, error: '用户不存在' });
   return ok(user);
 });
 
@@ -274,7 +274,7 @@ app.register(async function (router) {
   router.get('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(id) as any;
-    if (!c) return reply.status(404).send({ success: false, error: '客户不存在' });
+    if (!c) return reply.code(404).send({ success: false, error: '客户不存在' });
     const customer = mapCustomer(c);
     const ordersRaw = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier FROM orders o JOIN products p ON o.product_id = p.id WHERE o.customer_id = ? ORDER BY o.purchase_date DESC`).all(id) as any[];
     const followUps = (db.prepare('SELECT * FROM follow_ups WHERE customer_id = ? ORDER BY date DESC, created_at DESC').all(id) as any[]).map(mapFollowUp);
@@ -287,16 +287,16 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account = 'main', douyin_nickname, source, importance = 'normal', stage = 'new_friend', tags = [], remark, next_talk_topic } = request.body;
-    if (!name) return reply.status(400).send({ success: false, error: '备注名不能为空' });
+    if (!name) return reply.code(400).send({ success: false, error: '备注名不能为空' });
     const r = db.prepare('INSERT INTO customers (name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       name, nickname || null, phone || null, wechat_id || null, wechat_remark || null, wechat_add_date || null, wechat_account, douyin_nickname || null, source || 'other', importance, stage, JSON.stringify(tags), remark || null, next_talk_topic || null
     );
-    return reply.status(201).send(ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
     const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -324,25 +324,25 @@ app.register(async function (router) {
   router.post('/:id/follow-ups', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const { method, content, result, next_follow_date, is_live_note = false, child_id } = request.body;
-    if (!method || !content) return reply.status(400).send({ success: false, error: '方式和内容不能为空' });
+    if (!method || !content) return reply.code(400).send({ success: false, error: '方式和内容不能为空' });
     const r = db.prepare('INSERT INTO follow_ups (customer_id, child_id, method, content, result, next_follow_date, is_live_note) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, child_id || null, method, content, result || null, next_follow_date || null, is_live_note ? 1 : 0);
     updateCustomerStats(id);
-    return reply.status(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.post('/:id/orders', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const { product_id, amount, order_type, remark, shipping_note, child_id } = request.body;
-    if (!product_id) return reply.status(400).send({ success: false, error: '请选择产品' });
+    if (!product_id) return reply.code(400).send({ success: false, error: '请选择产品' });
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(product_id) as any;
-    if (!product) return reply.status(400).send({ success: false, error: '产品不存在' });
+    if (!product) return reply.code(400).send({ success: false, error: '产品不存在' });
     const finalAmount = amount || product.price;
     const existingCount = (db.prepare('SELECT COUNT(*) as c FROM orders WHERE customer_id = ?').get(id) as any).c;
     const finalType = order_type || (existingCount === 0 ? 'first' : 'repurchase');
     const r = db.prepare("INSERT INTO orders (order_no, customer_id, child_id, product_id, amount, order_type, remark, shipping_note, purchase_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))").run(generateOrderNo(), id, child_id || null, product_id, finalAmount, finalType, remark || null, shipping_note || null);
     updateCustomerStats(id);
     updateProductSales(product_id);
-    return reply.status(201).send(ok(db.prepare('SELECT * FROM orders WHERE id = ?').get(r.lastInsertRowid)));
+    return reply.code(201).send(ok(db.prepare('SELECT * FROM orders WHERE id = ?').get(r.lastInsertRowid)));
   });
 
   router.get('/:id/suggestions', async (request: any) => {
@@ -352,7 +352,7 @@ app.register(async function (router) {
 
   router.put('/:id/tags', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
     const { tags } = request.body;
     db.prepare("UPDATE customers SET tags = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(tags || []), id);
     return ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id)));
@@ -360,9 +360,9 @@ app.register(async function (router) {
 
   router.put('/:id/importance', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
     const { importance } = request.body;
-    if (!['vip', 'normal', 'watch'].includes(importance)) return reply.status(400).send({ success: false, error: '重要性值无效' });
+    if (!['vip', 'normal', 'watch'].includes(importance)) return reply.code(400).send({ success: false, error: '重要性值无效' });
     db.prepare("UPDATE customers SET importance = ?, updated_at = datetime('now') WHERE id = ?").run(importance, id);
     return ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id)));
   });
@@ -390,14 +390,14 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { name, tier = 'main', category, price, commission_percent = 0, selling_points, related_product_ids = [], description, is_on_sale = true } = request.body;
-    if (!name) return reply.status(400).send({ success: false, error: '商品名不能为空' });
+    if (!name) return reply.code(400).send({ success: false, error: '商品名不能为空' });
     const r = db.prepare('INSERT INTO products (name, tier, category, price, commission_percent, selling_points, related_product_ids, description, is_on_sale) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(name, tier, category || null, price || 0, commission_percent || 0, selling_points || null, JSON.stringify(related_product_ids), description || null, is_on_sale ? 1 : 0);
-    return reply.status(201).send(ok(mapProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '商品不存在' });
+    if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '商品不存在' });
     const { name, tier, category, price, commission_percent, selling_points, related_product_ids, description, is_on_sale } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -471,14 +471,14 @@ app.register(async function (router) {
   router.get('/', async () => ok(db.prepare('SELECT id, username, role, display_name, created_at FROM users ORDER BY created_at DESC').all()));
   router.post('/', async (request: any, reply: any) => {
     const { username, password, role = 'assistant', display_name } = request.body;
-    if (!username || !password) return reply.status(400).send({ success: false, error: '用户名和密码不能为空' });
-    if (db.prepare('SELECT id FROM users WHERE username = ?').get(username)) return reply.status(409).send({ success: false, error: '用户名已存在' });
+    if (!username || !password) return reply.code(400).send({ success: false, error: '用户名和密码不能为空' });
+    if (db.prepare('SELECT id FROM users WHERE username = ?').get(username)) return reply.code(409).send({ success: false, error: '用户名已存在' });
     const r = db.prepare('INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)').run(username, bcrypt.hashSync(password, 10), role, display_name || null);
-    return reply.status(201).send(ok(db.prepare('SELECT id, username, role, display_name, created_at FROM users WHERE id = ?').get(r.lastInsertRowid)));
+    return reply.code(201).send(ok(db.prepare('SELECT id, username, role, display_name, created_at FROM users WHERE id = ?').get(r.lastInsertRowid)));
   });
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '用户不存在' });
+    if (!db.prepare('SELECT id FROM users WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '用户不存在' });
     const { password, role, display_name } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (password) { fields.push('password = ?'); params.push(bcrypt.hashSync(password, 10)); }
@@ -515,10 +515,10 @@ app.register(async function (router) {
   });
   router.post('/quick-note', async (request: any, reply: any) => {
     const { customer_id, content, child_id } = request.body;
-    if (!customer_id || !content) return reply.status(400).send({ success: false, error: '客户和内容不能为空' });
+    if (!customer_id || !content) return reply.code(400).send({ success: false, error: '客户和内容不能为空' });
     const r = db.prepare("INSERT INTO follow_ups (customer_id, child_id, method, content, is_live_note) VALUES (?, ?, 'live', ?, 1)").run(customer_id, child_id || null, content);
     updateCustomerStats(customer_id);
-    return reply.status(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
   });
 }, { prefix: '/api/live' });
 
@@ -547,7 +547,7 @@ app.register(async function (router) {
   router.get('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const g = db.prepare('SELECT * FROM wechat_groups WHERE id = ?').get(id);
-    if (!g) return reply.status(404).send({ success: false, error: '群不存在' });
+    if (!g) return reply.code(404).send({ success: false, error: '群不存在' });
     const group = mapGroup(g);
     const members = (db.prepare('SELECT * FROM wechat_group_members WHERE group_id = ? ORDER BY activity_score DESC, created_at DESC').all(id) as any[]).map(mapGroupMember);
     group.active_members = members;
@@ -556,18 +556,18 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { name, purpose, description, member_count = 0, status = 'active', tags = [], group_rules, owner_note, notes } = request.body;
-    if (!name) return reply.status(400).send({ success: false, error: '群名称不能为空' });
+    if (!name) return reply.code(400).send({ success: false, error: '群名称不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO wechat_groups (name, purpose, description, member_count, status, tags, group_rules, owner_note, notes, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(name, purpose || null, description || null, member_count || 0, status, JSON.stringify(tags), group_rules || null, owner_note || null, notes || null, now, now);
-    return reply.status(201).send(ok(mapGroup(db.prepare('SELECT * FROM wechat_groups WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapGroup(db.prepare('SELECT * FROM wechat_groups WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '群不存在' });
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '群不存在' });
     const { name, purpose, description, member_count, status, tags, group_rules, owner_note, notes } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -587,7 +587,7 @@ app.register(async function (router) {
 
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '群不存在' });
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '群不存在' });
     db.prepare('DELETE FROM wechat_group_members WHERE group_id = ?').run(id);
     db.prepare('DELETE FROM wechat_groups WHERE id = ?').run(id);
     return ok(null);
@@ -595,9 +595,9 @@ app.register(async function (router) {
 
   router.post('/:id/members/batch', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.status(404).send({ success: false, error: '群不存在' });
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.code(404).send({ success: false, error: '群不存在' });
     const { names, role = 'new' } = request.body;
-    if (!names || !Array.isArray(names) || names.length === 0) return reply.status(400).send({ success: false, error: '请输入要导入的昵称列表' });
+    if (!names || !Array.isArray(names) || names.length === 0) return reply.code(400).send({ success: false, error: '请输入要导入的昵称列表' });
     
     const insertMember = db.prepare(`
       INSERT OR IGNORE INTO wechat_group_members (group_id, wechat_name, role, tags, activity_score)
@@ -624,22 +624,22 @@ app.register(async function (router) {
 
   router.post('/:id/members', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.status(404).send({ success: false, error: '群不存在' });
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.code(404).send({ success: false, error: '群不存在' });
     const { wechat_name, nickname, role = 'active', tags = [], customer_id, activity_score = 50, remark } = request.body;
-    if (!wechat_name) return reply.status(400).send({ success: false, error: '微信昵称不能为空' });
+    if (!wechat_name) return reply.code(400).send({ success: false, error: '微信昵称不能为空' });
     const r = db.prepare(`
       INSERT INTO wechat_group_members (group_id, wechat_name, nickname, role, tags, customer_id, activity_score, remark)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(groupId, wechat_name, nickname || null, role, JSON.stringify(tags), customer_id || null, activity_score || 50, remark || null);
     db.prepare("UPDATE wechat_groups SET updated_at = datetime('now'), member_count = (SELECT COUNT(*) FROM wechat_group_members WHERE group_id = ?) WHERE id = ?").run(groupId, groupId);
-    return reply.status(201).send(ok(mapGroupMember(db.prepare('SELECT * FROM wechat_group_members WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapGroupMember(db.prepare('SELECT * FROM wechat_group_members WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id/members/:memberId', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
     const memberId = parseInt(request.params.memberId);
-    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.status(404).send({ success: false, error: '群不存在' });
-    if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.status(404).send({ success: false, error: '成员不存在' });
+    if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.code(404).send({ success: false, error: '群不存在' });
+    if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.code(404).send({ success: false, error: '成员不存在' });
     const { wechat_name, nickname, role, tags, customer_id, activity_score, remark } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (wechat_name !== undefined) { fields.push('wechat_name = ?'); params.push(wechat_name); }
@@ -657,7 +657,7 @@ app.register(async function (router) {
   router.delete('/:id/members/:memberId', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
     const memberId = parseInt(request.params.memberId);
-    if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.status(404).send({ success: false, error: '成员不存在' });
+    if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.code(404).send({ success: false, error: '成员不存在' });
     db.prepare('DELETE FROM wechat_group_members WHERE id = ?').run(memberId);
     db.prepare("UPDATE wechat_groups SET updated_at = datetime('now'), member_count = (SELECT COUNT(*) FROM wechat_group_members WHERE group_id = ?) WHERE id = ?").run(groupId, groupId);
     return ok(null);
@@ -704,7 +704,7 @@ app.register(async function (router) {
   router.get('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const ch = db.prepare('SELECT * FROM children WHERE id = ?').get(id) as any;
-    if (!ch) return reply.status(404).send({ success: false, error: '孩子不存在' });
+    if (!ch) return reply.code(404).send({ success: false, error: '孩子不存在' });
     const child = mapChild(ch);
     const progressRaw = db.prepare(`
       SELECT cp.*, lp.name as path_name, ls.name as current_stage_name
@@ -732,19 +732,19 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { customer_id, nickname, gender, birth_date, grade, region, textbook_version, weak_subjects = [], notes } = request.body;
-    if (!customer_id || !nickname || !grade) return reply.status(400).send({ success: false, error: '家长ID、昵称和年级不能为空' });
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(customer_id)) return reply.status(404).send({ success: false, error: '客户不存在' });
+    if (!customer_id || !nickname || !grade) return reply.code(400).send({ success: false, error: '家长ID、昵称和年级不能为空' });
+    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(customer_id)) return reply.code(404).send({ success: false, error: '客户不存在' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO children (customer_id, nickname, gender, birth_date, grade, region, textbook_version, weak_subjects, notes, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(customer_id, nickname, gender || null, birth_date || null, grade, region || null, textbook_version || null, JSON.stringify(weak_subjects), notes || null, now, now);
-    return reply.status(201).send(ok(mapChild(db.prepare('SELECT * FROM children WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapChild(db.prepare('SELECT * FROM children WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '孩子不存在' });
+    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '孩子不存在' });
     const { nickname, gender, birth_date, grade, region, textbook_version, weak_subjects, notes } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (nickname !== undefined) { fields.push('nickname = ?'); params.push(nickname); }
@@ -763,7 +763,7 @@ app.register(async function (router) {
 
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '孩子不存在' });
+    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '孩子不存在' });
     db.prepare('DELETE FROM child_learning_progress WHERE child_id = ?').run(id);
     db.prepare('DELETE FROM children WHERE id = ?').run(id);
     return ok(null);
@@ -772,18 +772,18 @@ app.register(async function (router) {
   router.post('/:id/progress', async (request: any, reply: any) => {
     const childId = parseInt(request.params.id);
     const { path_id } = request.body;
-    if (!path_id) return reply.status(400).send({ success: false, error: '请选择学习路径' });
-    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(childId)) return reply.status(404).send({ success: false, error: '孩子不存在' });
-    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(path_id)) return reply.status(404).send({ success: false, error: '学习路径不存在' });
+    if (!path_id) return reply.code(400).send({ success: false, error: '请选择学习路径' });
+    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(childId)) return reply.code(404).send({ success: false, error: '孩子不存在' });
+    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(path_id)) return reply.code(404).send({ success: false, error: '学习路径不存在' });
     const existing = db.prepare('SELECT id FROM child_learning_progress WHERE child_id = ? AND path_id = ?').get(childId, path_id);
-    if (existing) return reply.status(409).send({ success: false, error: '该学习路径已添加' });
+    if (existing) return reply.code(409).send({ success: false, error: '该学习路径已添加' });
     const firstStage = db.prepare('SELECT id FROM learning_stages WHERE path_id = ? ORDER BY order_index ASC LIMIT 1').get(path_id) as any;
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO child_learning_progress (child_id, path_id, current_stage_id, status, start_date, updated_at)
       VALUES (?, ?, ?, 'in_progress', date('now'), ?)
     `).run(childId, path_id, firstStage?.id || null, now);
-    return reply.status(201).send(ok(mapProgress(db.prepare('SELECT * FROM child_learning_progress WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapProgress(db.prepare('SELECT * FROM child_learning_progress WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id/progress/:progressId/advance', async (request: any, reply: any) => {
@@ -791,7 +791,7 @@ app.register(async function (router) {
     const progressId = parseInt(request.params.progressId);
     const { completed_date, notes, next_stage_id } = request.body;
     const progress = db.prepare('SELECT * FROM child_learning_progress WHERE id = ? AND child_id = ?').get(progressId, childId) as any;
-    if (!progress) return reply.status(404).send({ success: false, error: '进度记录不存在' });
+    if (!progress) return reply.code(404).send({ success: false, error: '进度记录不存在' });
     let nextStageId = next_stage_id;
     let status = progress.status;
     if (nextStageId === undefined && progress.current_stage_id) {
@@ -818,7 +818,7 @@ app.register(async function (router) {
   router.delete('/:id/progress/:progressId', async (request: any, reply: any) => {
     const childId = parseInt(request.params.id);
     const progressId = parseInt(request.params.progressId);
-    if (!db.prepare('SELECT id FROM child_learning_progress WHERE id = ? AND child_id = ?').get(progressId, childId)) return reply.status(404).send({ success: false, error: '进度记录不存在' });
+    if (!db.prepare('SELECT id FROM child_learning_progress WHERE id = ? AND child_id = ?').get(progressId, childId)) return reply.code(404).send({ success: false, error: '进度记录不存在' });
     db.prepare('DELETE FROM child_learning_progress WHERE id = ?').run(progressId);
     return ok(null);
   });
@@ -842,7 +842,7 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { name, subject, description, is_active = true, stages = [] } = request.body;
-    if (!name || !subject) return reply.status(400).send({ success: false, error: '名称和学科不能为空' });
+    if (!name || !subject) return reply.code(400).send({ success: false, error: '名称和学科不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO learning_paths (name, subject, description, is_active, created_at, updated_at)
@@ -861,12 +861,12 @@ app.register(async function (router) {
     if (stages.length > 0) insertStages(stages);
     const path = mapPath(db.prepare('SELECT * FROM learning_paths WHERE id = ?').get(pathId));
     (path as any).stages = (db.prepare('SELECT * FROM learning_stages WHERE path_id = ? ORDER BY order_index ASC').all(pathId) as any[]).map(mapStage);
-    return reply.status(201).send(ok(path));
+    return reply.code(201).send(ok(path));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '学习路径不存在' });
+    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '学习路径不存在' });
     const { name, subject, description, is_active, stages } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -893,7 +893,7 @@ app.register(async function (router) {
 
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '学习路径不存在' });
+    if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '学习路径不存在' });
     db.prepare('DELETE FROM child_learning_progress WHERE path_id = ?').run(id);
     db.prepare('DELETE FROM learning_stages WHERE path_id = ?').run(id);
     db.prepare('DELETE FROM learning_paths WHERE id = ?').run(id);
@@ -994,7 +994,7 @@ app.register(async function (router) {
     const event = db.prepare(`SELECT e.*, g.name as group_name,
       CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
       FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.id = ?`).get(id) as any;
-    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
     const participantsRaw = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(id) as any[];
     const recordsRaw = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(id) as any[];
@@ -1044,7 +1044,7 @@ app.register(async function (router) {
 
   router.post('/', async (request: any, reply: any) => {
     const { name, group_id, start_date, end_date, required_text, reward_rules, status = 'active' } = request.body;
-    if (!name || !start_date || !end_date) return reply.status(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
+    if (!name || !start_date || !end_date) return reply.code(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO checkin_events (name, group_id, start_date, end_date, required_text, reward_rules, status, created_at, updated_at)
@@ -1065,12 +1065,12 @@ app.register(async function (router) {
       insertMembers(members);
     }
     
-    return reply.status(201).send(ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { name, group_id, start_date, end_date, required_text, reward_rules, status } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
@@ -1088,7 +1088,7 @@ app.register(async function (router) {
 
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     db.prepare('DELETE FROM checkin_records WHERE event_id = ?').run(id);
     db.prepare('DELETE FROM checkin_participants WHERE event_id = ?').run(id);
     db.prepare('DELETE FROM checkin_events WHERE id = ?').run(id);
@@ -1097,20 +1097,20 @@ app.register(async function (router) {
 
   router.post('/:id/participants', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(eventId)) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(eventId)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { member_id, customer_id, nickname, child_name } = request.body;
-    if (!nickname) return reply.status(400).send({ success: false, error: '昵称不能为空' });
+    if (!nickname) return reply.code(400).send({ success: false, error: '昵称不能为空' });
     const r = db.prepare(`
       INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
       VALUES (?, ?, ?, ?, ?)
     `).run(eventId, member_id || null, customer_id || null, nickname, child_name || null);
-    return reply.status(201).send(ok(mapCheckinParticipant(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapCheckinParticipant(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.delete('/:id/participants/:pid', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const pid = parseInt(request.params.pid);
-    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(pid, eventId)) return reply.status(404).send({ success: false, error: '参与者不存在' });
+    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(pid, eventId)) return reply.code(404).send({ success: false, error: '参与者不存在' });
     db.prepare('DELETE FROM checkin_records WHERE participant_id = ?').run(pid);
     db.prepare('DELETE FROM checkin_participants WHERE id = ?').run(pid);
     return ok(null);
@@ -1119,10 +1119,10 @@ app.register(async function (router) {
   router.post('/:id/checkin', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
-    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { participant_id, checkin_date, note } = request.body;
-    if (!participant_id || !checkin_date) return reply.status(400).send({ success: false, error: '参与者和日期不能为空' });
-    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(participant_id, eventId)) return reply.status(404).send({ success: false, error: '参与者不存在' });
+    if (!participant_id || !checkin_date) return reply.code(400).send({ success: false, error: '参与者和日期不能为空' });
+    if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(participant_id, eventId)) return reply.code(404).send({ success: false, error: '参与者不存在' });
     
     const existing = db.prepare('SELECT id FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(eventId, participant_id, checkin_date);
     if (existing) {
@@ -1134,14 +1134,14 @@ app.register(async function (router) {
       INSERT INTO checkin_records (event_id, participant_id, checkin_date, note)
       VALUES (?, ?, ?, ?)
     `).run(eventId, participant_id, checkin_date, note || null);
-    return reply.status(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
+    return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
   });
 
   router.delete('/:id/checkin/:rid', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const rid = parseInt(request.params.rid);
     const record = db.prepare('SELECT * FROM checkin_records WHERE id = ? AND event_id = ?').get(rid, eventId) as any;
-    if (!record) return reply.status(404).send({ success: false, error: '打卡记录不存在' });
+    if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在' });
     db.prepare('DELETE FROM checkin_records WHERE id = ?').run(rid);
     return ok(null);
   });
@@ -1149,9 +1149,9 @@ app.register(async function (router) {
   router.post('/:id/batch-checkin', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
-    if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { checkin_date, participant_ids, note } = request.body;
-    if (!checkin_date || !participant_ids || !Array.isArray(participant_ids)) return reply.status(400).send({ success: false, error: '日期和参与者列表不能为空' });
+    if (!checkin_date || !participant_ids || !Array.isArray(participant_ids)) return reply.code(400).send({ success: false, error: '日期和参与者列表不能为空' });
     
     const insertRecord = db.prepare(`
       INSERT OR IGNORE INTO checkin_records (event_id, participant_id, checkin_date, note)
@@ -1184,18 +1184,18 @@ app.register(async function (router) {
   router.get('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const m = db.prepare(`SELECT m.*, p.name as product_name, u.display_name as uploader_name FROM materials m LEFT JOIN products p ON m.product_id = p.id LEFT JOIN users u ON m.uploaded_by = u.id WHERE m.id = ?`).get(id) as any;
-    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    if (!m) return reply.code(404).send({ success: false, error: '资料不存在' });
     return ok(mapMaterial(m));
   });
 
   router.post('/upload', async (request: any, reply: any) => {
     const data = await request.file();
-    if (!data) return reply.status(400).send({ success: false, error: '未收到文件' });
+    if (!data) return reply.code(400).send({ success: false, error: '未收到文件' });
 
     const { category = 'other', description, tags: tagsStr, product_id } = data.fields as any;
     const cat = (category?.value || 'other') as MaterialCategory;
     const validCats: MaterialCategory[] = ['sales', 'internal', 'product', 'planning', 'other'];
-    if (!validCats.includes(cat)) return reply.status(400).send({ success: false, error: '无效的分类' });
+    if (!validCats.includes(cat)) return reply.code(400).send({ success: false, error: '无效的分类' });
 
     const ext = path.extname(data.filename).toLowerCase();
     const uniqueName = `${randomUUID()}${ext}`;
@@ -1225,7 +1225,7 @@ app.register(async function (router) {
 
   router.patch('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM materials WHERE id = ?').get(id)) return reply.status(404).send({ success: false, error: '资料不存在' });
+    if (!db.prepare('SELECT id FROM materials WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '资料不存在' });
     const { category, description, tags, product_id } = request.body as any;
     const updates: string[] = [];
     const params: any[] = [];
@@ -1244,7 +1244,7 @@ app.register(async function (router) {
   router.post('/:id/download', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(id) as any;
-    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    if (!m) return reply.code(404).send({ success: false, error: '资料不存在' });
     db.prepare('UPDATE materials SET download_count = download_count + 1 WHERE id = ?').run(id);
     return ok({ download_count: m.download_count + 1 });
   });
@@ -1252,7 +1252,7 @@ app.register(async function (router) {
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(id) as any;
-    if (!m) return reply.status(404).send({ success: false, error: '资料不存在' });
+    if (!m) return reply.code(404).send({ success: false, error: '资料不存在' });
     try { fs.unlinkSync(m.file_path); } catch {}
     db.prepare('DELETE FROM materials WHERE id = ?').run(id);
     return ok(null);
@@ -1262,13 +1262,26 @@ app.register(async function (router) {
 async function wxAuthMiddleware(request: any, reply: any) {
   try {
     const token = request.headers.authorization?.replace('Bearer ', '');
-    if (!token) return reply.status(401).send({ success: false, error: '请先登录' });
+    if (!token) return reply.code(401).send({ success: false, error: '请先登录' });
     const decoded = app.jwt.verify(token) as any;
     const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(decoded.wxUserId) as any;
-    if (!user) return reply.status(401).send({ success: false, error: '用户不存在' });
+    if (!user) return reply.code(401).send({ success: false, error: '用户不存在' });
     request.wxUser = user;
   } catch (e) {
-    return reply.status(401).send({ success: false, error: '登录已过期，请重新登录' });
+    return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+  }
+}
+
+async function wxOptionalAuthMiddleware(request: any, _reply: any) {
+  try {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+    if (!token) return;
+    const decoded = app.jwt.verify(token) as any;
+    const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(decoded.wxUserId) as any;
+    if (user) {
+      request.wxUser = user;
+    }
+  } catch (e) {
   }
 }
 
@@ -1348,7 +1361,7 @@ app.post('/api/wx/update-profile', { preHandler: [wxAuthMiddleware] }, async (re
   return ok(updated);
 });
 
-app.get('/api/wx/checkin-events', { preHandler: [wxAuthMiddleware] }, async (request: any) => {
+app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any) => {
   const user = request.wxUser;
   const today = new Date().toISOString().split('T')[0];
   const events = db.prepare(`
@@ -1362,17 +1375,21 @@ app.get('/api/wx/checkin-events', { preHandler: [wxAuthMiddleware] }, async (req
 
   const result = events.map(e => {
     const daysLeft = Math.ceil((new Date(e.end_date).getTime() - new Date(today).getTime()) / 86400000);
-    const participant = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(e.id, user.id) as any;
+    let isJoined = false;
     let myCheckinDays = 0;
     let myCurrentStreak = 0;
     let todayChecked = false;
     
-    if (participant) {
-      const records = db.prepare('SELECT checkin_date FROM checkin_records WHERE participant_id = ?').all(participant.id) as { checkin_date: string }[];
-      const stats = calculateStreaks(records, e.start_date, e.end_date);
-      myCheckinDays = stats.checkin_days;
-      myCurrentStreak = stats.current_streak;
-      todayChecked = records.some(r => r.checkin_date === today);
+    if (user) {
+      const participant = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(e.id, user.id) as any;
+      if (participant) {
+        isJoined = true;
+        const records = db.prepare('SELECT checkin_date FROM checkin_records WHERE participant_id = ?').all(participant.id) as { checkin_date: string }[];
+        const stats = calculateStreaks(records, e.start_date, e.end_date);
+        myCheckinDays = stats.checkin_days;
+        myCurrentStreak = stats.current_streak;
+        todayChecked = records.some(r => r.checkin_date === today);
+      }
     }
 
     return {
@@ -1386,7 +1403,7 @@ app.get('/api/wx/checkin-events', { preHandler: [wxAuthMiddleware] }, async (req
       participant_count: e.participant_count,
       total_days: e.total_days,
       days_left: daysLeft,
-      is_joined: !!participant,
+      is_joined: isJoined,
       my_checkin_days: myCheckinDays,
       my_current_streak: myCurrentStreak,
       today_checked: todayChecked,
@@ -1400,11 +1417,11 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
   const user = request.wxUser;
   const eventId = parseInt(request.params.id);
   const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
-  if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
-  if (event.status !== 'active') return reply.status(400).send({ success: false, error: '活动已结束' });
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+  if (event.status !== 'active') return reply.code(400).send({ success: false, error: '活动已结束' });
   
   const existing = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id);
-  if (existing) return reply.status(409).send({ success: false, error: '您已加入该活动' });
+  if (existing) return reply.code(409).send({ success: false, error: '您已加入该活动' });
   
   const nickname = user.nickname || '微信用户';
   const r = db.prepare(`
@@ -1412,38 +1429,45 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
     VALUES (?, ?, ?, ?)
   `).run(eventId, user.id, nickname, user.child_name || null);
   
-  return reply.status(201).send(ok(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid)));
+  return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid)));
 });
 
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
-  const { event_id, checkin_date, note, image_url } = request.body;
+  const { event_id, note, image_url } = request.body;
   
-  if (!event_id || !checkin_date) return reply.status(400).send({ success: false, error: '活动和日期不能为空' });
+  if (!event_id) return reply.code(400).send({ success: false, error: '活动不能为空' });
+  
+  const today = new Date().toISOString().split('T')[0];
   
   const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(event_id) as any;
-  if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
-  if (event.status !== 'active') return reply.status(400).send({ success: false, error: '活动已结束' });
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+  if (event.status !== 'active') return reply.code(400).send({ success: false, error: '活动已结束' });
   
   const participant = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(event_id, user.id) as any;
-  if (!participant) return reply.status(400).send({ success: false, error: '请先加入活动' });
+  if (!participant) return reply.code(400).send({ success: false, error: '请先加入活动' });
   
-  if (checkin_date < event.start_date || checkin_date > event.end_date) {
-    return reply.status(400).send({ success: false, error: '不在活动时间范围内' });
+  if (today < event.start_date || today > event.end_date) {
+    return reply.code(400).send({ success: false, error: '不在活动时间范围内' });
   }
   
-  const existing = db.prepare('SELECT * FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(event_id, participant.id, checkin_date);
+  const existing = db.prepare('SELECT * FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(event_id, participant.id, today);
   if (existing) {
-    db.prepare('UPDATE checkin_records SET note = ?, image_url = ? WHERE id = ?').run(note || null, image_url || null, (existing as any).id);
-    return ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get((existing as any).id));
+    return reply.code(400).send({ success: false, error: '今日已打卡，明天再来吧~' });
   }
+  
+  const previousRecords = db.prepare('SELECT checkin_date FROM checkin_records WHERE event_id = ? AND participant_id = ? ORDER BY checkin_date DESC').all(event_id, participant.id) as any[];
+  const checkinCount = previousRecords.length + 1;
   
   const r = db.prepare(`
     INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url)
     VALUES (?, ?, ?, ?, ?)
-  `).run(event_id, participant.id, checkin_date, note || null, image_url || null);
+  `).run(event_id, participant.id, today, note || null, image_url || null);
   
-  return reply.status(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
+  return reply.code(201).send(ok({
+    ...db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid),
+    checkin_number: checkinCount
+  }));
 });
 
 app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (request: any) => {
@@ -1507,16 +1531,16 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
   return ok(result);
 });
 
-app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const eventId = parseInt(request.params.id);
   const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
-  if (!event) return reply.status(404).send({ success: false, error: '打卡活动不存在' });
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
   const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ?').all(eventId) as any[];
   const records = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(eventId) as any[];
 
-  const me = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id) as any;
+  const me = user ? db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id) as any : null;
 
   const ranking = participants.map(p => {
     const pRecords = records.filter(r => r.participant_id === p.id);
@@ -1550,11 +1574,11 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxAuthMiddleware] }
 
 app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const data = await request.file();
-  if (!data) return reply.status(400).send({ success: false, error: '未收到图片' });
+  if (!data) return reply.code(400).send({ success: false, error: '未收到图片' });
 
   const ext = path.extname(data.filename).toLowerCase();
   const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-  if (!allowedExts.includes(ext)) return reply.status(400).send({ success: false, error: '只支持图片格式' });
+  if (!allowedExts.includes(ext)) return reply.code(400).send({ success: false, error: '只支持图片格式' });
 
   const uniqueName = `checkin_${randomUUID()}${ext}`;
   const filePath = path.join(uploadsDir, uniqueName);
@@ -1571,9 +1595,11 @@ app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (requ
 });
 
 app.setErrorHandler((error: any, _request, reply) => {
-  if (error.statusCode === 401 || error.statusCode === 403) return reply.status(error.statusCode).send({ success: false, error: error.message });
+  if (error.statusCode) {
+    return reply.code(error.statusCode).send({ success: false, error: error.message });
+  }
   app.log.error(error);
-  reply.status(500).send({ success: false, error: '服务器内部错误' });
+  reply.code(500).send({ success: false, error: '服务器内部错误' });
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -1582,12 +1608,12 @@ if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '..', 'dist');
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/api/')) {
-      return reply.status(404).send({ success: false, error: 'API不存在' });
+      return reply.code(404).send({ success: false, error: 'API不存在' });
     }
     return reply.sendFile('index.html', distPath);
   });
 } else {
-  app.setNotFoundHandler((_request, reply) => { reply.status(404).send({ success: false, error: 'API不存在' }); });
+  app.setNotFoundHandler((_request, reply) => { reply.code(404).send({ success: false, error: 'API不存在' }); });
 }
 
 export default app;

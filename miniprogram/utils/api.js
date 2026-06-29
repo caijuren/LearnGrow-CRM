@@ -92,7 +92,8 @@ function getEvents() {
 function joinEvent(eventId) {
   return request({
     url: `/api/wx/checkin-events/${eventId}/join`,
-    method: 'POST'
+    method: 'POST',
+    data: {}
   });
 }
 

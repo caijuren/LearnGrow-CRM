@@ -5,21 +5,23 @@ Page({
   data: {
     events: [],
     userInfo: null,
-    loading: true
+    loading: true,
+    isLoggedIn: false
   },
 
   onLoad() {
-    if (!app.checkLogin()) {
-      wx.reLaunch({ url: '/pages/login/login' });
-      return;
-    }
-    this.setData({ userInfo: app.globalData.userInfo });
+    this.setData({ 
+      isLoggedIn: app.checkLogin(),
+      userInfo: app.globalData.userInfo 
+    });
   },
 
   onShow() {
-    if (app.checkLogin()) {
-      this.loadEvents();
-    }
+    this.setData({ 
+      isLoggedIn: app.checkLogin(),
+      userInfo: app.globalData.userInfo 
+    });
+    this.loadEvents();
   },
 
   async loadEvents() {
@@ -35,6 +37,7 @@ Page({
   },
 
   async handleJoin(e) {
+    if (!app.requireLogin()) return;
     const { id, name } = e.currentTarget.dataset;
     try {
       await api.joinEvent(id);
@@ -46,6 +49,7 @@ Page({
   },
 
   handleQuickCheckin(e) {
+    if (!app.requireLogin()) return;
     const { id } = e.currentTarget.dataset;
     wx.navigateTo({ url: `/pages/event-detail/event-detail?id=${id}&autoCheckin=1` });
   },
@@ -61,11 +65,17 @@ Page({
   },
 
   goToMyCheckins() {
+    if (!app.requireLogin()) return;
     wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
   },
 
   goToProfile() {
+    if (!app.requireLogin()) return;
     wx.navigateTo({ url: '/pages/profile/profile' });
+  },
+
+  goToLogin() {
+    wx.navigateTo({ url: '/pages/login/login' });
   },
 
   onPullDownRefresh() {

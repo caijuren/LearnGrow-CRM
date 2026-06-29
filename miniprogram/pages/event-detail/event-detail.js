@@ -13,21 +13,30 @@ Page({
     checkinImage: '',
     checkinImageUrl: '',
     submitting: false,
-    baseUrl: app.globalData.baseUrl
+    baseUrl: app.globalData.baseUrl,
+    isLoggedIn: false,
+    isJoined: false
   },
 
   onLoad(options) {
-    if (!app.checkLogin()) {
-      wx.reLaunch({ url: '/pages/login/login' });
-      return;
-    }
-    this.setData({ eventId: parseInt(options.id) });
+    this.setData({ 
+      eventId: parseInt(options.id),
+      isLoggedIn: app.checkLogin()
+    });
     this.loadData();
     
     if (options.autoCheckin === '1') {
+      if (!app.requireLogin()) return;
       setTimeout(() => {
         wx.pageScrollTo({ selector: '.checkin-form', duration: 300 });
       }, 500);
+    }
+  },
+
+  onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() });
+    if (app.checkLogin()) {
+      this.loadData();
     }
   },
 
@@ -40,25 +49,31 @@ Page({
         return;
       }
 
-      const myCheckins = await api.getMyCheckins();
-      const myCheckin = myCheckins.find(c => c.event.id === this.data.eventId);
-
-      const today = new Date().toISOString().split('T')[0];
-      let todayRecord = null;
-      let todayChecked = false;
-      let myStats = { checkin_days: event.my_checkin_days, current_streak: event.my_current_streak, max_streak: 0 };
+      let myStats = { checkin_days: 0, current_streak: 0, max_streak: 0 };
       let calendarDays = [];
+      let todayChecked = false;
+      let todayRecord = null;
+      let isJoined = false;
 
-      if (myCheckin) {
-        myStats = {
-          checkin_days: myCheckin.checkin_days,
-          current_streak: myCheckin.current_streak,
-          max_streak: myCheckin.max_streak
-        };
-        todayRecord = myCheckin.records.find(r => r.checkin_date === today) || null;
-        todayChecked = !!todayRecord;
+      if (app.checkLogin()) {
+        const myCheckins = await api.getMyCheckins();
+        const myCheckin = myCheckins.find(c => c.event.id === this.data.eventId);
 
-        calendarDays = this.buildCalendar(myCheckin.calendar);
+        const today = new Date().toISOString().split('T')[0];
+
+        if (myCheckin) {
+          isJoined = true;
+          myStats = {
+            checkin_days: myCheckin.checkin_days,
+            current_streak: myCheckin.current_streak,
+            max_streak: myCheckin.max_streak
+          };
+          todayRecord = myCheckin.records.find(r => r.checkin_date === today) || null;
+          todayChecked = !!todayRecord;
+          calendarDays = this.buildCalendar(myCheckin.calendar);
+        } else {
+          calendarDays = this.buildEmptyCalendar(event.start_date, event.end_date);
+        }
       } else {
         calendarDays = this.buildEmptyCalendar(event.start_date, event.end_date);
       }
@@ -68,7 +83,8 @@ Page({
         myStats,
         todayChecked,
         todayRecord,
-        calendarDays
+        calendarDays,
+        isJoined
       });
     } catch (e) {
       console.error(e);
@@ -128,6 +144,7 @@ Page({
   },
 
   async handleJoin() {
+    if (!app.requireLogin()) return;
     try {
       await api.joinEvent(this.data.eventId);
       wx.showToast({ title: '加入成功', icon: 'success' });
@@ -142,42 +159,59 @@ Page({
   },
 
   async chooseImage() {
-    try {
-      const res = await new Promise((resolve, reject) => {
-        wx.chooseImage({
-          count: 1,
-          sizeType: ['compressed'],
-          sourceType: ['album', 'camera'],
-          success: resolve,
-          fail: reject
-        });
-      });
+    if (!app.requireLogin()) return;
+    const that = this;
+    wx.showActionSheet({
+      itemList: ['拍照', '从相册选择'],
+      success: async (res) => {
+        try {
+          let sourceType = [];
+          if (res.tapIndex === 0) {
+            sourceType = ['camera'];
+          } else {
+            sourceType = ['album'];
+          }
 
-      const tempFilePath = res.tempFilePaths[0];
-      this.setData({ checkinImage: tempFilePath });
+          const chooseRes = await new Promise((resolve, reject) => {
+            wx.chooseImage({
+              count: 1,
+              sizeType: ['compressed'],
+              sourceType: sourceType,
+              success: resolve,
+              fail: reject
+            });
+          });
 
-      wx.showLoading({ title: '上传中...' });
-      const uploadRes = await api.uploadImage(tempFilePath);
-      this.setData({ checkinImageUrl: uploadRes.url });
-      wx.hideLoading();
-    } catch (e) {
-      wx.hideLoading();
-      console.error(e);
-    }
+          const tempFilePath = chooseRes.tempFilePaths[0];
+          that.setData({ checkinImage: tempFilePath });
+
+          wx.showLoading({ title: '上传中...' });
+          const uploadRes = await api.uploadImage(tempFilePath);
+          that.setData({ checkinImageUrl: uploadRes.url });
+          wx.hideLoading();
+        } catch (e) {
+          wx.hideLoading();
+          console.error(e);
+        }
+      }
+    });
   },
 
   async submitCheckin() {
+    if (!app.requireLogin()) return;
     this.setData({ submitting: true });
     try {
-      const today = new Date().toISOString().split('T')[0];
-      await api.doCheckin({
+      const result = await api.doCheckin({
         event_id: this.data.eventId,
-        checkin_date: today,
         note: this.data.checkinNote || null,
         image_url: this.data.checkinImageUrl || null
       });
 
-      wx.showToast({ title: '打卡成功', icon: 'success' });
+      wx.showToast({ 
+        title: `第${result.checkin_number}次打卡成功！`, 
+        icon: 'success',
+        duration: 2000
+      });
       this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '' });
       this.loadData();
     } catch (e) {
@@ -189,5 +223,9 @@ Page({
 
   goToRanking() {
     wx.navigateTo({ url: `/pages/ranking/ranking?id=${this.data.eventId}` });
+  },
+
+  goToLogin() {
+    wx.navigateTo({ url: '/pages/login/login' });
   }
 });

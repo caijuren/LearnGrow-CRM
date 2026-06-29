@@ -5,17 +5,16 @@ Page({
   data: {
     checkins: [],
     loading: true,
-    baseUrl: app.globalData.baseUrl
+    baseUrl: app.globalData.baseUrl,
+    isLoggedIn: false
   },
 
   onLoad() {
-    if (!app.checkLogin()) {
-      wx.reLaunch({ url: '/pages/login/login' });
-      return;
-    }
+    this.setData({ isLoggedIn: app.checkLogin() });
   },
 
   onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() });
     if (app.checkLogin()) {
       this.loadCheckins();
     }
@@ -46,7 +45,15 @@ Page({
     wx.navigateTo({ url: '/pages/profile/profile' });
   },
 
+  goToLogin() {
+    wx.navigateTo({ url: '/pages/login/login' });
+  },
+
   onPullDownRefresh() {
-    this.loadCheckins().then(() => wx.stopPullDownRefresh());
+    if (app.checkLogin()) {
+      this.loadCheckins().then(() => wx.stopPullDownRefresh());
+    } else {
+      wx.stopPullDownRefresh();
+    }
   }
 });

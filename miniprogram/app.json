@@ -5,7 +5,8 @@
     "pages/event-detail/event-detail",
     "pages/my-checkins/my-checkins",
     "pages/ranking/ranking",
-    "pages/profile/profile"
+    "pages/profile/profile",
+    "pages/privacy/privacy"
   ],
   "window": {
     "backgroundTextStyle": "light",

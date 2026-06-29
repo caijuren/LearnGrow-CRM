@@ -2,6 +2,18 @@
   padding-bottom: 160rpx;
 }
 
+.profile-guest {
+  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+  border-radius: 32rpx;
+  padding: 80rpx 40rpx;
+  margin-bottom: 24rpx;
+  text-align: center;
+}
+
+.guest-avatar {
+  font-size: 100rpx;
+}
+
 .profile-header {
   background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
   border-radius: 32rpx;

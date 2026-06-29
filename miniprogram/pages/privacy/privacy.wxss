@@ -1,0 +1,46 @@
+.privacy-container {
+  min-height: 100vh;
+  background: #fff1f2;
+  padding: 24rpx;
+}
+
+.privacy-content {
+  background: white;
+  border-radius: 24rpx;
+  padding: 32rpx;
+}
+
+.section {
+  margin-bottom: 32rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 16rpx;
+}
+
+.section-text {
+  font-size: 28rpx;
+  color: #64748b;
+  line-height: 1.8;
+  margin-bottom: 8rpx;
+}
+
+.bold {
+  font-weight: bold;
+  color: #334155;
+}
+
+.footer {
+  margin-top: 48rpx;
+  padding-top: 32rpx;
+  border-top: 2rpx solid #f1f5f9;
+  text-align: center;
+}
+
+.footer-text {
+  font-size: 24rpx;
+  color: #94a3b8;
+}

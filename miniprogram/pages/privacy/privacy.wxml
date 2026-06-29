@@ -1,0 +1,88 @@
+<view class="privacy-container">
+  <view class="privacy-content">
+    <view class="section">
+      <view class="section-title">引言</view>
+      <view class="section-text">
+        欢迎使用"乐学长打卡"小程序。我们非常重视您的个人信息和隐私保护。本隐私政策将帮助您了解我们如何收集、使用和保护您的个人信息。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">一、我们收集的信息</view>
+      <view class="section-text">
+        1. <text class="bold">微信登录信息：</text>当您使用微信登录时，我们会获取您的微信openid（唯一标识），用于识别您的账号。
+      </view>
+      <view class="section-text">
+        2. <text class="bold">您主动提供的信息：</text>包括您设置的昵称、头像、孩子昵称等，用于展示您的打卡记录和排行榜。
+      </view>
+      <view class="section-text">
+        3. <text class="bold">打卡记录：</text>您上传的打卡文字、图片等内容，用于活动打卡和展示。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">二、我们如何使用信息</view>
+      <view class="section-text">
+        1. 为您提供打卡、排行榜等核心功能服务；
+      </view>
+      <view class="section-text">
+        2. 维护和改进我们的服务质量；
+      </view>
+      <view class="section-text">
+        3. 保障账号安全，防止违规行为。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">三、信息存储与安全</view>
+      <view class="section-text">
+        我们采用行业标准的安全技术和管理措施来保护您的个人信息，防止信息泄露、丢失或被非法获取。您的打卡数据存储在我们的服务器上，仅用于提供打卡服务。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">四、信息共享</view>
+      <view class="section-text">
+        我们不会向第三方出售、出租或分享您的个人信息，除非：
+      </view>
+      <view class="section-text">
+        1. 获得您的明确同意；
+      </view>
+      <view class="section-text">
+        2. 法律法规要求或司法机关依法定程序要求。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">五、您的权利</view>
+      <view class="section-text">
+        您有权访问、更正、删除您的个人信息。如需操作，请在"个人中心"进行设置，或联系我们的客服。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">六、未成年人保护</view>
+      <view class="section-text">
+        我们非常重视未成年人的个人信息保护。本产品需在家长或监护人的指导下使用，我们不会主动收集未成年人的个人信息。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">七、政策更新</view>
+      <view class="section-text">
+        我们可能会适时更新本隐私政策。更新后的政策将在小程序内公布，您继续使用即表示同意更新后的政策。
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">八、联系我们</view>
+      <view class="section-text">
+        如果您对本隐私政策有任何疑问或建议，请通过小程序内的客服渠道联系我们。
+      </view>
+    </view>
+
+    <view class="footer">
+      <view class="footer-text">最后更新日期：2026年6月29日</view>
+    </view>
+  </view>
+</view>

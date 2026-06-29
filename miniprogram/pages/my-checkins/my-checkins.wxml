@@ -4,7 +4,16 @@
     <view class="text-secondary mt-1">查看所有参与的打卡活动</view>
   </view>
 
-  <view wx:if="{{checkins.length === 0 && !loading}}" class="empty">
+  <view wx:if="{{!isLoggedIn}}" class="empty">
+    <view class="empty-icon">🔐</view>
+    <view class="font-bold text-lg">登录后查看打卡记录</view>
+    <view class="text-muted mt-2" style="font-size: 26rpx;">登录后即可查看您的所有打卡活动</view>
+    <view class="mt-4">
+      <button class="btn-primary btn-small" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && checkins.length === 0 && !loading}}" class="empty">
     <view class="empty-icon">📋</view>
     <view>还没有参加任何打卡活动</view>
     <navigator url="/pages/index/index" open-type="reLaunch" class="mt-4">

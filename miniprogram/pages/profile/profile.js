@@ -11,19 +11,21 @@ Page({
     editing: false,
     editNickname: '',
     editChildName: '',
-    saving: false
+    saving: false,
+    isLoggedIn: false
   },
 
   onLoad() {
-    if (!app.checkLogin()) {
-      wx.reLaunch({ url: '/pages/login/login' });
-      return;
+    this.setData({ isLoggedIn: app.checkLogin() });
+    if (app.checkLogin()) {
+      this.setData({ userInfo: app.globalData.userInfo });
     }
-    this.setData({ userInfo: app.globalData.userInfo });
   },
 
   onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() });
     if (app.checkLogin()) {
+      this.setData({ userInfo: app.globalData.userInfo });
       this.loadStats();
     }
   },
@@ -112,6 +114,10 @@ Page({
     wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
   },
 
+  goToLogin() {
+    wx.navigateTo({ url: '/pages/login/login' });
+  },
+
   handleLogout() {
     wx.showModal({
       title: '提示',
@@ -119,7 +125,7 @@ Page({
       success: (res) => {
         if (res.confirm) {
           app.logout();
-          wx.reLaunch({ url: '/pages/login/login' });
+          this.setData({ isLoggedIn: false, userInfo: null });
         }
       }
     });

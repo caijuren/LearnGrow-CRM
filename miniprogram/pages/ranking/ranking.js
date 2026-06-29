@@ -4,16 +4,20 @@ const app = getApp();
 Page({
   data: {
     eventId: null,
-    ranking: []
+    ranking: [],
+    isLoggedIn: false
   },
 
   onLoad(options) {
-    if (!app.checkLogin()) {
-      wx.reLaunch({ url: '/pages/login/login' });
-      return;
-    }
-    this.setData({ eventId: parseInt(options.id) });
+    this.setData({ 
+      eventId: parseInt(options.id),
+      isLoggedIn: app.checkLogin()
+    });
     this.loadRanking();
+  },
+
+  onShow() {
+    this.setData({ isLoggedIn: app.checkLogin() });
   },
 
   async loadRanking() {

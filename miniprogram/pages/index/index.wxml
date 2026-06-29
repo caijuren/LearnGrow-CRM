@@ -1,12 +1,20 @@
 <view class="container">
   <view class="header flex-between items-center mb-4">
     <view>
-      <view class="greeting text-xl font-bold">你好，{{userInfo.nickname || '家长'}} 👋</view>
-      <view class="text-secondary mt-1">今天也要坚持打卡哦</view>
+      <view class="greeting text-xl font-bold">你好，{{userInfo.nickname || '游客家长'}} 👋</view>
+      <view class="text-secondary mt-1">{{isLoggedIn ? '今天也要坚持打卡哦' : '登录后可参与打卡活动'}}</view>
     </view>
-    <view class="avatar" bindtap="goToProfile">
-      {{userInfo.nickname ? userInfo.nickname[0] : '我'}}
+    <view class="avatar" bindtap="{{isLoggedIn ? 'goToProfile' : 'goToLogin'}}">
+      {{isLoggedIn ? (userInfo.nickname ? userInfo.nickname[0] : '我') : '登'}}
     </view>
+  </view>
+
+  <view wx:if="{{!isLoggedIn}}" class="login-banner mb-4" bindtap="goToLogin">
+    <view class="login-banner-text">
+      <text class="font-bold">立即登录</text>
+      <text class="text-secondary ml-2" style="font-size: 24rpx;">解锁完整打卡功能</text>
+    </view>
+    <text class="login-banner-arrow">›</text>
   </view>
 
   <view wx:if="{{events.length === 0 && !loading}}" class="empty">
@@ -18,9 +26,9 @@
   <view wx:for="{{events}}" wx:key="id" class="event-card" bindtap="goToDetail" data-id="{{item.id}}">
     <view class="event-header">
       <view class="event-title text-lg font-bold">{{item.name}}</view>
-      <view wx:if="{{item.today_checked}}" class="badge badge-success">今日已打卡</view>
-      <view wx:elif="{{item.is_joined}}" class="badge badge-warning">今日待打卡</view>
-      <view wx:else class="badge badge-rose">未加入</view>
+      <view wx:if="{{isLoggedIn && item.today_checked}}" class="badge badge-success">今日已打卡</view>
+      <view wx:elif="{{isLoggedIn && item.is_joined}}" class="badge badge-warning">今日待打卡</view>
+      <view wx:else class="badge badge-rose">{{isLoggedIn ? '未加入' : '浏览中'}}</view>
     </view>
 
     <view class="event-meta flex gap-3 mt-3">
@@ -34,7 +42,7 @@
       </view>
     </view>
 
-    <view wx:if="{{item.is_joined}}" class="progress-section mt-3">
+    <view wx:if="{{isLoggedIn && item.is_joined}}" class="progress-section mt-3">
       <view class="flex-between items-center mb-2">
         <text class="text-secondary" style="font-size: 26rpx;">我的进度</text>
         <text class="text-primary font-semibold">{{item.my_checkin_days}}/{{item.total_days}}天</text>
@@ -54,8 +62,8 @@
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
-      <button wx:if="{{!item.is_joined}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
-        立即加入
+      <button wx:if="{{!isLoggedIn || !item.is_joined}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
+        {{isLoggedIn ? '立即加入' : '登录加入'}}
       </button>
       <button wx:elif="{{!item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
         立即打卡
@@ -75,9 +83,9 @@
       <text class="nav-icon">📋</text>
       <text class="nav-text">我的打卡</text>
     </view>
-    <view class="nav-item" bindtap="goToProfile">
+    <view class="nav-item" bindtap="{{isLoggedIn ? 'goToProfile' : 'goToLogin'}}">
       <text class="nav-icon">👤</text>
-      <text class="nav-text">我的</text>
+      <text class="nav-text">{{isLoggedIn ? '我的' : '登录'}}</text>
     </view>
   </view>
 </view>

@@ -6,7 +6,7 @@
     </view>
     <view class="hero-badges flex gap-2 mt-3">
       <view class="hero-badge">{{event.participant_count}}人参与</view>
-      <view wx:if="{{event.is_joined}}" class="hero-badge">已加入</view>
+      <view wx:if="{{isLoggedIn && isJoined}}" class="hero-badge">已加入</view>
     </view>
   </view>
 
@@ -23,19 +23,37 @@
     <view class="text-secondary">{{event.required_text}}</view>
   </view>
 
-  <view wx:if="{{event.is_joined}}" class="card">
-    <view class="font-bold mb-3">✅ 今日打卡</view>
+  <view wx:if="{{!isLoggedIn}}" class="card login-prompt-card">
+    <view style="text-align: center; padding: 20rpx 0;">
+      <view style="font-size: 60rpx; margin-bottom: 16rpx;">🔐</view>
+      <view class="font-bold text-lg mb-2">登录后参与打卡</view>
+      <view class="text-secondary mb-4" style="font-size: 26rpx;">登录后即可加入活动、每日打卡</view>
+      <button class="btn-primary" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && isJoined}}" class="card checkin-card">
+    <view class="font-bold mb-3" style="font-size: 34rpx;">✅ 今日打卡</view>
     
     <view wx:if="{{todayChecked}}" class="checked-status">
       <view class="check-icon">✓</view>
-      <view class="text-success font-bold text-lg mt-2">今日已打卡</view>
-      <view class="text-muted mt-1">{{todayRecord.checkin_date}}</view>
+      <view class="text-success font-bold text-lg mt-2" style="font-size: 36rpx;">今日已打卡</view>
+      <view class="text-muted mt-1" style="font-size: 28rpx;">明天继续加油哦~</view>
       <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
       <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
     </view>
 
     <view wx:else class="checkin-form">
-      <view class="form-item">
+      <view class="quick-photo" bindtap="chooseImage">
+        <view class="quick-photo-icon">📷</view>
+        <view class="quick-photo-text">
+          <view class="font-bold" style="font-size: 32rpx;">拍照打卡</view>
+          <view class="text-muted" style="font-size: 26rpx; margin-top: 8rpx;">点击拍照，快速完成打卡</view>
+        </view>
+        <view class="quick-photo-arrow">→</view>
+      </view>
+
+      <view class="form-item mt-4">
         <view class="label">打卡感言（选填）</view>
         <textarea class="textarea" placeholder="说点什么吧~ 比如今天学习了什么内容" value="{{checkinNote}}" bindinput="onNoteInput" maxlength="200" />
       </view>
@@ -45,26 +63,26 @@
         <view class="upload-area" bindtap="chooseImage">
           <image wx:if="{{checkinImage}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
           <view wx:else class="upload-placeholder">
-            <text style="font-size: 60rpx;">📷</text>
-            <text class="text-muted mt-2" style="font-size: 26rpx;">点击上传图片</text>
+            <text style="font-size: 60rpx;">🖼️</text>
+            <text class="text-muted mt-2" style="font-size: 26rpx;">从相册选择图片</text>
           </view>
         </view>
       </view>
 
-      <button class="btn-primary mt-3" bindtap="submitCheckin" loading="{{submitting}}">
-        提交打卡
+      <button class="btn-primary btn-large mt-3" bindtap="submitCheckin" loading="{{submitting}}">
+        立即打卡
       </button>
     </view>
   </view>
 
-  <view wx:if="{{!event.is_joined}}" class="card" style="text-align: center; padding: 60rpx 40rpx;">
+  <view wx:if="{{isLoggedIn && !isJoined}}" class="card" style="text-align: center; padding: 60rpx 40rpx;">
     <view style="font-size: 80rpx; margin-bottom: 24rpx;">🎉</view>
     <view class="font-bold text-lg mb-2">加入打卡活动</view>
     <view class="text-secondary mb-4">加入后即可开始每日打卡</view>
     <button class="btn-primary" bindtap="handleJoin">立即加入活动</button>
   </view>
 
-  <view wx:if="{{event.is_joined}}" class="card">
+  <view wx:if="{{isLoggedIn && isJoined}}" class="card">
     <view class="flex-between items-center mb-3">
       <view class="font-bold">📊 我的打卡记录</view>
       <view class="text-primary font-semibold">{{myStats.checkin_days}}/{{event.total_days}}天</view>
@@ -87,6 +105,20 @@
         {{item.day}}
       </view>
     </view>
+  </view>
+
+  <view wx:if="{{!isLoggedIn}}" class="card">
+    <view class="flex-between items-center mb-3">
+      <view class="font-bold">📅 活动日历</view>
+      <view class="text-secondary" style="font-size: 26rpx;">共{{event.total_days}}天</view>
+    </view>
+    <view class="calendar-grid">
+      <view class="calendar-weekday" wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this">{{item}}</view>
+      <view wx:for="{{calendarDays}}" wx:key="date" class="calendar-day {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
+        {{item.day}}
+      </view>
+    </view>
+    <view class="text-muted mt-3" style="text-align: center; font-size: 24rpx;">登录后查看打卡进度</view>
   </view>
 
   <view class="card" bindtap="goToRanking">
