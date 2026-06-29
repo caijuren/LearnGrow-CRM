@@ -1,0 +1,101 @@
+<view class="container" wx:if="{{event}}">
+  <view class="event-hero">
+    <view class="hero-title text-xl font-bold text-white">{{event.name}}</view>
+    <view class="hero-meta mt-2" style="opacity: 0.9;">
+      📅 {{event.start_date}} ~ {{event.end_date}}
+    </view>
+    <view class="hero-badges flex gap-2 mt-3">
+      <view class="hero-badge">{{event.participant_count}}人参与</view>
+      <view wx:if="{{event.is_joined}}" class="hero-badge">已加入</view>
+    </view>
+  </view>
+
+  <view wx:if="{{event.reward_rules}}" class="reward-card card">
+    <view class="flex items-center gap-2 mb-2">
+      <text style="font-size: 36rpx;">🏆</text>
+      <text class="font-bold text-lg">奖励规则</text>
+    </view>
+    <view class="text-secondary" style="line-height: 1.6;">{{event.reward_rules}}</view>
+  </view>
+
+  <view wx:if="{{event.required_text}}" class="card">
+    <view class="font-bold mb-2">📝 打卡要求</view>
+    <view class="text-secondary">{{event.required_text}}</view>
+  </view>
+
+  <view wx:if="{{event.is_joined}}" class="card">
+    <view class="font-bold mb-3">✅ 今日打卡</view>
+    
+    <view wx:if="{{todayChecked}}" class="checked-status">
+      <view class="check-icon">✓</view>
+      <view class="text-success font-bold text-lg mt-2">今日已打卡</view>
+      <view class="text-muted mt-1">{{todayRecord.checkin_date}}</view>
+      <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
+      <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+    </view>
+
+    <view wx:else class="checkin-form">
+      <view class="form-item">
+        <view class="label">打卡感言（选填）</view>
+        <textarea class="textarea" placeholder="说点什么吧~ 比如今天学习了什么内容" value="{{checkinNote}}" bindinput="onNoteInput" maxlength="200" />
+      </view>
+
+      <view class="form-item">
+        <view class="label">上传截图（选填）</view>
+        <view class="upload-area" bindtap="chooseImage">
+          <image wx:if="{{checkinImage}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
+          <view wx:else class="upload-placeholder">
+            <text style="font-size: 60rpx;">📷</text>
+            <text class="text-muted mt-2" style="font-size: 26rpx;">点击上传图片</text>
+          </view>
+        </view>
+      </view>
+
+      <button class="btn-primary mt-3" bindtap="submitCheckin" loading="{{submitting}}">
+        提交打卡
+      </button>
+    </view>
+  </view>
+
+  <view wx:if="{{!event.is_joined}}" class="card" style="text-align: center; padding: 60rpx 40rpx;">
+    <view style="font-size: 80rpx; margin-bottom: 24rpx;">🎉</view>
+    <view class="font-bold text-lg mb-2">加入打卡活动</view>
+    <view class="text-secondary mb-4">加入后即可开始每日打卡</view>
+    <button class="btn-primary" bindtap="handleJoin">立即加入活动</button>
+  </view>
+
+  <view wx:if="{{event.is_joined}}" class="card">
+    <view class="flex-between items-center mb-3">
+      <view class="font-bold">📊 我的打卡记录</view>
+      <view class="text-primary font-semibold">{{myStats.checkin_days}}/{{event.total_days}}天</view>
+    </view>
+
+    <view class="streak-info flex gap-3 mb-3">
+      <view class="streak-item">
+        <view class="streak-num text-warning font-bold">{{myStats.current_streak}}</view>
+        <view class="streak-label">连续打卡</view>
+      </view>
+      <view class="streak-item">
+        <view class="streak-num text-primary font-bold">{{myStats.max_streak}}</view>
+        <view class="streak-label">最长连续</view>
+      </view>
+    </view>
+
+    <view class="calendar-grid">
+      <view class="calendar-weekday" wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this">{{item}}</view>
+      <view wx:for="{{calendarDays}}" wx:key="date" class="calendar-day {{item.checked ? 'checked' : ''}} {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
+        {{item.day}}
+      </view>
+    </view>
+  </view>
+
+  <view class="card" bindtap="goToRanking">
+    <view class="flex-between items-center">
+      <view class="flex items-center gap-2">
+        <text style="font-size: 36rpx;">🏆</text>
+        <text class="font-bold">查看排行榜</text>
+      </view>
+      <text class="text-muted">→</text>
+    </view>
+  </view>
+</view>

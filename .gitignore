@@ -20,6 +20,16 @@ data/*.db-wal
 # Local config
 .trae/
 .workbuddy/
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Avatar generation temp files
+generate-avatar.cjs
+generate-avatar.html
+miniprogram-avatar-preview.html
+miniprogram-avatar.png
 
 # Editor directories and files
 .vscode/*

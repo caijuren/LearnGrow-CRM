@@ -1,0 +1,45 @@
+<view class="container">
+  <view class="ranking-header">
+    <view class="text-xl font-bold text-white">🏆 打卡排行榜</view>
+  </view>
+
+  <view wx:if="{{ranking.length >= 3}}" class="podium">
+    <view class="podium-item second">
+      <view class="podium-rank">🥈</view>
+      <view class="podium-avatar">{{ranking[1].nickname[0]}}</view>
+      <view class="podium-name">{{ranking[1].nickname}}</view>
+      <view class="podium-days">{{ranking[1].checkin_days}}天</view>
+    </view>
+    <view class="podium-item first">
+      <view class="podium-crown">👑</view>
+      <view class="podium-avatar gold">{{ranking[0].nickname[0]}}</view>
+      <view class="podium-name">{{ranking[0].nickname}}</view>
+      <view class="podium-days">{{ranking[0].checkin_days}}天</view>
+    </view>
+    <view class="podium-item third" wx:if="{{ranking.length >= 3}}">
+      <view class="podium-rank">🥉</view>
+      <view class="podium-avatar bronze">{{ranking[2].nickname[0]}}</view>
+      <view class="podium-name">{{ranking[2].nickname}}</view>
+      <view class="podium-days">{{ranking[2].checkin_days}}天</view>
+    </view>
+  </view>
+
+  <view class="ranking-list card">
+    <view wx:if="{{ranking.length === 0}}" class="empty">
+      <view class="empty-icon">🏆</view>
+      <view>暂无排名数据</view>
+    </view>
+    <view wx:for="{{ranking}}" wx:key="rank" wx:if="{{index >= 3}}" class="ranking-item {{item.is_me ? 'is-me' : ''}}">
+      <view class="rank-num">{{item.rank}}</view>
+      <view class="user-avatar">{{item.nickname[0]}}</view>
+      <view class="user-info flex-1">
+        <view class="user-name">
+          {{item.nickname}}
+          <text wx:if="{{item.is_me}}" class="badge badge-rose" style="margin-left: 8rpx;">我</text>
+        </view>
+        <view wx:if="{{item.current_streak >= 2}}" class="streak-tag text-warning" style="font-size: 22rpx;">🔥 连续{{item.current_streak}}天</view>
+      </view>
+      <view class="user-days text-primary font-bold">{{item.checkin_days}}天</view>
+    </view>
+  </view>
+</view>

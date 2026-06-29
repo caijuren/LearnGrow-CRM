@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/event-detail/event-detail",
+    "pages/my-checkins/my-checkins",
+    "pages/ranking/ranking",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#f43f5e",
+    "navigationBarTitleText": "学习打卡",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#fef2f2"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

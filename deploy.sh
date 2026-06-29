@@ -1,99 +1,122 @@
 #!/bin/bash
 
+# ============================================
+# LearnGrow CRM - 服务器部署脚本
+# ============================================
+# 使用前请配置好 SSH 免密登录和服务器环境变量
+# 服务器侧请创建 /etc/learngrow/deploy.env 文件，格式：
+#   SERVER_HOST="你的服务器IP"
+#   SERVER_USER="ssh用户名"
+#   PROJECT_DIR="/var/www/learngrow-crm"
+#   WX_APPID="你的微信AppID"
+#   WX_SECRET="你的微信Secret"
+# ============================================
+
 set -e
+
+ENV_FILE="/etc/learngrow/deploy.env"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ 未找到环境配置文件: $ENV_FILE"
+  echo "请在服务器上创建该文件并填入部署所需变量"
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+
+APP_PORT=3456
 
 echo "========================================="
 echo "LearnGrow CRM 一键部署脚本（无冲突版）"
 echo "========================================="
 echo ""
-echo "✅ 独立目录: /var/www/learngrow-crm"
-echo "✅ 独立端口: 3456（不占用80/8080/3000等常用端口）"
-echo "✅ 不修改现有 Nginx/其他应用配置"
+echo "✅ 服务器: $SERVER_USER@$SERVER_HOST"
+echo "✅ 部署目录: $PROJECT_DIR"
+echo "✅ 独立端口: $APP_PORT（不占用80/8080/3000等常用端口）"
 echo ""
 
-APP_DIR="/var/www/learngrow-crm"
-LOG_DIR="/var/log/learngrow-crm"
-APP_PORT=3456
+echo "[1/5] 上传代码到服务器临时目录..."
+TMP_DIR="/tmp/learngrow-deploy"
+ssh $SERVER_USER@$SERVER_HOST "rm -rf $TMP_DIR && mkdir -p $TMP_DIR"
 
-echo "[1/7] 更新系统包..."
-sudo apt update -y
+rsync -avz \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  --exclude='node_modules' \
+  --exclude='dist' \
+  --exclude='data/*.db' \
+  --exclude='*.log' \
+  --exclude='.git' \
+  "./api/" \
+  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/api/"
 
-echo ""
-echo "[2/7] 安装必要工具..."
-sudo apt install -y git curl build-essential
+rsync -avz \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  --exclude='node_modules' \
+  --exclude='dist' \
+  "./shared/" \
+  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/shared/"
 
-echo ""
-echo "[3/7] 检查 Node.js 环境..."
-if ! command -v node &> /dev/null; then
-    echo "安装 Node.js 20.x..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
-else
-    echo "Node.js 已安装，版本: $(node --version)"
-fi
+rsync -avz \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  "./src/" \
+  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/src/"
 
-echo ""
-echo "[4/7] 检查 PM2..."
-if ! command -v pm2 &> /dev/null; then
-    echo "安装 PM2..."
-    sudo npm install -g pm2
-    sudo pm2 startup systemd -u root || true
-else
-    echo "PM2 已安装，版本: $(pm2 --version)"
-fi
-
-echo ""
-echo "[5/7] 准备应用目录..."
-sudo mkdir -p $APP_DIR
-sudo mkdir -p $LOG_DIR
-sudo mkdir -p $APP_DIR/data
-
-if [ -d "$APP_DIR/.git" ]; then
-    echo "代码目录已存在，拉取最新代码..."
-    cd $APP_DIR
-    sudo git fetch origin
-    sudo git reset --hard origin/main
-else
-    echo "克隆代码..."
-    sudo rm -rf $APP_DIR
-    sudo git clone https://github.com/caijuren/LearnGrow-CRM.git $APP_DIR
-    cd $APP_DIR
-fi
+rsync -avz \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  --exclude='node_modules' \
+  "./" \
+  --exclude='api/' --exclude='shared/' --exclude='src/' \
+  --exclude='data/' --exclude='miniprogram/' \
+  --exclude='tests/' --exclude='.git/' --exclude='.trae/' \
+  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/"
 
 echo ""
-echo "[6/7] 安装依赖并构建前端..."
-cd $APP_DIR
-sudo npm install
-sudo npm run build
+echo "[2/5] 在服务器上部署应用..."
+ssh $SERVER_USER@$SERVER_HOST << ENDSSH
+  set -e
+  sudo cp -r $TMP_DIR/api/* $PROJECT_DIR/api/
+  sudo cp -r $TMP_DIR/shared/* $PROJECT_DIR/shared/
+  sudo cp -r $TMP_DIR/src/* $PROJECT_DIR/src/
+  sudo cp $TMP_DIR/package.json $PROJECT_DIR/
+  rm -rf $TMP_DIR
+  cd $PROJECT_DIR
+  echo "   📦 安装依赖..."
+  sudo npm install
+  echo "   🔨 构建中..."
+  sudo npm run build
+  echo "   🔄 重启服务..."
+  sudo pm2 restart learngrow-crm --update-env
+  echo "   ✅ 验证API..."
+  sleep 2
+  curl -s http://localhost:$APP_PORT/api/health
+  echo ""
+ENDSSH
 
 echo ""
-echo "[7/7] 启动服务..."
-cd $APP_DIR
-sudo pm2 delete learngrow-crm 2>/dev/null || true
-sudo pm2 start ecosystem.config.cjs
-sudo pm2 save
+echo "[3/5] 同步环境变量到服务器..."
+ssh $SERVER_USER@$SERVER_HOST "sudo mkdir -p /etc/learngrow && sudo tee /etc/learngrow/deploy.env > /dev/null << 'EOF'
+SERVER_HOST=\"$SERVER_HOST\"
+SERVER_USER=\"$SERVER_USER\"
+PROJECT_DIR=\"$PROJECT_DIR\"
+WX_APPID=\"$WX_APPID\"
+WX_SECRET=\"$WX_SECRET\"
+EOF
+sudo chmod 600 /etc/learngrow/deploy.env"
 
 echo ""
 echo "========================================="
 echo "✅ 部署完成！"
 echo "========================================="
 echo ""
-echo "📱 访问地址: http://你的服务器IP:$APP_PORT"
-echo ""
-echo "⚠️  重要：请在腾讯云控制台防火墙/安全组中开放 TCP 端口 $APP_PORT"
+echo "� 访问地址: http://$SERVER_HOST:$APP_PORT"
 echo ""
 echo "📌 默认登录账号:"
 echo "   用户名: admin"
 echo "   密码: admin123"
 echo ""
 echo "🔧 常用命令:"
-echo "   查看服务状态: pm2 status"
-echo "   查看实时日志: pm2 logs learngrow-crm"
-echo "   重启服务: pm2 restart learngrow-crm"
-echo "   停止服务: pm2 stop learngrow-crm"
-echo "   更新代码后重新部署: cd $APP_DIR && sudo ./deploy.sh"
-echo ""
-echo "💡 提示:"
-echo "   - 此部署完全独立，不会影响服务器上的其他应用"
-echo "   - 如果后续想通过80端口/域名访问，可以在现有Nginx中添加反向代理到 127.0.0.1:$APP_PORT"
+echo "   查看服务状态: ssh $SERVER_USER@$SERVER_HOST 'pm2 status'"
+echo "   查看实时日志: ssh $SERVER_USER@$SERVER_HOST 'pm2 logs learngrow-crm'"
+echo "   重启服务: ssh $SERVER_USER@$SERVER_HOST 'pm2 restart learngrow-crm'"
 echo ""

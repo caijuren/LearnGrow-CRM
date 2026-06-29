@@ -1,0 +1,83 @@
+<view class="container">
+  <view class="header flex-between items-center mb-4">
+    <view>
+      <view class="greeting text-xl font-bold">你好，{{userInfo.nickname || '家长'}} 👋</view>
+      <view class="text-secondary mt-1">今天也要坚持打卡哦</view>
+    </view>
+    <view class="avatar" bindtap="goToProfile">
+      {{userInfo.nickname ? userInfo.nickname[0] : '我'}}
+    </view>
+  </view>
+
+  <view wx:if="{{events.length === 0 && !loading}}" class="empty">
+    <view class="empty-icon">📅</view>
+    <view>暂无进行中的打卡活动</view>
+    <view class="text-muted mt-2" style="font-size: 26rpx;">请等待老师创建新活动</view>
+  </view>
+
+  <view wx:for="{{events}}" wx:key="id" class="event-card" bindtap="goToDetail" data-id="{{item.id}}">
+    <view class="event-header">
+      <view class="event-title text-lg font-bold">{{item.name}}</view>
+      <view wx:if="{{item.today_checked}}" class="badge badge-success">今日已打卡</view>
+      <view wx:elif="{{item.is_joined}}" class="badge badge-warning">今日待打卡</view>
+      <view wx:else class="badge badge-rose">未加入</view>
+    </view>
+
+    <view class="event-meta flex gap-3 mt-3">
+      <view class="meta-item">
+        <text class="meta-label">📅</text>
+        <text class="meta-value">{{item.start_date}} ~ {{item.end_date}}</text>
+      </view>
+      <view class="meta-item">
+        <text class="meta-label">👥</text>
+        <text class="meta-value">{{item.participant_count}}人参与</text>
+      </view>
+    </view>
+
+    <view wx:if="{{item.is_joined}}" class="progress-section mt-3">
+      <view class="flex-between items-center mb-2">
+        <text class="text-secondary" style="font-size: 26rpx;">我的进度</text>
+        <text class="text-primary font-semibold">{{item.my_checkin_days}}/{{item.total_days}}天</text>
+      </view>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{item.my_checkin_days / item.total_days * 100}}%"></view>
+      </view>
+      <view class="flex-between mt-2" style="font-size: 24rpx;">
+        <text wx:if="{{item.my_current_streak >= 2}}" class="text-warning">🔥 连续{{item.my_current_streak}}天</text>
+        <text wx:else class="text-muted">加油坚持哦～</text>
+        <text wx:if="{{item.days_left >= 0}}" class="text-muted">还剩{{item.days_left}}天</text>
+      </view>
+    </view>
+
+    <view wx:if="{{item.required_text}}" class="required-text mt-3">
+      <text class="text-muted" style="font-size: 24rpx;">打卡要求：{{item.required_text}}</text>
+    </view>
+
+    <view class="event-actions mt-3 flex gap-2">
+      <button wx:if="{{!item.is_joined}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
+        立即加入
+      </button>
+      <button wx:elif="{{!item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
+        立即打卡
+      </button>
+      <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
+        排行榜
+      </button>
+    </view>
+  </view>
+
+  <view class="bottom-nav">
+    <view class="nav-item active">
+      <text class="nav-icon">🏠</text>
+      <text class="nav-text">活动</text>
+    </view>
+    <view class="nav-item" bindtap="goToMyCheckins">
+      <text class="nav-icon">📋</text>
+      <text class="nav-text">我的打卡</text>
+    </view>
+    <view class="nav-item" bindtap="goToProfile">
+      <text class="nav-icon">👤</text>
+      <text class="nav-text">我的</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,152 @@
+.container {
+  padding-bottom: 60rpx;
+}
+
+.ranking-header {
+  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+  margin: -24rpx -24rpx 24rpx;
+  padding: 60rpx 40rpx 100rpx;
+  text-align: center;
+}
+
+.podium {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 24rpx;
+  margin: -60rpx 0 24rpx;
+  padding: 0 24rpx;
+}
+
+.podium-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  border-radius: 24rpx;
+  padding: 32rpx 16rpx 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.08);
+}
+
+.podium-item.first {
+  transform: scale(1.1);
+  z-index: 1;
+  background: linear-gradient(180deg, #fef3c7 0%, white 50%);
+}
+
+.podium-item.second {
+  background: linear-gradient(180deg, #e2e8f0 0%, white 50%);
+}
+
+.podium-item.third {
+  background: linear-gradient(180deg, #fed7aa 0%, white 50%);
+}
+
+.podium-crown {
+  font-size: 48rpx;
+  margin-bottom: 8rpx;
+}
+
+.podium-rank {
+  font-size: 40rpx;
+  margin-bottom: 8rpx;
+}
+
+.podium-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.podium-avatar.gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.podium-avatar.bronze {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+}
+
+.podium-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4rpx;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podium-days {
+  font-size: 24rpx;
+  color: #f43f5e;
+  font-weight: 600;
+}
+
+.ranking-list {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 32rpx;
+  border-bottom: 2rpx solid #f8fafc;
+}
+
+.ranking-item:last-child {
+  border-bottom: none;
+}
+
+.ranking-item.is-me {
+  background: #fef2f2;
+}
+
+.rank-num {
+  width: 48rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.user-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.user-info {
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+}
+
+.user-days {
+  font-size: 28rpx;
+}

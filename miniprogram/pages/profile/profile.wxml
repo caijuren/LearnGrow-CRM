@@ -1,0 +1,91 @@
+<view class="container">
+  <view class="profile-header">
+    <view class="profile-avatar avatar avatar-lg">
+      {{userInfo.nickname ? userInfo.nickname[0] : '我'}}
+    </view>
+    <view wx:if="{{!editing}}" class="profile-info">
+      <view class="profile-name text-xl font-bold text-white">{{userInfo.nickname || '微信用户'}}</view>
+      <view wx:if="{{userInfo.child_name}}" class="profile-child text-white" style="opacity: 0.85; margin-top: 8rpx; font-size: 26rpx;">
+        👶 {{userInfo.child_name}}
+      </view>
+      <view class="edit-btn" bindtap="startEdit">✏️ 编辑资料</view>
+    </view>
+    <view wx:else class="profile-edit-form">
+      <view class="edit-form-item">
+        <input class="edit-input" placeholder="昵称" value="{{editNickname}}" bindinput="onNicknameInput" />
+      </view>
+      <view class="edit-form-item">
+        <input class="edit-input" placeholder="孩子昵称（选填）" value="{{editChildName}}" bindinput="onChildNameInput" />
+      </view>
+      <view class="flex gap-2">
+        <button class="edit-btn-save btn-small" bindtap="saveProfile" loading="{{saving}}">保存</button>
+        <button class="edit-btn-cancel btn-small" bindtap="cancelEdit">取消</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="stats-card card">
+    <view class="stats-row flex gap-2">
+      <view class="stat-item flex-1">
+        <view class="stat-num text-primary font-bold text-xl">{{joinedEvents}}</view>
+        <view class="stat-label text-muted">参与活动</view>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item flex-1">
+        <view class="stat-num text-warning font-bold text-xl">{{totalDays}}</view>
+        <view class="stat-label text-muted">累计打卡</view>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-item flex-1">
+        <view class="stat-num text-success font-bold text-xl">{{totalStreak}}</view>
+        <view class="stat-label text-muted">最长连续</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{myCheckins.length > 0}}" class="card">
+    <view class="font-bold mb-3">📋 我的活动</view>
+    <view wx:for="{{myCheckins}}" wx:key="event.id" class="event-item" bindtap="goToEvent" data-id="{{item.event.id}}">
+      <view class="flex-between items-center">
+        <view class="flex-1">
+          <view class="event-name font-semibold">{{item.event.name}}</view>
+          <view class="text-muted mt-1" style="font-size: 24rpx;">
+            {{item.checkin_days}}天打卡 · {{item.event.status === 'active' ? '进行中' : '已结束'}}
+          </view>
+        </view>
+        <text class="text-muted">→</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card menu-card">
+    <view class="menu-item" bindtap="goToMyCheckins">
+      <view class="menu-icon">📊</view>
+      <view class="menu-text">我的打卡记录</view>
+      <text class="menu-arrow text-muted">→</text>
+    </view>
+    <view class="menu-divider"></view>
+    <view class="menu-item" bindtap="goHome">
+      <view class="menu-icon">🏠</view>
+      <view class="menu-text">返回活动列表</view>
+      <text class="menu-arrow text-muted">→</text>
+    </view>
+  </view>
+
+  <button class="logout-btn" bindtap="handleLogout">退出登录</button>
+
+  <view class="bottom-nav">
+    <view class="nav-item" bindtap="goHome">
+      <text class="nav-icon">🏠</text>
+      <text class="nav-text">活动</text>
+    </view>
+    <view class="nav-item" bindtap="goToMyCheckins">
+      <text class="nav-icon">📋</text>
+      <text class="nav-text">我的打卡</text>
+    </view>
+    <view class="nav-item active">
+      <text class="nav-icon">👤</text>
+      <text class="nav-text">我的</text>
+    </view>
+  </view>
+</view>

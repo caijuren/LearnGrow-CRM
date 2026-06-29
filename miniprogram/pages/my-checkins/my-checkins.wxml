@@ -1,0 +1,74 @@
+<view class="container">
+  <view class="page-header">
+    <view class="text-xl font-bold">我的打卡</view>
+    <view class="text-secondary mt-1">查看所有参与的打卡活动</view>
+  </view>
+
+  <view wx:if="{{checkins.length === 0 && !loading}}" class="empty">
+    <view class="empty-icon">📋</view>
+    <view>还没有参加任何打卡活动</view>
+    <navigator url="/pages/index/index" open-type="reLaunch" class="mt-4">
+      <button class="btn-primary btn-small">去看看活动</button>
+    </navigator>
+  </view>
+
+  <view wx:for="{{checkins}}" wx:key="event.id" class="checkin-card card" bindtap="goToDetail" data-id="{{item.event.id}}">
+    <view class="flex-between items-start mb-3">
+      <view class="flex-1">
+        <view class="text-lg font-bold">{{item.event.name}}</view>
+        <view class="text-secondary mt-1" style="font-size: 26rpx;">
+          📅 {{item.event.start_date}} ~ {{item.event.end_date}}
+        </view>
+      </view>
+      <view wx:if="{{item.event.status === 'active'}}" class="badge badge-success">进行中</view>
+      <view wx:else class="badge" style="background: #f1f5f9; color: #64748b;">已结束</view>
+    </view>
+
+    <view class="stats-row flex gap-2 mb-3">
+      <view class="stat-box">
+        <view class="stat-num text-primary font-bold">{{item.checkin_days}}</view>
+        <view class="stat-label">累计打卡</view>
+      </view>
+      <view class="stat-box">
+        <view class="stat-num text-warning font-bold">{{item.current_streak}}</view>
+        <view class="stat-label">当前连续</view>
+      </view>
+      <view class="stat-box">
+        <view class="stat-num text-success font-bold">{{item.max_streak}}</view>
+        <view class="stat-label">最长连续</view>
+      </view>
+    </view>
+
+    <view class="mini-calendar">
+      <view wx:for="{{item.calendar}}" wx:for-item="day" wx:key="date" class="mini-day {{day.checked ? 'checked' : ''}}"></view>
+    </view>
+
+    <view wx:if="{{item.records.length > 0}}" class="recent-records mt-3">
+      <view class="text-secondary mb-2" style="font-size: 26rpx;">最近打卡</view>
+      <scroll-view scroll-x class="records-scroll">
+        <view class="records-list flex gap-2">
+          <view wx:for="{{item.records}}" wx:for-item="record" wx:key="id" class="record-item">
+            <image wx:if="{{record.image_url}}" class="record-image" src="{{baseUrl}}{{record.image_url}}" mode="aspectFill" />
+            <view wx:else class="record-placeholder">✓</view>
+            <view class="record-date">{{record.checkin_date.slice(5)}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <view class="bottom-nav">
+    <view class="nav-item" bindtap="goHome">
+      <text class="nav-icon">🏠</text>
+      <text class="nav-text">活动</text>
+    </view>
+    <view class="nav-item active">
+      <text class="nav-icon">📋</text>
+      <text class="nav-text">我的打卡</text>
+    </view>
+    <view class="nav-item" bindtap="goToProfile">
+      <text class="nav-icon">👤</text>
+      <text class="nav-text">我的</text>
+    </view>
+  </view>
+</view>

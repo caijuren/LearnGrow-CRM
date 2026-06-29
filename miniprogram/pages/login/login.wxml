@@ -1,0 +1,33 @@
+<view class="login-container">
+  <view class="login-header">
+    <view class="logo">📚</view>
+    <view class="title text-2xl font-bold">学习打卡</view>
+    <view class="subtitle text-secondary mt-2">每天坚持，养成好习惯</view>
+  </view>
+
+  <view class="login-form card">
+    <view class="form-item">
+      <view class="label">昵称</view>
+      <input class="input" placeholder="请输入您的昵称（如：轩轩妈妈）" value="{{nickname}}" bindinput="onNicknameInput" />
+    </view>
+
+    <view class="form-item">
+      <view class="label">孩子昵称（选填）</view>
+      <input class="input" placeholder="请输入孩子昵称" value="{{childName}}" bindinput="onChildNameInput" />
+    </view>
+
+    <button class="btn-primary mt-4" bindtap="handleLogin" loading="{{loading}}">
+      微信一键登录
+    </button>
+
+    <view class="agreement mt-3 text-muted text-sm">
+      登录即表示同意《用户协议》和《隐私政策》
+    </view>
+  </view>
+
+  <view class="tips mt-4">
+    <view class="tip-item text-secondary">
+      💡 首次登录后昵称可以在个人中心修改
+    </view>
+  </view>
+</view>
