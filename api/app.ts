@@ -1456,17 +1456,45 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
     return reply.code(400).send({ success: false, error: '今日已打卡，明天再来吧~' });
   }
   
-  const previousRecords = db.prepare('SELECT checkin_date FROM checkin_records WHERE event_id = ? AND participant_id = ? ORDER BY checkin_date DESC').all(event_id, participant.id) as any[];
+  const previousRecords = db.prepare('SELECT checkin_date FROM checkin_records WHERE event_id = ? AND participant_id = ? AND status = ? ORDER BY checkin_date DESC').all(event_id, participant.id, 'approved') as any[];
   const checkinCount = previousRecords.length + 1;
   
   const r = db.prepare(`
-    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(event_id, participant.id, today, note || null, image_url || null);
+    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, status)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(event_id, participant.id, today, note || null, image_url || null, 'approved');
+
+  const newBadges: any[] = [];
+  const allApprovedRecords = [...previousRecords, { checkin_date: today }];
+  const allBadges = db.prepare('SELECT * FROM checkin_badges WHERE event_id = ?').all(event_id) as any[];
+  
+  if (allBadges.length > 0) {
+    const streakStats = calculateStreaks(allApprovedRecords, event.start_date, event.end_date);
+    
+    for (const badge of allBadges) {
+      const alreadyAchieved = db.prepare('SELECT id FROM checkin_badge_achievements WHERE badge_id = ? AND participant_id = ?').get(badge.id, participant.id);
+      if (alreadyAchieved) continue;
+      
+      let achieved = false;
+      if (badge.type === 'total' && streakStats.checkin_days >= badge.target_days) {
+        achieved = true;
+      } else if (badge.type === 'streak' && streakStats.current_streak >= badge.target_days) {
+        achieved = true;
+      } else if (badge.type === 'milestone' && checkinCount >= badge.target_days) {
+        achieved = true;
+      }
+      
+      if (achieved) {
+        db.prepare('INSERT INTO checkin_badge_achievements (badge_id, participant_id) VALUES (?, ?)').run(badge.id, participant.id);
+        newBadges.push(badge);
+      }
+    }
+  }
   
   return reply.code(201).send(ok({
-    ...db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid),
-    checkin_number: checkinCount
+    ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid) as object),
+    checkin_number: checkinCount,
+    new_badges: newBadges
   }));
 });
 
@@ -1593,6 +1621,333 @@ app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (requ
 
   return ok({ url: `/uploads/${uniqueName}` });
 });
+
+async function getWxAccessToken() {
+  const appId = process.env.WX_APPID;
+  const appSecret = process.env.WX_APPSECRET;
+  if (!appId || !appSecret) return null;
+
+  const cached = db.prepare("SELECT value FROM settings WHERE key = 'wx_access_token'").get() as any;
+  if (cached) {
+    const tokenData = JSON.parse(cached.value);
+    if (tokenData.expires_at > Date.now()) return tokenData.access_token;
+  }
+
+  try {
+    const res = await fetch(`https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${appSecret}`);
+    const data: any = await res.json();
+    if (data.access_token) {
+      const tokenData = {
+        access_token: data.access_token,
+        expires_at: Date.now() + (data.expires_in - 300) * 1000
+      };
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('wx_access_token', ?)").run(JSON.stringify(tokenData));
+      return data.access_token;
+    }
+  } catch (e) {
+    console.error('获取微信access_token失败', e);
+  }
+  return null;
+}
+
+async function sendWxSubscribeMessage(openid: string, templateId: string, data: any, page?: string) {
+  const accessToken = await getWxAccessToken();
+  if (!accessToken) return { success: false, error: '未配置微信AppSecret' };
+
+  try {
+    const res = await fetch(`https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=${accessToken}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        touser: openid,
+        template_id: templateId,
+        page: page || 'pages/index/index',
+        data
+      })
+    });
+    const result: any = await res.json();
+    return { success: result.errcode === 0, error: result.errmsg };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+app.get('/api/wx/checkin-events/:id/materials', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
+  const eventId = parseInt(request.params.id);
+  const materials = db.prepare(`
+    SELECT id, title, description, file_url, file_type, sort_order
+    FROM checkin_materials
+    WHERE event_id = ? AND is_active = 1
+    ORDER BY sort_order ASC, id DESC
+  `).all(eventId);
+  return ok(materials);
+});
+
+app.get('/api/wx/checkin-events/:id/badges', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
+  const eventId = parseInt(request.params.id);
+  const user = request.wxUser;
+
+  const badges = db.prepare(`
+    SELECT id, name, description, icon, type, target_days
+    FROM checkin_badges
+    WHERE event_id = ?
+    ORDER BY target_days ASC
+  `).all(eventId) as any[];
+
+  let achievedIds: number[] = [];
+  if (user) {
+    const participant = db.prepare('SELECT id FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id) as any;
+    if (participant) {
+      const achieved = db.prepare('SELECT badge_id FROM checkin_badge_achievements WHERE participant_id = ?').all(participant.id) as any[];
+      achievedIds = achieved.map(a => a.badge_id);
+    }
+  }
+
+  return ok(badges.map(b => ({
+    ...b,
+    achieved: achievedIds.includes(b.id)
+  })));
+});
+
+app.get('/api/wx/my-badges', { preHandler: [wxAuthMiddleware] }, async (request: any) => {
+  const user = request.wxUser;
+  const achievements = db.prepare(`
+    SELECT ba.*, b.name as badge_name, b.description as badge_description, b.icon as badge_icon,
+           b.type as badge_type, b.target_days, e.name as event_name, e.id as event_id
+    FROM checkin_badge_achievements ba
+    JOIN checkin_badges b ON ba.badge_id = b.id
+    JOIN checkin_events e ON b.event_id = e.id
+    JOIN checkin_participants p ON ba.participant_id = p.id
+    WHERE p.wx_user_id = ?
+    ORDER BY ba.achieved_at DESC
+  `).all(user.id);
+  return ok(achievements);
+});
+
+app.register(async function (router) {
+  router.addHook('preHandler', authMiddleware);
+
+  router.get('/:id/records', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const { status, page = '1', limit = '20' } = request.query as any;
+    const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
+
+    let sql = `
+      SELECT r.*, p.nickname, p.child_name, p.wx_user_id
+      FROM checkin_records r
+      JOIN checkin_participants p ON r.participant_id = p.id
+      WHERE r.event_id = ?
+    `;
+    const params: any[] = [eventId];
+    if (status) { sql += ' AND r.status = ?'; params.push(status); }
+    sql += ' ORDER BY r.checkin_date DESC, r.id DESC LIMIT ? OFFSET ?';
+    params.push(limitNum, offset);
+
+    const records = db.prepare(sql).all(...params);
+
+    let countSql = 'SELECT COUNT(*) as total FROM checkin_records WHERE event_id = ?';
+    const countParams: any[] = [eventId];
+    if (status) { countSql += ' AND status = ?'; countParams.push(status); }
+    const total = (db.prepare(countSql).get(...countParams) as any).total;
+
+    return ok({ records, total });
+  });
+
+  router.post('/:id/records/:rid/review', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const recordId = parseInt(request.params.rid);
+    const { status, review_note } = request.body;
+    if (!['approved', 'rejected'].includes(status)) return reply.code(400).send({ success: false, error: '状态无效' });
+
+    const record = db.prepare('SELECT * FROM checkin_records WHERE id = ? AND event_id = ?').get(recordId, eventId) as any;
+    if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在' });
+
+    db.prepare(`
+      UPDATE checkin_records
+      SET status = ?, reviewed_by = ?, reviewed_at = datetime('now'), review_note = ?
+      WHERE id = ?
+    `).run(status, (request.user as AuthUser).id, review_note || null, recordId);
+
+    return ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId));
+  });
+
+  router.get('/:id/export', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    if (!event) return reply.code(404).send({ success: false, error: '活动不存在' });
+
+    const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(eventId) as any[];
+    const records = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(eventId) as any[];
+
+    const csvRows = [];
+    csvRows.push(['昵称', '孩子姓名', '打卡天数', '加入时间']);
+
+    for (const p of participants) {
+      const pRecords = records.filter(r => r.participant_id === p.id && r.status === 'approved');
+      csvRows.push([
+        p.nickname || '',
+        p.child_name || '',
+        pRecords.length,
+        p.joined_at || ''
+      ]);
+    }
+
+    csvRows.push([]);
+    csvRows.push(['--- 打卡明细 ---']);
+    csvRows.push(['昵称', '孩子姓名', '打卡日期', '打卡内容', '状态', '审核备注']);
+
+    for (const r of records) {
+      const p = participants.find(p => p.id === r.participant_id);
+      csvRows.push([
+        p?.nickname || '',
+        p?.child_name || '',
+        r.checkin_date || '',
+        r.note || '',
+        r.status === 'approved' ? '已通过' : r.status === 'rejected' ? '已拒绝' : '待审核',
+        r.review_note || ''
+      ]);
+    }
+
+    const csvContent = '\uFEFF' + csvRows.map(row =>
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="checkin_${eventId}.csv"`);
+    return csvContent;
+  });
+
+  router.get('/:id/badges', async (request: any) => {
+    const eventId = parseInt(request.params.id);
+    const badges = db.prepare('SELECT * FROM checkin_badges WHERE event_id = ? ORDER BY target_days ASC').all(eventId);
+    return ok(badges);
+  });
+
+  router.post('/:id/badges', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const { name, description, icon, type = 'streak', target_days = 0 } = request.body;
+    if (!name) return reply.code(400).send({ success: false, error: '徽章名称不能为空' });
+
+    const r = db.prepare(`
+      INSERT INTO checkin_badges (event_id, name, description, icon, type, target_days)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(eventId, name, description || null, icon || null, type, target_days || 0);
+
+    return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_badges WHERE id = ?').get(r.lastInsertRowid)));
+  });
+
+  router.put('/:id/badges/:bid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const badgeId = parseInt(request.params.bid);
+    const { name, description, icon, type, target_days } = request.body;
+
+    const badge = db.prepare('SELECT * FROM checkin_badges WHERE id = ? AND event_id = ?').get(badgeId, eventId) as any;
+    if (!badge) return reply.code(404).send({ success: false, error: '徽章不存在' });
+
+    const fields: string[] = [], params: any[] = [];
+    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
+    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+    if (icon !== undefined) { fields.push('icon = ?'); params.push(icon); }
+    if (type !== undefined) { fields.push('type = ?'); params.push(type); }
+    if (target_days !== undefined) { fields.push('target_days = ?'); params.push(target_days); }
+    params.push(badgeId);
+
+    db.prepare(`UPDATE checkin_badges SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return ok(db.prepare('SELECT * FROM checkin_badges WHERE id = ?').get(badgeId));
+  });
+
+  router.delete('/:id/badges/:bid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const badgeId = parseInt(request.params.bid);
+    const badge = db.prepare('SELECT * FROM checkin_badges WHERE id = ? AND event_id = ?').get(badgeId, eventId);
+    if (!badge) return reply.code(404).send({ success: false, error: '徽章不存在' });
+    db.prepare('DELETE FROM checkin_badges WHERE id = ?').run(badgeId);
+    return ok({ deleted: true });
+  });
+
+  router.get('/:id/rewards', async (request: any) => {
+    const eventId = parseInt(request.params.id);
+    const { status, search } = request.query as any;
+    let sql = `
+      SELECT p.*,
+        (SELECT COUNT(*) FROM checkin_records r WHERE r.participant_id = p.id AND r.status = 'approved') as checkin_days
+      FROM checkin_participants p
+      WHERE p.event_id = ?
+    `;
+    const params: any[] = [eventId];
+    if (status) { sql += ' AND p.reward_status = ?'; params.push(status); }
+    if (search) { sql += ' AND (p.nickname LIKE ? OR p.child_name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+    sql += ' ORDER BY checkin_days DESC, p.joined_at ASC';
+    const participants = db.prepare(sql).all(...params);
+    return ok(participants);
+  });
+
+  router.post('/:id/rewards/:pid/distribute', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const participantId = parseInt(request.params.pid);
+    const { reward_note } = request.body;
+
+    const participant = db.prepare('SELECT * FROM checkin_participants WHERE id = ? AND event_id = ?').get(participantId, eventId) as any;
+    if (!participant) return reply.code(404).send({ success: false, error: '参与者不存在' });
+
+    db.prepare(`
+      UPDATE checkin_participants
+      SET reward_status = 'distributed', reward_distributed_at = datetime('now'), reward_note = ?
+      WHERE id = ?
+    `).run(reward_note || null, participantId);
+
+    return ok(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(participantId));
+  });
+
+  router.get('/:id/materials-manage', async (request: any) => {
+    const eventId = parseInt(request.params.id);
+    const materials = db.prepare('SELECT * FROM checkin_materials WHERE event_id = ? ORDER BY sort_order ASC, id DESC').all(eventId);
+    return ok(materials);
+  });
+
+  router.post('/:id/materials', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const { title, description, file_url, file_type, sort_order = 0, is_active = 1 } = request.body;
+    if (!title) return reply.code(400).send({ success: false, error: '标题不能为空' });
+
+    const r = db.prepare(`
+      INSERT INTO checkin_materials (event_id, title, description, file_url, file_type, sort_order, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(eventId, title, description || null, file_url || null, file_type || null, sort_order, is_active ? 1 : 0);
+
+    return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_materials WHERE id = ?').get(r.lastInsertRowid)));
+  });
+
+  router.put('/:id/materials/:mid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const materialId = parseInt(request.params.mid);
+    const { title, description, file_url, file_type, sort_order, is_active } = request.body;
+
+    const material = db.prepare('SELECT * FROM checkin_materials WHERE id = ? AND event_id = ?').get(materialId, eventId) as any;
+    if (!material) return reply.code(404).send({ success: false, error: '资料不存在' });
+
+    const fields: string[] = [], params: any[] = [];
+    if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+    if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+    if (file_url !== undefined) { fields.push('file_url = ?'); params.push(file_url); }
+    if (file_type !== undefined) { fields.push('file_type = ?'); params.push(file_type); }
+    if (sort_order !== undefined) { fields.push('sort_order = ?'); params.push(sort_order); }
+    if (is_active !== undefined) { fields.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+    params.push(materialId);
+
+    db.prepare(`UPDATE checkin_materials SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return ok(db.prepare('SELECT * FROM checkin_materials WHERE id = ?').get(materialId));
+  });
+
+  router.delete('/:id/materials/:mid', async (request: any, reply: any) => {
+    const eventId = parseInt(request.params.id);
+    const materialId = parseInt(request.params.mid);
+    const material = db.prepare('SELECT * FROM checkin_materials WHERE id = ? AND event_id = ?').get(materialId, eventId);
+    if (!material) return reply.code(404).send({ success: false, error: '资料不存在' });
+    db.prepare('DELETE FROM checkin_materials WHERE id = ?').run(materialId);
+    return ok({ deleted: true });
+  });
+}, { prefix: '/api/checkin-events' });
 
 app.setErrorHandler((error: any, _request, reply) => {
   if (error.statusCode) {

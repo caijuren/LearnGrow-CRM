@@ -21,6 +21,10 @@ declare module '@fastify/jwt' {
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
+    const query = request.query as any;
+    if (query?.token) {
+      request.headers.authorization = `Bearer ${query.token}`;
+    }
     await request.jwtVerify();
   } catch (err) {
     reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });

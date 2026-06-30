@@ -346,3 +346,71 @@ export async function deleteMaterial(id: number) {
 export async function recordMaterialDownload(id: number) {
   return request<{ download_count: number }>(`/materials/${id}/download`, { method: 'POST' });
 }
+
+// ========== 打卡管理新接口 ==========
+
+export async function fetchCheckinRecords(eventId: number, params: { status?: string; page?: number; limit?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  return request<{ records: any[]; total: number }>(`/checkin-events/${eventId}/records?${qs.toString()}`);
+}
+
+export async function reviewCheckinRecord(eventId: number, recordId: number, status: 'approved' | 'rejected', review_note?: string) {
+  return request<any>(`/checkin-events/${eventId}/records/${recordId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ status, review_note })
+  });
+}
+
+export async function fetchEventBadges(eventId: number) {
+  return request<any[]>(`/checkin-events/${eventId}/badges`);
+}
+
+export async function createEventBadge(eventId: number, data: { name: string; description?: string; icon?: string; type: string; target_days: number }) {
+  return request<any>(`/checkin-events/${eventId}/badges`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateEventBadge(eventId: number, badgeId: number, data: Partial<{ name: string; description: string; icon: string; type: string; target_days: number }>) {
+  return request<any>(`/checkin-events/${eventId}/badges/${badgeId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteEventBadge(eventId: number, badgeId: number) {
+  return request<{ deleted: boolean }>(`/checkin-events/${eventId}/badges/${badgeId}`, { method: 'DELETE' });
+}
+
+export async function fetchEventMaterials(eventId: number) {
+  return request<any[]>(`/checkin-events/${eventId}/materials-manage`);
+}
+
+export async function createEventMaterial(eventId: number, data: { title: string; description?: string; file_url?: string; file_type?: string; sort_order?: number; is_active?: boolean }) {
+  return request<any>(`/checkin-events/${eventId}/materials`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateEventMaterial(eventId: number, materialId: number, data: Partial<{ title: string; description: string; file_url: string; file_type: string; sort_order: number; is_active: boolean }>) {
+  return request<any>(`/checkin-events/${eventId}/materials/${materialId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteEventMaterial(eventId: number, materialId: number) {
+  return request<{ deleted: boolean }>(`/checkin-events/${eventId}/materials/${materialId}`, { method: 'DELETE' });
+}
+
+export async function fetchEventRewards(eventId: number, params: { status?: string; search?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set('status', params.status);
+  if (params.search) qs.set('search', params.search);
+  return request<any[]>(`/checkin-events/${eventId}/rewards?${qs.toString()}`);
+}
+
+export async function distributeReward(eventId: number, participantId: number, reward_note?: string) {
+  return request<any>(`/checkin-events/${eventId}/rewards/${participantId}/distribute`, {
+    method: 'POST',
+    body: JSON.stringify({ reward_note })
+  });
+}
+
+export function getExportUrl(eventId: number) {
+  const token = getToken();
+  return `/api/checkin-events/${eventId}/export?token=${token}`;
+}

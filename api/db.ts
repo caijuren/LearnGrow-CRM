@@ -569,11 +569,108 @@ const existingCheckinRecordCols = (sqlite.prepare("PRAGMA table_info(checkin_rec
 if (!existingCheckinRecordCols.includes('image_url')) {
   sqlite.exec("ALTER TABLE checkin_records ADD COLUMN image_url TEXT");
 }
+if (!existingCheckinRecordCols.includes('status')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('pending', 'approved', 'rejected'))");
+}
+if (!existingCheckinRecordCols.includes('reviewed_by')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN reviewed_by INTEGER");
+}
+if (!existingCheckinRecordCols.includes('reviewed_at')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN reviewed_at TEXT");
+}
+if (!existingCheckinRecordCols.includes('review_note')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN review_note TEXT");
+}
 
 const existingCheckinParticipantCols = (sqlite.prepare("PRAGMA table_info(checkin_participants)").all() as any[]).map(c => c.name);
 if (!existingCheckinParticipantCols.includes('wx_user_id')) {
   sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN wx_user_id INTEGER");
 }
+if (!existingCheckinParticipantCols.includes('reward_status')) {
+  sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN reward_status TEXT NOT NULL DEFAULT 'none' CHECK(reward_status IN ('none', 'pending', 'distributed'))");
+}
+if (!existingCheckinParticipantCols.includes('reward_distributed_at')) {
+  sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN reward_distributed_at TEXT");
+}
+if (!existingCheckinParticipantCols.includes('reward_note')) {
+  sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN reward_note TEXT");
+}
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS checkin_badges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT,
+    type TEXT NOT NULL DEFAULT 'streak' CHECK(type IN ('streak', 'total', 'milestone')),
+    target_days INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS checkin_badge_achievements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    badge_id INTEGER NOT NULL,
+    participant_id INTEGER NOT NULL,
+    achieved_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (badge_id) REFERENCES checkin_badges(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant_id) REFERENCES checkin_participants(id) ON DELETE CASCADE,
+    UNIQUE(badge_id, participant_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS checkin_materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER,
+    title TEXT NOT NULL,
+    description TEXT,
+    file_url TEXT,
+    file_type TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_checkin_badges_event ON checkin_badges(event_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_badge_achievements_participant ON checkin_badge_achievements(participant_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_materials_event ON checkin_materials(event_id);
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS wx_subscribe_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id TEXT NOT NULL UNIQUE,
+    scene TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS wx_subscribe_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wx_user_id INTEGER NOT NULL,
+    template_id TEXT NOT NULL,
+    scene TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'failed')),
+    error_msg TEXT,
+    sent_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (wx_user_id) REFERENCES wx_users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_subscribe_records_user ON wx_subscribe_records(wx_user_id);
+  CREATE INDEX IF NOT EXISTS idx_subscribe_records_status ON wx_subscribe_records(status);
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
 
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS wx_users (
