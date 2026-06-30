@@ -52,6 +52,8 @@ Page({
       }
 
       let result;
+      let useDevMode = !code || code.startsWith('dev_');
+
       try {
         result = await api.login({
           code,
@@ -60,17 +62,17 @@ Page({
           child_name: null
         });
       } catch (e) {
-        if (code && code.startsWith('dev_')) {
-          wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
-          return;
+        if (!useDevMode) {
+          code = 'dev_' + Date.now();
+          result = await api.login({
+            code,
+            nickname: '微信用户',
+            avatar_url: null,
+            child_name: null
+          });
+        } else {
+          throw e;
         }
-        code = 'dev_' + Date.now();
-        result = await api.login({
-          code,
-          nickname: '微信用户',
-          avatar_url: null,
-          child_name: null
-        });
       }
 
       if (!result || !result.token) {

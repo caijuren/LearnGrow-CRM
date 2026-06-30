@@ -1290,7 +1290,7 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
   
   let openid: string;
   const WX_APPID = process.env.WX_APPID;
-  const WX_SECRET = process.env.WX_SECRET;
+  const WX_SECRET = process.env.WX_SECRET || process.env.WX_APPSECRET;
   
   if (WX_APPID && WX_SECRET && code) {
     try {
