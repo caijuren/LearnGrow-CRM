@@ -81,29 +81,21 @@
     </view>
 
     <view wx:else class="checkin-form">
-      <view class="quick-photo" bindtap="chooseImage">
-        <view class="quick-photo-icon">📷</view>
-        <view class="quick-photo-text">
-          <view class="font-bold" style="font-size: 32rpx;">拍照打卡</view>
-          <view class="text-muted" style="font-size: 26rpx; margin-top: 8rpx;">点击拍照，快速完成打卡</view>
-        </view>
-        <view class="quick-photo-arrow">→</view>
-      </view>
-
-      <view class="form-item mt-4">
-        <view class="label">打卡感言（选填）</view>
-        <textarea class="textarea" placeholder="说点什么吧~ 比如今天学习了什么内容" value="{{checkinNote}}" bindinput="onNoteInput" maxlength="200" />
-      </view>
-
       <view class="form-item">
-        <view class="label">上传截图（选填）</view>
+        <view class="label">打卡图片（选填）</view>
         <view class="upload-area" bindtap="chooseImage">
           <image wx:if="{{checkinImage}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
           <view wx:else class="upload-placeholder">
             <text style="font-size: 60rpx;">🖼️</text>
-            <text class="text-muted mt-2" style="font-size: 26rpx;">从相册选择图片</text>
+            <text class="text-muted mt-2" style="font-size: 26rpx;">点击上传图片</text>
+            <text class="text-muted" style="font-size: 22rpx; margin-top: 8rpx;">支持拍照或从相册选择</text>
           </view>
         </view>
+      </view>
+
+      <view class="form-item mt-3">
+        <view class="label">打卡感言（选填）</view>
+        <textarea class="textarea" placeholder="说点什么吧~ 比如今天学习了什么内容" value="{{checkinNote}}" bindinput="onNoteInput" maxlength="200" />
       </view>
 
       <button class="btn-primary btn-large mt-3" bindtap="submitCheckin" loading="{{submitting}}">
