@@ -1,35 +1,82 @@
 .container {
-  padding-bottom: 160rpx;
+  padding-bottom: 180rpx;
 }
 
 .page-header {
-  padding: 20rpx 0 32rpx;
+  padding: 24rpx 4rpx 32rpx;
+}
+
+.page-header .text-xl {
+  font-size: 40rpx;
 }
 
 .checkin-card {
-  border-left: 8rpx solid #f43f5e;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  box-shadow: 0 8rpx 32rpx rgba(244, 63, 94, 0.06);
+}
+
+.checkin-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6rpx;
+  background: linear-gradient(90deg, #f43f5e, #ec4899);
 }
 
 .stats-row {
   justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 28rpx;
 }
 
 .stat-box {
   flex: 1;
-  background: #fef2f2;
-  border-radius: 16rpx;
-  padding: 20rpx;
+  background: linear-gradient(135deg, #fef2f2 0%, #fdf2f8 100%);
+  border-radius: 20rpx;
+  padding: 24rpx 12rpx;
   text-align: center;
 }
 
+.stat-box:nth-child(2) {
+  background: linear-gradient(135deg, #fef3c7 0%, #ffedd5 100%);
+}
+
+.stat-box:nth-child(3) {
+  background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+}
+
 .stat-num {
-  font-size: 36rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-box:nth-child(2) .stat-num {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-box:nth-child(3) .stat-num {
+  background: linear-gradient(135deg, #10b981, #059669);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .stat-label {
   font-size: 22rpx;
-  color: #94a3b8;
-  margin-top: 4rpx;
+  color: #64748b;
+  margin-top: 8rpx;
+  font-weight: 500;
 }
 
 .mini-calendar {
@@ -39,52 +86,74 @@
 }
 
 .mini-day {
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 4rpx;
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 6rpx;
   background: #f1f5f9;
+  transition: all 0.2s;
 }
 
 .mini-day.checked {
   background: linear-gradient(135deg, #f43f5e, #ec4899);
+  box-shadow: 0 2rpx 8rpx rgba(244, 63, 94, 0.2);
 }
 
 .records-scroll {
   white-space: nowrap;
+  margin: 0 -4rpx;
+  padding: 4rpx;
 }
 
 .records-list {
   padding: 4rpx 0;
+  display: inline-flex;
+  gap: 16rpx;
 }
 
 .record-item {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
 }
 
 .record-image {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 12rpx;
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
 }
 
 .record-placeholder {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 12rpx;
-  background: #dcfce7;
-  color: #16a34a;
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #15803d;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40rpx;
+  font-size: 44rpx;
+  font-weight: 600;
 }
 
 .record-date {
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #94a3b8;
+  font-weight: 500;
+}
+
+.recent-records {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #f1f5f9;
+}
+
+.recent-records .text-secondary {
+  font-size: 26rpx;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 20rpx;
 }
 
 .bottom-nav {
@@ -92,11 +161,13 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
   display: flex;
-  padding: 20rpx 0 calc(20rpx + env(safe-area-inset-bottom));
-  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.05);
+  padding: 16rpx 0 calc(16rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -4rpx 24rpx rgba(0, 0, 0, 0.04);
   z-index: 100;
+  border-top: 2rpx solid #f1f5f9;
 }
 
 .nav-item {
@@ -104,18 +175,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8rpx;
+  gap: 6rpx;
   color: #94a3b8;
+  transition: all 0.2s;
+  padding: 8rpx 0;
 }
 
 .nav-item.active {
   color: #f43f5e;
 }
 
+.nav-item.active .nav-icon {
+  transform: scale(1.1);
+}
+
 .nav-icon {
-  font-size: 44rpx;
+  font-size: 48rpx;
+  transition: transform 0.2s;
 }
 
 .nav-text {
-  font-size: 24rpx;
+  font-size: 22rpx;
+  font-weight: 500;
 }

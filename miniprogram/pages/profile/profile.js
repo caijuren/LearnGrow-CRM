@@ -5,6 +5,7 @@ Page({
   data: {
     userInfo: null,
     myCheckins: [],
+    myBadges: [],
     totalDays: 0,
     totalStreak: 0,
     joinedEvents: 0,
@@ -42,8 +43,14 @@ Page({
         if (c.max_streak > maxStreak) maxStreak = c.max_streak;
       }
 
+      let myBadges = [];
+      try {
+        myBadges = await api.getMyBadges() || [];
+      } catch (e) { console.log('徽章加载失败', e); }
+
       this.setData({
         myCheckins,
+        myBadges,
         totalDays,
         totalStreak: maxStreak,
         joinedEvents: myCheckins.length

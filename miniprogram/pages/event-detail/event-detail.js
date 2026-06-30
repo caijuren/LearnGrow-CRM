@@ -15,7 +15,10 @@ Page({
     submitting: false,
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false,
-    isJoined: false
+    isJoined: false,
+    badges: [],
+    achievedBadges: 0,
+    materials: []
   },
 
   onLoad(options) {
@@ -78,13 +81,28 @@ Page({
         calendarDays = this.buildEmptyCalendar(event.start_date, event.end_date);
       }
 
+      let badges = [];
+      let achievedBadges = 0;
+      try {
+        badges = await api.getEventBadges(this.data.eventId) || [];
+        achievedBadges = badges.filter(b => b.achieved).length;
+      } catch (e) { console.log('徽章加载失败', e); }
+
+      let materials = [];
+      try {
+        materials = await api.getEventMaterials(this.data.eventId) || [];
+      } catch (e) { console.log('资料加载失败', e); }
+
       this.setData({
         event,
         myStats,
         todayChecked,
         todayRecord,
         calendarDays,
-        isJoined
+        isJoined,
+        badges,
+        achievedBadges,
+        materials
       });
     } catch (e) {
       console.error(e);
@@ -207,10 +225,15 @@ Page({
         image_url: this.data.checkinImageUrl || null
       });
 
+      let toastTitle = `第${result.checkin_number}次打卡成功！`;
+      if (result.new_badges && result.new_badges.length > 0) {
+        toastTitle = `🎉 获得${result.new_badges[0].name}徽章！`;
+      }
+
       wx.showToast({ 
-        title: `第${result.checkin_number}次打卡成功！`, 
+        title: toastTitle, 
         icon: 'success',
-        duration: 2000
+        duration: 2500
       });
       this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '' });
       this.loadData();
@@ -218,6 +241,39 @@ Page({
       console.error(e);
     } finally {
       this.setData({ submitting: false });
+    }
+  },
+
+  openMaterial(e) {
+    const url = e.currentTarget.dataset.url;
+    const type = e.currentTarget.dataset.type;
+    if (!url) return;
+
+    const fullUrl = this.data.baseUrl + url;
+    
+    if (type === 'pdf' || url.endsWith('.pdf')) {
+      wx.showLoading({ title: '加载中...' });
+      wx.downloadFile({
+        url: fullUrl,
+        success: (res) => {
+          wx.hideLoading();
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            showMenu: true
+          });
+        },
+        fail: () => {
+          wx.hideLoading();
+          wx.showToast({ title: '加载失败', icon: 'none' });
+        }
+      });
+    } else {
+      wx.setClipboardData({
+        data: fullUrl,
+        success: () => {
+          wx.showToast({ title: '链接已复制', icon: 'success' });
+        }
+      });
     }
   },
 

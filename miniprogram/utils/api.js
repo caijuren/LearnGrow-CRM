@@ -113,6 +113,18 @@ function getRanking(eventId) {
   return request({ url: `/api/wx/checkin-events/${eventId}/ranking` });
 }
 
+function getEventMaterials(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/materials` });
+}
+
+function getEventBadges(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/badges` });
+}
+
+function getMyBadges() {
+  return request({ url: '/api/wx/my-badges' });
+}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}月${d.getDate()}日`;
@@ -144,6 +156,9 @@ module.exports = {
   doCheckin,
   getMyCheckins,
   getRanking,
+  getEventMaterials,
+  getEventBadges,
+  getMyBadges,
   formatDate,
   getDayOfWeek,
   isToday,

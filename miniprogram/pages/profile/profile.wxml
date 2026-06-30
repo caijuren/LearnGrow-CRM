@@ -1,9 +1,14 @@
 <view class="container">
   <view wx:if="{{!isLoggedIn}}" class="profile-guest">
-    <view class="guest-avatar">👤</view>
-    <view class="guest-title text-xl font-bold text-white mt-4">欢迎使用打卡小程序</view>
-    <view class="guest-desc text-white mt-2" style="opacity: 0.85; font-size: 26rpx;">登录后参与打卡活动，记录成长点滴</view>
-    <button class="btn-primary mt-6" style="background: white; color: #f43f5e;" bindtap="goToLogin">立即登录</button>
+    <view class="guest-avatar-wrap">
+      <view class="guest-avatar">👤</view>
+    </view>
+    <view class="guest-title">欢迎使用打卡小程序</view>
+    <view class="guest-desc">登录后参与打卡活动，记录成长点滴</view>
+    <button class="guest-login-btn" bindtap="goToLogin">
+      <text>立即登录</text>
+      <text class="btn-arrow">→</text>
+    </button>
   </view>
 
   <block wx:if="{{isLoggedIn}}">
@@ -47,6 +52,19 @@
         <view class="stat-item flex-1">
           <view class="stat-num text-success font-bold text-xl">{{totalStreak}}</view>
           <view class="stat-label text-muted">最长连续</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{myBadges.length > 0}}" class="card">
+      <view class="flex-between items-center mb-3">
+        <view class="font-bold">🎖️ 我的徽章</view>
+        <text class="text-muted" style="font-size: 24rpx;">共 {{myBadges.length}} 个</text>
+      </view>
+      <view class="user-badge-row">
+        <view wx:for="{{myBadges}}" wx:key="id" class="user-badge-item">
+          <view class="user-badge-icon">{{item.badge_icon || '🏅'}}</view>
+          <view class="user-badge-name">{{item.badge_name}}</view>
         </view>
       </view>
     </view>

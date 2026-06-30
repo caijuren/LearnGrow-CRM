@@ -23,6 +23,15 @@ Page({
     wx.navigateTo({ url: '/pages/privacy/privacy' });
   },
 
+  goBack() {
+    const pages = getCurrentPages();
+    if (pages.length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.reLaunch({ url: '/pages/index/index' });
+    }
+  },
+
   async handleWxLogin() {
     if (!this.data.agreed) {
       wx.showToast({ title: '请先同意隐私协议', icon: 'none' });
@@ -42,12 +51,32 @@ Page({
         code = 'dev_' + Date.now();
       }
 
-      const result = await api.login({
-        code,
-        nickname: '微信用户',
-        avatar_url: null,
-        child_name: null
-      });
+      let result;
+      try {
+        result = await api.login({
+          code,
+          nickname: '微信用户',
+          avatar_url: null,
+          child_name: null
+        });
+      } catch (e) {
+        if (code && code.startsWith('dev_')) {
+          wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
+          return;
+        }
+        code = 'dev_' + Date.now();
+        result = await api.login({
+          code,
+          nickname: '微信用户',
+          avatar_url: null,
+          child_name: null
+        });
+      }
+
+      if (!result || !result.token) {
+        wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
+        return;
+      }
 
       app.setLogin(result.token, result.user);
 
@@ -63,7 +92,7 @@ Page({
       }, 1000);
     } catch (e) {
       console.error(e);
-      wx.showToast({ title: '登录失败，请重试', icon: 'none' });
+      wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }

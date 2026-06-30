@@ -65,12 +65,10 @@ Page({
   },
 
   goToMyCheckins() {
-    if (!app.requireLogin()) return;
     wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
   },
 
   goToProfile() {
-    if (!app.requireLogin()) return;
     wx.navigateTo({ url: '/pages/profile/profile' });
   },
 

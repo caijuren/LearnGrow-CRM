@@ -1,6 +1,6 @@
 {
   "libVersion": "3.16.1",
-  "projectname": "%E4%B9%90%E5%AD%A6%E9%95%BF%E6%89%93%E5%8D%A1",
+  "projectname": "miniprogram",
   "condition": {},
   "setting": {
     "urlCheck": false,

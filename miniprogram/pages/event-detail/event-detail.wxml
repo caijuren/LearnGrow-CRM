@@ -18,6 +18,43 @@
     <view class="text-secondary" style="line-height: 1.6;">{{event.reward_rules}}</view>
   </view>
 
+  <view wx:if="{{badges.length > 0}}" class="card">
+    <view class="flex items-center gap-2 mb-4">
+      <text style="font-size: 36rpx;">🎖️</text>
+      <text class="font-bold text-lg">打卡徽章</text>
+      <text class="text-muted" style="font-size: 24rpx; margin-left: auto;">已获得 {{achievedBadges}}/{{badges.length}}</text>
+    </view>
+    <view class="badge-grid">
+      <view wx:for="{{badges}}" wx:key="id" class="badge-item {{item.achieved ? 'achieved' : ''}}">
+        <view class="badge-icon">{{item.icon || '🏅'}}</view>
+        <view class="badge-name">{{item.name}}</view>
+        <view class="badge-target">{{item.target_days}}天</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{materials.length > 0}}" class="card">
+    <view class="flex items-center gap-2 mb-4">
+      <text style="font-size: 36rpx;">📚</text>
+      <text class="font-bold text-lg">学习资料</text>
+    </view>
+    <view class="material-list">
+      <view wx:for="{{materials}}" wx:key="id" class="material-item" bindtap="openMaterial" data-url="{{item.file_url}}" data-type="{{item.file_type}}">
+        <view class="material-icon">
+          <text wx:if="{{item.file_type === 'pdf'}}">📄</text>
+          <text wx:elif="{{item.file_type === 'video'}}">🎬</text>
+          <text wx:elif="{{item.file_type === 'audio'}}">🎵</text>
+          <text wx:else>📎</text>
+        </view>
+        <view class="material-info">
+          <view class="material-title">{{item.title}}</view>
+          <view wx:if="{{item.description}}" class="material-desc">{{item.description}}</view>
+        </view>
+        <view class="material-arrow">→</view>
+      </view>
+    </view>
+  </view>
+
   <view wx:if="{{event.required_text}}" class="card">
     <view class="font-bold mb-2">📝 打卡要求</view>
     <view class="text-secondary">{{event.required_text}}</view>

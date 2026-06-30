@@ -48,7 +48,7 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "2.19.4",
+  "libVersion": "3.16.1",
   "appid": "wxdf0f1e4f73b76ec8",
   "projectname": "learngrow-checkin",
   "isGameTourist": false,
