@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Search, Plus, X, Phone, MessageCircle, Star, Clock,
-  Trash2, Edit2, UserPlus, Filter, Tag, Loader2, User,
+  Search, Plus, X, MessageCircle, Star, Clock,
+  UserPlus, Filter, Tag, Loader2, User,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import {
-  SOURCE_LABELS, IMPORTANCE_LABELS, IMPORTANCE_COLORS, COMMON_TAGS,
-  STAGE_LABELS, STAGE_COLORS, WECHAT_ACCOUNT_LABELS,
+  SOURCE_LABELS, IMPORTANCE_LABELS, COMMON_TAGS,
+  STAGE_LABELS, WECHAT_ACCOUNT_LABELS,
   type Importance, type CustomerSource, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Modal from '@/components/Modal';
 
 const IMPORTANCE_FILTERS: { value: Importance | ''; label: string }[] = [
   { value: '', label: '全部' },
-  { value: 'vip', label: '⭐重点' },
+  { value: 'vip', label: '重点' },
   { value: 'normal', label: '普通' },
   { value: 'watch', label: '观察中' },
 ];
@@ -28,14 +29,6 @@ const STAGE_FILTERS: { value: CustomerStage | ''; label: string }[] = [
   { value: 'in_group', label: '已进群' },
   { value: 'repurchased', label: '复购客户' },
   { value: 'silent', label: '沉默客户' },
-];
-
-const AVATAR_COLORS = [
-  'from-rose-400 to-pink-500',
-  'from-pink-400 to-fuchsia-500',
-  'from-fuchsia-400 to-purple-500',
-  'from-purple-400 to-violet-500',
-  'from-violet-400 to-indigo-500',
 ];
 
 interface CustomerForm {
@@ -73,7 +66,6 @@ const emptyForm: CustomerForm = {
 };
 
 function CustomerCard({ customer, onClick }: { customer: any; onClick: () => void }) {
-  const avatarColor = AVATAR_COLORS[customer.id % AVATAR_COLORS.length];
   const isVip = customer.importance === 'vip';
 
   const formatDate = (dateStr: string | null) => {
@@ -91,61 +83,148 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
   return (
     <div
       onClick={onClick}
-      className={`relative bg-white rounded-2xl p-4 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer border-2 group ${
-        isVip
-          ? 'border-amber-300 bg-gradient-to-br from-amber-50/50 to-white hover:border-amber-400'
-          : 'border-slate-100 hover:border-rose-200'
-      }`}
+      className="cursor-pointer transition-all duration-150 group relative overflow-hidden"
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: 'var(--radius-md)',
+        padding: '1rem',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-border-strong)';
+        e.currentTarget.style.boxShadow = '0 1px 3px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.04)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-border-default)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
     >
+      {/* VIP 左侧色条 */}
       {isVip && (
-        <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-200">
-          <Star className="w-4 h-4 text-white fill-white" />
-        </div>
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '3px',
+            background: 'linear-gradient(180deg, rgb(245 158 11), rgb(234 179 8))',
+          }}
+        />
       )}
 
-      <div className="flex items-start gap-3">
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${avatarColor} flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform`}>
-          <span className="text-lg font-bold text-white">{customer.name[0]}</span>
+      <div className="flex items-start gap-3" style={{ paddingLeft: isVip ? '0.5rem' : 0 }}>
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: isVip ? 'rgb(245 158 11 / 0.08)' : 'var(--color-primary-soft)',
+            color: isVip ? 'rgb(217 119 6)' : 'var(--color-primary)',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+          }}
+        >
+          {customer.name[0]}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="text-base font-bold text-slate-900 truncate group-hover:text-rose-600 transition-colors">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <h3
+              className="truncate flex-1"
+              style={{
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                lineHeight: 1.4,
+              }}
+            >
               {customer.name}
             </h3>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${STAGE_COLORS[customer.stage]}`}>
+            {isVip && (
+              <Star
+                size={12}
+                strokeWidth={2}
+                style={{ color: 'rgb(245 158 11)', fill: 'currentColor', flexShrink: 0 }}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+              style={{
+                fontSize: '0.6875rem',
+                fontWeight: 500,
+                backgroundColor: 'var(--color-bg-subtle)',
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border-subtle)',
+              }}
+            >
               {STAGE_LABELS[customer.stage as CustomerStage]}
             </span>
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            {customer.wechat_remark && (
-              <div className="flex items-center gap-1 text-xs text-emerald-600">
-                <MessageCircle className="w-3 h-3" />
-                <span className="truncate">{customer.wechat_remark}</span>
-              </div>
-            )}
             {customer.wechat_account === 'assistant' && (
-              <span className="px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded text-[10px] font-medium">助理号</span>
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 500,
+                  backgroundColor: 'var(--color-bg-subtle)',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border-subtle)',
+                }}
+              >
+                助理号
+              </span>
             )}
           </div>
-          {customer.nickname && !customer.wechat_remark && (
-            <div className="flex items-center gap-1 text-xs text-slate-500 mb-1">
-              <span className="truncate">{customer.nickname}</span>
+          {customer.wechat_remark && (
+            <div
+              className="flex items-center gap-1 truncate"
+              style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)' }}
+            >
+              <MessageCircle size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+              <span className="truncate">{customer.wechat_remark}</span>
             </div>
           )}
           {customer.next_talk_topic && (
-            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg mt-1 line-clamp-1">
-              💬 {customer.next_talk_topic}
+            <div
+              className="mt-1.5 px-2 py-1 rounded-sm truncate"
+              style={{
+                fontSize: '0.6875rem',
+                backgroundColor: 'rgb(245 158 11 / 0.08)',
+                color: 'rgb(180 83 9)',
+                lineHeight: 1.4,
+              }}
+            >
+              {customer.next_talk_topic}
             </div>
           )}
           {customer.tags && customer.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {customer.tags.slice(0, 3).map((tag: string) => (
-                <span key={tag} className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-medium">
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                  style={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 500,
+                    backgroundColor: 'var(--color-bg-surface)',
+                    color: 'var(--color-text-secondary)',
+                    border: '1px solid var(--color-border-default)',
+                  }}
+                >
                   {tag}
                 </span>
               ))}
               {customer.tags.length > 3 && (
-                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-medium">
+                <span
+                  className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                  style={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 500,
+                    color: 'var(--color-text-tertiary)',
+                  }}
+                >
                   +{customer.tags.length - 3}
                 </span>
               )}
@@ -154,21 +233,88 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100">
-        <div className="text-center">
-          <div className="text-sm font-bold text-rose-600">¥{customer.total_spent?.toLocaleString() || 0}</div>
-          <div className="text-[10px] text-slate-400">累计消费</div>
+      {/* 底部数据 */}
+      <div
+        className="grid grid-cols-3 gap-2 mt-3 pt-3"
+        style={{
+          borderTop: '1px solid var(--color-border-subtle)',
+          marginLeft: isVip ? '0.5rem' : 0,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.2,
+            }}
+          >
+            ¥{customer.total_spent?.toLocaleString() || 0}
+          </div>
+          <div
+            style={{
+              fontSize: '0.6875rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '2px',
+            }}
+          >
+            累计消费
+          </div>
         </div>
-        <div className="text-center border-x border-slate-100">
-          <div className="text-sm font-bold text-slate-700">{customer.order_count || 0}</div>
-          <div className="text-[10px] text-slate-400">订单数</div>
+        <div
+          style={{
+            borderLeft: '1px solid var(--color-border-subtle)',
+            paddingLeft: '0.5rem',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.2,
+            }}
+          >
+            {customer.order_count || 0}
+          </div>
+          <div
+            style={{
+              fontSize: '0.6875rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '2px',
+            }}
+          >
+            订单数
+          </div>
         </div>
-        <div className="text-center">
-          <div className="text-sm font-medium text-slate-600 flex items-center justify-center gap-0.5">
-            <Clock className="w-3 h-3" />
+        <div
+          style={{
+            borderLeft: '1px solid var(--color-border-subtle)',
+            paddingLeft: '0.5rem',
+          }}
+        >
+          <div
+            className="flex items-center gap-0.5"
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.2,
+            }}
+          >
+            <Clock size={10} strokeWidth={1.8} />
             {formatDate(customer.last_follow_date)}
           </div>
-          <div className="text-[10px] text-slate-400">最后跟进</div>
+          <div
+            style={{
+              fontSize: '0.6875rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '2px',
+            }}
+          >
+            最后跟进
+          </div>
         </div>
       </div>
     </div>
@@ -177,6 +323,7 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
 
 export default function CustomerList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     customers,
     loading,
@@ -193,19 +340,42 @@ export default function CustomerList() {
   const [searchValue, setSearchValue] = useState('');
 
   useEffect(() => {
-    loadCustomers({ page: 1 });
-  }, []);
+    const params = new URLSearchParams(location.search);
+    const search = params.get('search') || undefined;
+    const importance = params.get('importance') || undefined;
+    const stageParam = params.get('stage') || undefined;
+    const stage = STAGE_FILTERS.some(f => f.value === stageParam) ? stageParam : undefined;
+    const needFollow = params.get('need_follow') === 'true' ? 'true' : undefined;
+    const tag = params.get('tag') || undefined;
+
+    setSearchValue(search || '');
+    if (params.get('showAdd') === 'true') {
+      setForm(emptyForm);
+      setShowAdd(true);
+    }
+    setCustomerFilters({ search, importance, stage, need_follow: needFollow, tag });
+  }, [location.search]);
 
   const handleSearch = () => {
-    setCustomerFilters({ search: searchValue || undefined });
+    const params = new URLSearchParams(location.search);
+    if (searchValue) params.set('search', searchValue);
+    else params.delete('search');
+    navigate(`/customers?${params.toString()}`);
   };
 
   const handleImportanceFilter = (importance: Importance | '') => {
-    setCustomerFilters({ importance: importance || undefined });
+    const params = new URLSearchParams(location.search);
+    if (importance) params.set('importance', importance);
+    else params.delete('importance');
+    navigate(`/customers?${params.toString()}`);
   };
 
   const handleStageFilter = (stage: CustomerStage | '') => {
-    setCustomerFilters({ stage: stage || undefined });
+    const params = new URLSearchParams(location.search);
+    params.delete('need_follow');
+    if (stage) params.set('stage', stage);
+    else params.delete('stage');
+    navigate(`/customers?${params.toString()}`);
   };
 
   const toggleTag = (tag: string) => {
@@ -258,90 +428,147 @@ export default function CustomerList() {
   const currentStage = customerFilters.stage || '';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+    <div className="page-shell">
+      <div className="page-inner">
+        <div className="page-header">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">
-              我的客户
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">管理您的微信私域客户，记录每一次沟通</p>
+            <h1 className="t-display">我的客户</h1>
+            <p className="t-caption mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+              管理您的微信私域客户，记录每一次沟通
+            </p>
           </div>
           <button
             onClick={() => { setForm(emptyForm); setShowAdd(true); }}
-            className="bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-lg shadow-rose-200 hover:shadow-xl hover:shadow-rose-300 transition-all"
+            className="btn-primary"
           >
-            <Plus className="w-4 h-4" />
+            <Plus size={15} strokeWidth={1.8} />
             添加客户
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
+        {/* 搜索 + 筛选区 */}
+        <div className="mb-6">
+          <div className="flex gap-3 mb-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search
+                size={15}
+                strokeWidth={1.8}
+                style={{
+                  position: 'absolute',
+                  left: '0.875rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              />
               <input
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
-                placeholder="搜索备注名/微信号/微信备注/手机/抖音名/下次聊啥"
+                className="input pl-9"
+                placeholder="搜索客户备注、微信号、手机、标签..."
                 value={searchValue}
                 onChange={e => setSearchValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
               />
             </div>
-            <button
-              onClick={handleSearch}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Filter className="w-4 h-4" />
-              搜索
+            <button onClick={handleSearch} className="btn-secondary">
+              <Filter size={14} strokeWidth={1.8} />
+              筛选
             </button>
           </div>
 
-          <div className="mt-4 space-y-3">
+          <div className="space-y-2.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 font-medium mr-1">重要程度:</span>
-              {IMPORTANCE_FILTERS.map(filter => (
-                <button
-                  key={filter.value}
-                  onClick={() => handleImportanceFilter(filter.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    currentImportance === filter.value
-                      ? filter.value === 'vip'
-                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                        : 'bg-rose-100 text-rose-700 border border-rose-200'
-                      : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+              <span
+                className="shrink-0"
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: 'var(--color-text-tertiary)',
+                  width: '64px',
+                }}
+              >
+                重要程度
+              </span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {IMPORTANCE_FILTERS.map(filter => {
+                  const isActive = currentImportance === filter.value;
+                  const isVipFilter = filter.value === 'vip';
+                  return (
+                    <button
+                      key={filter.value}
+                      onClick={() => handleImportanceFilter(filter.value)}
+                      className="transition-all"
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.75rem',
+                        fontWeight: isActive ? 600 : 500,
+                        backgroundColor: isActive
+                          ? isVipFilter
+                            ? 'rgb(245 158 11 / 0.1)'
+                            : 'var(--color-primary-soft)'
+                          : 'transparent',
+                        color: isActive
+                          ? isVipFilter
+                            ? 'rgb(180 83 9)'
+                            : 'var(--color-primary)'
+                          : 'var(--color-text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {filter.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 font-medium mr-1">客户阶段:</span>
-              {STAGE_FILTERS.map(filter => (
-                <button
-                  key={filter.value}
-                  onClick={() => handleStageFilter(filter.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    currentStage === filter.value
-                      ? 'bg-rose-100 text-rose-700 border border-rose-200'
-                      : 'bg-slate-50 text-slate-600 border border-transparent hover:bg-slate-100'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
+              <span
+                className="shrink-0"
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  color: 'var(--color-text-tertiary)',
+                  width: '64px',
+                }}
+              >
+                客户阶段
+              </span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {STAGE_FILTERS.map(filter => {
+                  const isActive = currentStage === filter.value;
+                  return (
+                    <button
+                      key={filter.value}
+                      onClick={() => handleStageFilter(filter.value)}
+                      className="transition-all"
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.75rem',
+                        fontWeight: isActive ? 600 : 500,
+                        backgroundColor: isActive ? 'var(--color-primary-soft)' : 'transparent',
+                        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {filter.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
-            <p className="text-sm text-slate-500 mt-3">加载中...</p>
+            <Loader2 size={28} strokeWidth={1.8} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
+            <p className="t-caption mt-3" style={{ color: 'var(--color-text-tertiary)' }}>加载中...</p>
           </div>
         ) : customers.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             {customers.map(customer => (
               <CustomerCard
                 key={customer.id}
@@ -352,7 +579,7 @@ export default function CustomerList() {
           </div>
         ) : (
           <Empty
-            icon={<User className="w-10 h-10 text-rose-300" />}
+            icon={<User size={28} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
             title="暂无客户"
             description={customerFilters.search || customerFilters.importance || customerFilters.stage
               ? '没有找到匹配的客户，试试调整筛选条件'
@@ -360,9 +587,9 @@ export default function CustomerList() {
             action={
               <button
                 onClick={() => { setForm(emptyForm); setShowAdd(true); }}
-                className="bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-lg shadow-rose-200"
+                className="btn-primary"
               >
-                <Plus className="w-4 h-4" />
+                <Plus size={14} strokeWidth={1.8} />
                 添加第一位客户
               </button>
             }
@@ -370,32 +597,28 @@ export default function CustomerList() {
         )}
       </div>
 
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAdd(false)}>
-          <div
-            className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-rose-500" />
-                添加微信好友
-              </h2>
-              <button
-                onClick={() => setShowAdd(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-
-            <div className="p-5 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
+      <Modal
+        isOpen={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="添加微信好友"
+        size="lg"
+        footer={
+          <>
+            <button onClick={() => setShowAdd(false)} className="btn-secondary">取消</button>
+            <button onClick={handleAdd} disabled={!form.name.trim() || submitting} className="btn-primary">
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              确认添加
+            </button>
+          </>
+        }
+      >
+            <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                  客户备注名 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                <label className="form-label">
+                客户备注名 <span className="text-brand-500">*</span>
+              </label>
+              <input
+                  className="input"
                   placeholder="例如：轩轩妈妈-三年级"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -404,18 +627,18 @@ export default function CustomerList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信号</label>
+                  <label className="form-label">微信号</label>
                   <input
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    className="input"
                     placeholder="微信号"
                     value={form.wechat_id}
                     onChange={e => setForm(f => ({ ...f, wechat_id: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信备注名</label>
+                  <label className="form-label">微信备注名</label>
                   <input
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    className="input"
                     placeholder="微信上的备注"
                     value={form.wechat_remark}
                     onChange={e => setForm(f => ({ ...f, wechat_remark: e.target.value }))}
@@ -425,18 +648,18 @@ export default function CustomerList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">添加微信日期</label>
+                  <label className="form-label">添加微信日期</label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    className="input"
                     value={form.wechat_add_date}
                     onChange={e => setForm(f => ({ ...f, wechat_add_date: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">在哪个微信号</label>
+                  <label className="form-label">在哪个微信号</label>
                   <select
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    className="select w-full"
                     value={form.wechat_account}
                     onChange={e => setForm(f => ({ ...f, wechat_account: e.target.value as WechatAccount }))}
                   >
@@ -449,18 +672,18 @@ export default function CustomerList() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">手机号</label>
+                  <label className="form-label">手机号</label>
                   <input
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    className="input"
                     placeholder="手机号码（选填）"
                     value={form.phone}
                     onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">抖音昵称</label>
+                  <label className="form-label">抖音昵称</label>
                   <input
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                    className="input"
                     placeholder="抖音昵称（选填）"
                     value={form.douyin_nickname}
                     onChange={e => setForm(f => ({ ...f, douyin_nickname: e.target.value }))}
@@ -468,11 +691,11 @@ export default function CustomerList() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">来源</label>
+                  <label className="form-label">来源</label>
                   <select
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    className="select w-full"
                     value={form.source}
                     onChange={e => setForm(f => ({ ...f, source: e.target.value as CustomerSource | '' }))}
                   >
@@ -483,9 +706,9 @@ export default function CustomerList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">重要程度</label>
+                  <label className="form-label">重要程度</label>
                   <select
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    className="select w-full"
                     value={form.importance}
                     onChange={e => setForm(f => ({ ...f, importance: e.target.value as Importance }))}
                   >
@@ -495,9 +718,9 @@ export default function CustomerList() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1.5 block">客户阶段</label>
+                  <label className="form-label">客户阶段</label>
                   <select
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                    className="select w-full"
                     value={form.stage}
                     onChange={e => setForm(f => ({ ...f, stage: e.target.value as CustomerStage }))}
                   >
@@ -509,9 +732,9 @@ export default function CustomerList() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">下次聊啥/关注点</label>
+                <label className="form-label">下次聊啥/关注点</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  className="input"
                   placeholder="例如：等发工资买作文、孩子要小升初、问过自然拼读"
                   value={form.next_talk_topic}
                   onChange={e => setForm(f => ({ ...f, next_talk_topic: e.target.value }))}
@@ -519,40 +742,51 @@ export default function CustomerList() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block flex items-center gap-1">
-                  <Tag className="w-3 h-3" />
+                <label className="form-label flex items-center gap-1">
+                  <Tag size={13} strokeWidth={1.8} />
                   标签
                 </label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {COMMON_TAGS.map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleTag(tag)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                        form.tags.includes(tag)
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
+                  {COMMON_TAGS.map(tag => {
+                    const selected = form.tags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className="chip"
+                        style={{
+                          backgroundColor: selected ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
+                          borderColor: selected ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
+                          color: selected ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                          fontWeight: selected ? 600 : 500,
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
                   {form.tags.filter(t => !COMMON_TAGS.includes(t)).map(tag => (
                     <button
                       key={tag}
                       type="button"
                       onClick={() => toggleTag(tag)}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium border bg-pink-50 text-pink-700 border-pink-200 flex items-center gap-1"
+                      className="chip"
+                      style={{
+                        backgroundColor: 'rgb(244 63 94 / 0.08)',
+                        borderColor: 'rgb(244 63 94 / 0.2)',
+                        color: '#E11D48',
+                      }}
                     >
                       {tag}
-                      <X className="w-3 h-3" />
+                      <X size={12} strokeWidth={1.8} />
                     </button>
                   ))}
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-xs"
+                    className="input flex-1"
+                    style={{ fontSize: '0.8125rem' }}
                     placeholder="自定义标签"
                     value={customTag}
                     onChange={e => setCustomTag(e.target.value)}
@@ -561,7 +795,7 @@ export default function CustomerList() {
                   <button
                     type="button"
                     onClick={addCustomTag}
-                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition-colors"
+                    className="btn-secondary btn-sm"
                   >
                     添加
                   </button>
@@ -569,9 +803,9 @@ export default function CustomerList() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注</label>
+                <label className="form-label">备注</label>
                 <textarea
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm resize-none"
+                  className="input resize-none"
                   rows={3}
                   placeholder="记录一些关于这个客户的信息，比如家庭情况、谁管孩子学习、预算多少..."
                   value={form.remark}
@@ -579,26 +813,7 @@ export default function CustomerList() {
                 />
               </div>
             </div>
-
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setShowAdd(false)}
-                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAdd}
-                disabled={!form.name.trim() || submitting}
-                className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                确认添加
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

@@ -42,7 +42,7 @@ Page({
   },
 
   goToProfile() {
-    wx.navigateTo({ url: '/pages/profile/profile' });
+    wx.reLaunch({ url: '/pages/profile/profile' });
   },
 
   goToLogin() {

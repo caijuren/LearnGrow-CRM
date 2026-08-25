@@ -23,19 +23,11 @@ rsync -avz \
   --exclude='data/*.db' \
   --exclude='*.log' \
   --exclude='.git' \
-  "/Users/grubby/Desktop/LearnGrow CRM/api/" \
-  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/api/"
-
-rsync -avz \
-  -e "ssh -o StrictHostKeyChecking=no" \
-  --exclude='node_modules' \
-  --exclude='dist' \
-  "/Users/grubby/Desktop/LearnGrow CRM/shared/" \
-  "$SERVER_USER@$SERVER_HOST:$TMP_DIR/shared/"
-
-rsync -avz \
-  -e "ssh -o StrictHostKeyChecking=no" \
-  "/Users/grubby/Desktop/LearnGrow CRM/package.json" \
+  --exclude='.env' \
+  --exclude='.env.local' \
+  --exclude='.env.production' \
+  --exclude='uploads' \
+  "/Users/grubby/Desktop/LearnGrow CRM/" \
   "$SERVER_USER@$SERVER_HOST:$TMP_DIR/"
 
 echo "   ✅ 代码已上传"
@@ -44,27 +36,42 @@ echo ""
 # 2. 在服务器上用sudo部署
 echo "2️⃣ 安装构建并重启服务..."
 ssh $SERVER_USER@$SERVER_HOST << ENDSSH
-  sudo cp -r $TMP_DIR/api/* $PROJECT_DIR/api/
-  sudo cp -r $TMP_DIR/shared/* $PROJECT_DIR/shared/
-  sudo cp $TMP_DIR/package.json $PROJECT_DIR/
-  
-  rm -rf $TMP_DIR
+  sudo mkdir -p $PROJECT_DIR
+  sudo rsync -a --delete \
+    --exclude='node_modules' \
+    --exclude='dist' \
+    --exclude='data' \
+    --exclude='uploads' \
+    --exclude='.env' \
+    --exclude='.env.local' \
+    --exclude='.env.production' \
+    $TMP_DIR/ $PROJECT_DIR/
   
   cd $PROJECT_DIR
   
   echo "   📦 安装依赖..."
-  sudo npm install
+  sudo npm ci
+
+  echo "   🔍 类型检查和测试..."
+  sudo npm run check
+  sudo npm test
   
   echo "   🔨 构建中..."
   sudo npm run build
+
+  echo "   🧪 生产预检..."
+  sudo npm run preflight:prod
   
-  echo "   🔄 重启服务..."
-  sudo pm2 restart learngrow-crm --update-env
+  echo "   🔄 重载服务..."
+  pm2 startOrReload ecosystem.config.cjs --only learngrow-crm --update-env
+  pm2 save
   
   echo "   ✅ 验证API..."
   sleep 2
   curl -s http://localhost:3456/api/health
   echo ""
+
+  rm -rf $TMP_DIR
 ENDSSH
 
 echo ""

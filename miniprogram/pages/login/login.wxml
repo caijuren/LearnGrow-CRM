@@ -32,4 +32,64 @@
   <view class="footer-tip">
     <text>💡 登录后可在「我的」设置昵称和孩子名字</text>
   </view>
+
+  <!-- 昵称设置弹窗 -->
+  <view class="nickname-overlay" wx:if="{{showNicknameSetup}}">
+    <view class="nickname-modal">
+      <view class="nickname-title">完善一下资料</view>
+      <view class="nickname-desc">选择头像并设置昵称</view>
+
+      <button
+        class="avatar-picker"
+        open-type="chooseAvatar"
+        bind:chooseavatar="onChooseAvatar"
+      >
+        <image
+          wx:if="{{setupAvatarUrl}}"
+          class="avatar-picker-img"
+          src="{{setupAvatarUrl}}"
+          mode="aspectFill"
+        />
+        <view wx:else class="avatar-placeholder">
+          <text class="avatar-placeholder-icon">+</text>
+          <text class="avatar-placeholder-text">选择头像</text>
+        </view>
+      </button>
+
+      <input
+        type="nickname"
+        class="nickname-input"
+        placeholder-class="input-placeholder"
+        placeholder="输入你的昵称"
+        value="{{setupNickname}}"
+        bindinput="onNicknameInput"
+        bindblur="onNicknameInput"
+        bindnicknamereview="onNicknameReview"
+        maxlength="20"
+      />
+      <view class="nickname-actions">
+        <button class="btn-save" bindtap="saveNickname" loading="{{saving}}">保存</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 孩子名称设置弹窗 -->
+  <view class="nickname-overlay" wx:if="{{showChildSetup}}">
+    <view class="nickname-modal">
+      <view class="nickname-title">孩子怎么称呼？</view>
+      <view class="nickname-desc">打卡记录会显示孩子的名字</view>
+      <input
+        class="nickname-input"
+        placeholder-class="input-placeholder"
+        placeholder="如：糖糖、小明"
+        value="{{setupChildName}}"
+        bindinput="onChildNameInput"
+        bindblur="onChildNameInput"
+        maxlength="20"
+      />
+      <view class="nickname-actions">
+        <button class="btn-save" bindtap="saveChildName" loading="{{saving}}">保存，开始打卡</button>
+      </view>
+    </view>
+  </view>
 </view>

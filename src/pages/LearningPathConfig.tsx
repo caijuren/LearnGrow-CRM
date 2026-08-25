@@ -5,11 +5,12 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store';
 import * as api from '@/lib/api';
+import Modal from '@/components/Modal';
 import type { LearningPath, Product } from '../../shared/types';
 
 const SUBJECT_OPTIONS = [
   { value: '英语', label: '英语', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-  { value: '语文', label: '语文', color: 'bg-rose-100 text-rose-700 border-rose-200', dot: 'bg-rose-500' },
+  { value: '语文', label: '语文', color: 'bg-brand-100 text-brand-700 border-brand-200', dot: 'bg-brand-500' },
   { value: '数学', label: '数学', color: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
 ];
 
@@ -213,11 +214,11 @@ export default function LearningPathConfig() {
   const hasContent = isNew || selectedId != null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white p-4 md:p-6">
+    <div className="page-shell page-enter">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
               <Route className="w-6 h-6 text-indigo-500" />
               学习路径配置
             </h1>
@@ -225,7 +226,7 @@ export default function LearningPathConfig() {
           </div>
           <button
             onClick={handleNewPath}
-            className="bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all"
+            className="btn-primary flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             新建路径
@@ -352,7 +353,7 @@ export default function LearningPathConfig() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                        路径名称 <span className="text-rose-500">*</span>
+                        路径名称 <span className="text-brand-500">*</span>
                       </label>
                       <input
                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
@@ -464,7 +465,7 @@ export default function LearningPathConfig() {
                             <div className="p-4 space-y-3">
                               <div>
                                 <label className="text-xs font-medium text-slate-600 mb-1 block">
-                                  阶段名称 <span className="text-rose-500">*</span>
+                                  阶段名称 <span className="text-brand-500">*</span>
                                 </label>
                                 <input
                                   className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
@@ -586,41 +587,27 @@ export default function LearningPathConfig() {
         </div>
       </div>
 
-      {deletingId != null && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !saving && setDeletingId(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">确认删除学习路径？</h3>
-              <p className="text-sm text-slate-500 mb-1">
-                即将删除路径 <span className="font-semibold text-slate-700">
-                  {learningPaths.find(p => p.id === deletingId)?.name}
-                </span>
-              </p>
-              <p className="text-xs text-red-500">此操作不可撤销</p>
-            </div>
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setDeletingId(null)}
-                disabled={saving}
-                className="flex-1 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={saving}
-                className="flex-1 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                确认删除
-              </button>
-            </div>
-          </div>
+      <Modal
+        isOpen={deletingId != null}
+        onClose={() => !saving && setDeletingId(null)}
+        title="确认删除学习路径"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setDeletingId(null)} disabled={saving} className="btn-secondary flex-1">取消</button>
+            <button onClick={handleDelete} disabled={saving} className="btn-danger flex-1 bg-red-500 text-white hover:bg-red-600">
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              确认删除
+            </button>
+          </>
+        }
+      >
+        <div className="text-center py-1">
+          <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center mx-auto mb-3"><AlertTriangle className="w-6 h-6 text-red-500" /></div>
+          <p className="text-sm text-slate-600">即将删除路径 <span className="font-semibold text-slate-800">{learningPaths.find(p => p.id === deletingId)?.name}</span></p>
+          <p className="text-xs text-red-500 mt-1">此操作不可撤销</p>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

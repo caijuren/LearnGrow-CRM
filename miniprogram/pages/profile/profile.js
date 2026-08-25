@@ -12,8 +12,11 @@ Page({
     editing: false,
     editNickname: '',
     editChildName: '',
+    editAvatarUrl: '',
+    editAvatarPath: '',
     saving: false,
-    isLoggedIn: false
+    isLoggedIn: false,
+    baseUrl: app.globalData.baseUrl
   },
 
   onLoad() {
@@ -61,10 +64,14 @@ Page({
   },
 
   startEdit() {
+    const nickname = this.data.userInfo.nickname || '';
+    const avatarUrl = this.data.userInfo.avatar_url || '';
     this.setData({
       editing: true,
-      editNickname: this.data.userInfo.nickname || '',
-      editChildName: this.data.userInfo.child_name || ''
+      editNickname: nickname === '微信用户' ? '' : nickname,
+      editChildName: this.data.userInfo.child_name || '',
+      editAvatarUrl: avatarUrl ? this.data.baseUrl + avatarUrl : '',
+      editAvatarPath: ''
     });
   },
 
@@ -80,24 +87,53 @@ Page({
     this.setData({ editChildName: e.detail.value });
   },
 
+  async onChooseAvatar(e) {
+    const tempFilePath = e.detail.avatarUrl;
+    if (!tempFilePath) return;
+
+    this.setData({ saving: true });
+    try {
+      const uploadRes = await api.uploadImage(tempFilePath);
+      this.setData({
+        editAvatarUrl: this.data.baseUrl + uploadRes.url,
+        editAvatarPath: uploadRes.url
+      });
+    } catch (err) {
+      console.error(err);
+      wx.showToast({ title: '头像上传失败', icon: 'none' });
+    } finally {
+      this.setData({ saving: false });
+    }
+  },
+
   async saveProfile() {
-    if (!this.data.editNickname.trim()) {
+    const nickname = this.data.editNickname.trim();
+    const childName = this.data.editChildName.trim();
+
+    if (!nickname) {
       wx.showToast({ title: '昵称不能为空', icon: 'none' });
+      return;
+    }
+    if (!childName) {
+      wx.showToast({ title: '孩子名称不能为空', icon: 'none' });
       return;
     }
 
     this.setData({ saving: true });
     try {
-      const updated = await api.updateProfile({
-        nickname: this.data.editNickname.trim(),
-        child_name: this.data.editChildName.trim() || null
-      });
+      const payload = { nickname, child_name: childName };
+      if (this.data.editAvatarPath) {
+        payload.avatar_url = this.data.editAvatarPath;
+      }
+      const updated = await api.updateProfile(payload);
 
       const newUserInfo = { ...this.data.userInfo, ...updated };
       app.setLogin(app.globalData.token, newUserInfo);
       this.setData({
         userInfo: newUserInfo,
-        editing: false
+        editing: false,
+        editAvatarUrl: '',
+        editAvatarPath: ''
       });
 
       wx.showToast({ title: '保存成功', icon: 'success' });
@@ -118,7 +154,7 @@ Page({
   },
 
   goToMyCheckins() {
-    wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
+    wx.reLaunch({ url: '/pages/my-checkins/my-checkins' });
   },
 
   goToLogin() {

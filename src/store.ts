@@ -12,7 +12,7 @@ interface AppState {
   totalCustomers: number;
   customerPage: number;
   selectedCustomer: Customer360 | null;
-  customerFilters: { search?: string; importance?: string; stage?: string; tag?: string };
+  customerFilters: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string };
   allTags: string[];
 
   products: Product[];
@@ -39,6 +39,7 @@ interface AppState {
   groupFilters: { status?: string; search?: string };
 
   checkinEvents: CheckinEvent[];
+  deletedCheckinEvents: CheckinEvent[];
   selectedCheckinEvent: CheckinEventDetail | null;
   checkinFilter: { status?: string };
 
@@ -57,7 +58,7 @@ interface AppState {
   loadDashboard: () => Promise<void>;
   loadTodos: () => Promise<void>;
 
-  loadCustomers: (params?: { search?: string; importance?: string; stage?: string; tag?: string; page?: number; limit?: number }) => Promise<void>;
+  loadCustomers: (params?: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; page?: number; limit?: number }) => Promise<void>;
   loadCustomer: (id: number) => Promise<void>;
   addCustomer: (data: Partial<Customer>) => Promise<void>;
   editCustomer: (id: number, data: Partial<Customer>) => Promise<void>;
@@ -122,6 +123,9 @@ interface AppState {
   addCheckinEvent: (data: Partial<CheckinEvent> & { name: string; start_date: string; end_date: string }) => Promise<void>;
   editCheckinEvent: (id: number, data: Partial<CheckinEvent>) => Promise<void>;
   removeCheckinEvent: (id: number) => Promise<void>;
+  loadDeletedCheckinEvents: () => Promise<void>;
+  restoreCheckinEvent: (id: number) => Promise<void>;
+  permanentlyDeleteCheckinEvent: (id: number) => Promise<void>;
   setCheckinFilter: (filter: Partial<AppState['checkinFilter']>) => void;
   clearSelectedCheckinEvent: () => void;
 
@@ -170,6 +174,7 @@ export const useStore = create<AppState>((set, get) => ({
   selectedGroup: null,
   groupFilters: {},
   checkinEvents: [],
+  deletedCheckinEvents: [],
   selectedCheckinEvent: null,
   checkinFilter: {},
   materials: [],
@@ -628,6 +633,30 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteCheckinEvent(id);
       await get().loadCheckinEvents();
       set({ selectedCheckinEvent: null, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  loadDeletedCheckinEvents: async () => {
+    set({ loading: true, error: null });
+    try {
+      const data = await api.fetchDeletedCheckinEvents();
+      set({ deletedCheckinEvents: data.events, loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); }
+  },
+  restoreCheckinEvent: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await api.restoreCheckinEvent(id);
+      await get().loadDeletedCheckinEvents();
+      await get().loadCheckinEvents();
+      set({ loading: false });
+    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+  },
+  permanentlyDeleteCheckinEvent: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await api.permanentlyDeleteCheckinEvent(id);
+      await get().loadDeletedCheckinEvents();
+      set({ loading: false });
     } catch (e: any) { set({ error: e.message, loading: false }); }
   },
   setCheckinFilter: (filter) => {

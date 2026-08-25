@@ -2,7 +2,7 @@
   <view class="event-hero">
     <view class="hero-title text-xl font-bold text-white">{{event.name}}</view>
     <view class="hero-meta mt-2" style="opacity: 0.9;">
-      📅 {{event.start_date}} ~ {{event.end_date}}
+      {{event.start_date}} ~ {{event.end_date}}
     </view>
     <view class="hero-badges flex gap-2 mt-3">
       <view class="hero-badge">{{event.participant_count}}人参与</view>
@@ -10,9 +10,25 @@
     </view>
   </view>
 
+  <!-- 状态横幅 -->
+  <view wx:if="{{event.event_status === 'upcoming'}}" class="status-banner upcoming">
+    <text class="status-banner-icon">⏳</text>
+    <view class="status-banner-content">
+      <view class="status-banner-title">活动即将开始</view>
+      <view class="status-banner-desc">{{event.start_date}} 起可参与打卡，敬请期待</view>
+    </view>
+  </view>
+  <view wx:elif="{{event.event_status === 'expired'}}" class="status-banner expired">
+    <text class="status-banner-icon">📅</text>
+    <view class="status-banner-content">
+      <view class="status-banner-title">活动已结束</view>
+      <view class="status-banner-desc">本次活动已于 {{event.end_date}} 结束，感谢参与</view>
+    </view>
+  </view>
+
   <view wx:if="{{event.reward_rules}}" class="reward-card card">
     <view class="flex items-center gap-2 mb-2">
-      <text style="font-size: 36rpx;">🏆</text>
+      <text class="section-mark">奖</text>
       <text class="font-bold text-lg">奖励规则</text>
     </view>
     <view class="text-secondary" style="line-height: 1.6;">{{event.reward_rules}}</view>
@@ -20,7 +36,7 @@
 
   <view wx:if="{{badges.length > 0}}" class="card">
     <view class="flex items-center gap-2 mb-4">
-      <text style="font-size: 36rpx;">🎖️</text>
+      <text class="section-mark">章</text>
       <text class="font-bold text-lg">打卡徽章</text>
       <text class="text-muted" style="font-size: 24rpx; margin-left: auto;">已获得 {{achievedBadges}}/{{badges.length}}</text>
     </view>
@@ -35,7 +51,7 @@
 
   <view wx:if="{{materials.length > 0}}" class="card">
     <view class="flex items-center gap-2 mb-4">
-      <text style="font-size: 36rpx;">📚</text>
+      <text class="section-mark">资</text>
       <text class="font-bold text-lg">学习资料</text>
     </view>
     <view class="material-list">
@@ -56,7 +72,7 @@
   </view>
 
   <view wx:if="{{event.required_text}}" class="card">
-    <view class="font-bold mb-2">📝 打卡要求</view>
+    <view class="font-bold mb-2">打卡要求</view>
     <view class="text-secondary">{{event.required_text}}</view>
   </view>
 
@@ -69,26 +85,74 @@
     </view>
   </view>
 
-  <view wx:if="{{isLoggedIn && isJoined}}" class="card checkin-card">
-    <view class="font-bold mb-3" style="font-size: 34rpx;">✅ 今日打卡</view>
+  <view wx:if="{{isLoggedIn && isJoined && event.event_status === 'ongoing'}}" class="card reminder-card">
+    <view class="reminder-main">
+      <view>
+        <view class="reminder-title">每日打卡提醒</view>
+        <view class="reminder-desc">
+          {{reminder.is_enabled ? '每天 ' + reminder.remind_time + ' 提醒你来打卡' : '开启后，到点提醒你别断签'}}
+        </view>
+      </view>
+      <switch checked="{{reminder.is_enabled}}" disabled="{{savingReminder}}" color="#f43f5e" bindchange="onReminderSwitch" />
+    </view>
+    <picker mode="time" value="{{reminder.remind_time}}" bindchange="onReminderTimeChange" disabled="{{savingReminder}}">
+      <view class="reminder-time-row">
+        <text>提醒时间</text>
+        <text>{{reminder.remind_time}}</text>
+      </view>
+    </picker>
+    <view wx:if="{{!reminder.template_id}}" class="reminder-tip">
+      当前未配置微信订阅模板，已先保存提醒偏好。
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && isJoined && event.event_status === 'ongoing'}}" class="card checkin-card">
+    <view class="font-bold mb-3" style="font-size: 34rpx;">今日打卡</view>
     
-    <view wx:if="{{todayChecked}}" class="checked-status">
+    <view wx:if="{{todayRecord && todayRecord.status === 'pending'}}" class="checked-status pending-status">
+      <view class="check-icon pending">!</view>
+      <view class="text-warning font-bold text-lg mt-2" style="font-size: 36rpx;">今日打卡待审核</view>
+      <view class="text-muted mt-1" style="font-size: 28rpx;">老师通过后会计入打卡天数</view>
+      <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
+      <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+    </view>
+
+    <view wx:elif="{{todayChecked && !isEditingTodayRecord}}" class="checked-status">
       <view class="check-icon">✓</view>
       <view class="text-success font-bold text-lg mt-2" style="font-size: 36rpx;">今日已打卡</view>
       <view class="text-muted mt-1" style="font-size: 28rpx;">明天继续加油哦~</view>
       <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
       <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+      <button class="btn-secondary mt-3" bindtap="startEditTodayRecord">修改今日打卡</button>
     </view>
 
     <view wx:else class="checkin-form">
-      <view class="form-item">
-        <view class="label">打卡图片（选填）</view>
-        <view class="upload-area" bindtap="chooseImage">
+      <view wx:if="{{isEditingTodayRecord}}" class="edit-banner">
+        <view class="edit-banner-title">修改今日打卡</view>
+        <view class="edit-banner-desc">修改后打卡将重新审核</view>
+        <view class="edit-banner-close" bindtap="cancelEditTodayRecord">取消</view>
+      </view>
+
+      <view wx:if="{{todayRecord && todayRecord.status === 'rejected' && !makeupDate}}" class="reject-banner">
+        <view class="reject-title">今日打卡未通过</view>
+        <view class="reject-desc">{{todayRecord.review_note || '请按老师要求调整后重新提交'}}</view>
+      </view>
+
+      <view wx:if="{{makeupDate}}" class="makeup-banner">
+        <view>
+          <view class="makeup-banner-title">正在补卡 {{makeupDate}}</view>
+          <view class="makeup-banner-desc">补卡提交后按活动规则审核和计入天数</view>
+        </view>
+        <button class="makeup-clear" bindtap="clearMakeupDate">取消</button>
+      </view>
+
+      <view class="form-item mt-3">
+        <view class="label">打卡图片 <text style="color: #f43f5e;">*</text></view>
+        <view class="upload-area {{!checkinImage ? 'upload-area-empty' : ''}}" bindtap="chooseImage">
           <image wx:if="{{checkinImage}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
           <view wx:else class="upload-placeholder">
-            <text style="font-size: 60rpx;">🖼️</text>
-            <text class="text-muted mt-2" style="font-size: 26rpx;">点击上传图片</text>
-            <text class="text-muted" style="font-size: 22rpx; margin-top: 8rpx;">支持拍照或从相册选择</text>
+            <text class="upload-icon">+</text>
+            <text class="text-muted mt-2" style="font-size: 26rpx;">上传图片</text>
           </view>
         </view>
       </view>
@@ -99,13 +163,12 @@
       </view>
 
       <button class="btn-primary btn-large mt-3" bindtap="submitCheckin" loading="{{submitting}}">
-        立即打卡
+        {{isEditingTodayRecord ? '保存修改' : (makeupDate ? '提交补卡' : '立即打卡')}}
       </button>
     </view>
   </view>
 
-  <view wx:if="{{isLoggedIn && !isJoined}}" class="card" style="text-align: center; padding: 60rpx 40rpx;">
-    <view style="font-size: 80rpx; margin-bottom: 24rpx;">🎉</view>
+  <view wx:if="{{isLoggedIn && !isJoined && event.event_status === 'ongoing'}}" class="card" style="text-align: center; padding: 60rpx 40rpx;">
     <view class="font-bold text-lg mb-2">加入打卡活动</view>
     <view class="text-secondary mb-4">加入后即可开始每日打卡</view>
     <button class="btn-primary" bindtap="handleJoin">立即加入活动</button>
@@ -113,7 +176,7 @@
 
   <view wx:if="{{isLoggedIn && isJoined}}" class="card">
     <view class="flex-between items-center mb-3">
-      <view class="font-bold">📊 我的打卡记录</view>
+      <view class="font-bold">我的打卡记录</view>
       <view class="text-primary font-semibold">{{myStats.checkin_days}}/{{event.total_days}}天</view>
     </view>
 
@@ -130,15 +193,23 @@
 
     <view class="calendar-grid">
       <view class="calendar-weekday" wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this">{{item}}</view>
-      <view wx:for="{{calendarDays}}" wx:key="date" class="calendar-day {{item.checked ? 'checked' : ''}} {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
-        {{item.day}}
+      <view wx:for="{{calendarDays}}" wx:key="date" bindtap="selectMakeupDate" data-date="{{item.date}}" data-can-makeup="{{item.can_makeup}}" class="calendar-day {{item.checked ? 'checked' : ''}} {{item.status === 'pending' ? 'pending' : ''}} {{item.status === 'rejected' ? 'rejected' : ''}} {{item.can_makeup ? 'can-makeup' : ''}} {{item.missed && !item.can_makeup ? 'missed' : ''}} {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
+        <text>{{item.day}}</text>
+        <text wx:if="{{item.can_makeup}}" class="day-tag">补</text>
+        <text wx:elif="{{item.status === 'pending'}}" class="day-tag">审</text>
       </view>
+    </view>
+    <view class="calendar-legend">
+      <view><text class="legend-dot checked-dot"></text>已通过</view>
+      <view><text class="legend-dot pending-dot"></text>待审核</view>
+      <view><text class="legend-dot makeup-dot"></text>可补卡</view>
+      <view><text class="legend-dot missed-dot"></text>已错过</view>
     </view>
   </view>
 
   <view wx:if="{{!isLoggedIn}}" class="card">
     <view class="flex-between items-center mb-3">
-      <view class="font-bold">📅 活动日历</view>
+      <view class="font-bold">活动日历</view>
       <view class="text-secondary" style="font-size: 26rpx;">共{{event.total_days}}天</view>
     </view>
     <view class="calendar-grid">
@@ -150,13 +221,86 @@
     <view class="text-muted mt-3" style="text-align: center; font-size: 24rpx;">登录后查看打卡进度</view>
   </view>
 
+  <view wx:if="{{feed.length > 0}}" class="card feed-card">
+    <view class="flex-between items-center mb-3">
+      <view class="font-bold">大家的打卡</view>
+      <view class="text-muted" style="font-size: 24rpx;">最新{{feed.length}}条</view>
+    </view>
+    <view class="feed-list">
+      <view wx:for="{{feed}}" wx:key="id" class="feed-item">
+        <view class="feed-avatar">
+          <image wx:if="{{item.avatar_url}}" class="feed-avatar-img" src="{{baseUrl}}{{item.avatar_url}}" mode="aspectFill"/>
+          <text wx:else>{{item.nickname ? item.nickname[0] : '学'}}</text>
+        </view>
+        <view class="feed-body">
+          <view class="feed-head">
+            <view class="feed-name-row">
+              <text class="feed-name">{{item.display_name || item.nickname}}</text>
+              <text wx:if="{{item.is_makeup}}" class="feed-tag">补卡</text>
+            </view>
+            <text class="feed-date">{{item.formattedDate}}</text>
+          </view>
+          <view wx:if="{{item.note}}" class="feed-note">{{item.note}}</view>
+          <image wx:if="{{item.image_url}}" class="feed-image" src="{{baseUrl}}{{item.image_url}}" mode="widthFix" data-url="{{baseUrl}}{{item.image_url}}" bindtap="previewFeedImage"/>
+          <view class="feed-actions">
+            <button class="feed-like {{item.liked_by_me ? 'liked' : ''}}" catchtap="toggleFeedLike" data-id="{{item.id}}">
+              <text>{{item.liked_by_me ? '已鼓励' : '鼓励'}}</text>
+              <text wx:if="{{item.like_count > 0}}">{{item.like_count}}</text>
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="card" bindtap="goToRanking">
     <view class="flex-between items-center">
       <view class="flex items-center gap-2">
-        <text style="font-size: 36rpx;">🏆</text>
+        <text class="section-mark">榜</text>
         <text class="font-bold">查看排行榜</text>
       </view>
       <text class="text-muted">→</text>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && isJoined && event.event_status === 'ongoing'}}" class="detail-sticky-action">
+    <button wx:if="{{!todayChecked && !(todayRecord && todayRecord.status === 'pending')}}" class="sticky-primary" bindtap="scrollToCheckin">
+      {{todayRecord && todayRecord.status === 'rejected' ? '重新打卡' : '立即打卡'}}
+    </button>
+    <button wx:elif="{{todayRecord && todayRecord.status === 'pending'}}" class="sticky-secondary" bindtap="scrollToCheckin">
+      查看审核状态
+    </button>
+    <button wx:else class="sticky-secondary" bindtap="scrollToCheckin">
+      查看今日记录
+    </button>
+    <button class="sticky-rank" bindtap="goToRanking">排行榜</button>
+  </view>
+
+  <canvas class="poster-canvas" canvas-id="checkinPoster"></canvas>
+
+  <!-- 补充孩子名弹窗 -->
+  <view wx:if="{{showChildSetup}}" class="modal-mask" bindtap="closeChildSetup">
+    <view class="modal-content" catchtap="preventClose">
+      <view class="modal-title">补充孩子名称</view>
+      <view class="modal-desc">打卡需要显示孩子名称，方便老师识别。补充后下次打卡不再需要填写。</view>
+      <input class="modal-input" placeholder="如：轩轩" value="{{setupChildName}}" bindinput="onChildNameInput" maxlength="20" focus="{{showChildSetup}}" />
+      <view class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" bindtap="closeChildSetup">取消</button>
+        <button class="modal-btn modal-btn-primary" bindtap="saveChildName" loading="{{savingChildName}}">确认</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 打卡成功分享弹窗 -->
+  <view wx:if="{{showSuccessActions}}" class="modal-mask" bindtap="closeSuccessActions">
+    <view class="modal-content success-content" catchtap="preventClose">
+      <view class="modal-title">打卡成功</view>
+      <view class="modal-desc">坚持就是胜利，把这份成就感分享出去吧~</view>
+      <view class="success-actions">
+        <button class="success-btn success-btn-primary" bindtap="onCreatePoster">生成打卡海报</button>
+        <button class="success-btn success-btn-share" open-type="share">邀请好友一起打卡</button>
+      </view>
+      <view class="success-close" bindtap="closeSuccessActions">暂不分享</view>
     </view>
   </view>
 </view>

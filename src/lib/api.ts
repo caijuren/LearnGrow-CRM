@@ -9,10 +9,10 @@ function getToken() {
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (options.body) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(`${API_BASE}${url}`, { ...options, headers });
   const data = await res.json();
@@ -41,11 +41,12 @@ export async function fetchTodos() {
   return request<TodoItem[]>('/actions/todos');
 }
 
-export async function fetchCustomers(params: { search?: string; importance?: string; stage?: string; tag?: string; page?: number; limit?: number } = {}) {
+export async function fetchCustomers(params: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
   if (params.search) qs.set('search', params.search);
   if (params.importance) qs.set('importance', params.importance);
   if (params.stage) qs.set('stage', params.stage);
+  if (params.need_follow) qs.set('need_follow', params.need_follow);
   if (params.tag) qs.set('tag', params.tag);
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
@@ -289,6 +290,18 @@ export async function deleteCheckinEvent(id: number) {
   return request<null>(`/checkin-events/${id}`, { method: 'DELETE' });
 }
 
+export async function fetchDeletedCheckinEvents() {
+  return request<{ events: CheckinEvent[]; total: number }>('/checkin-events/deleted');
+}
+
+export async function restoreCheckinEvent(id: number) {
+  return request<CheckinEvent>(`/checkin-events/${id}/restore`, { method: 'PUT' });
+}
+
+export async function permanentlyDeleteCheckinEvent(id: number) {
+  return request<null>(`/checkin-events/${id}/permanent`, { method: 'DELETE' });
+}
+
 export async function addCheckinParticipant(eventId: number, data: Partial<CheckinParticipant> & { nickname: string }) {
   return request<CheckinParticipant>(`/checkin-events/${eventId}/participants`, { method: 'POST', body: JSON.stringify(data) });
 }
@@ -349,9 +362,10 @@ export async function recordMaterialDownload(id: number) {
 
 // ========== 打卡管理新接口 ==========
 
-export async function fetchCheckinRecords(eventId: number, params: { status?: string; page?: number; limit?: number } = {}) {
+export async function fetchCheckinRecords(eventId: number, params: { status?: string; record_type?: string; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
+  if (params.record_type) qs.set('record_type', params.record_type);
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
   return request<{ records: any[]; total: number }>(`/checkin-events/${eventId}/records?${qs.toString()}`);

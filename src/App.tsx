@@ -1,21 +1,30 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import Dashboard from '@/pages/Dashboard';
-import CustomerList from '@/pages/CustomerList';
-import CustomerDetail from '@/pages/CustomerDetail';
-import ChildDetail from '@/pages/ChildDetail';
-import GroupManagement from '@/pages/GroupManagement';
-import ProductList from '@/pages/ProductList';
-import OrderList from '@/pages/OrderList';
-import LearningPathConfig from '@/pages/LearningPathConfig';
-import LiveDesk from '@/pages/LiveDesk';
-import UserManagement from '@/pages/UserManagement';
-import MaterialLibrary from '@/pages/MaterialLibrary';
-import Login from '@/pages/Login';
-import CheckinList from '@/pages/CheckinList';
-import CheckinDetail from '@/pages/CheckinDetail';
 import { useStore } from '@/store';
+
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const CustomerList = lazy(() => import('@/pages/CustomerList'));
+const CustomerDetail = lazy(() => import('@/pages/CustomerDetail'));
+const ChildDetail = lazy(() => import('@/pages/ChildDetail'));
+const GroupManagement = lazy(() => import('@/pages/GroupManagement'));
+const ProductList = lazy(() => import('@/pages/ProductList'));
+const OrderList = lazy(() => import('@/pages/OrderList'));
+const LearningPathConfig = lazy(() => import('@/pages/LearningPathConfig'));
+const LiveDesk = lazy(() => import('@/pages/LiveDesk'));
+const UserManagement = lazy(() => import('@/pages/UserManagement'));
+const MaterialLibrary = lazy(() => import('@/pages/MaterialLibrary'));
+const Login = lazy(() => import('@/pages/Login'));
+const CheckinList = lazy(() => import('@/pages/CheckinList'));
+const CheckinDetail = lazy(() => import('@/pages/CheckinDetail'));
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="h-10 w-10 rounded-full border-4 border-brand-100 border-t-rose-500 animate-spin" />
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useStore(s => s.isAuthenticated);
@@ -50,24 +59,26 @@ function AppLayout() {
 export default function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-          <Route index element={<Dashboard />} />
-          <Route path="customers" element={<CustomerList />} />
-          <Route path="customers/:id" element={<CustomerDetail />} />
-          <Route path="customers/:id/children/:childId" element={<ChildDetail />} />
-          <Route path="groups" element={<GroupManagement />} />
-          <Route path="products" element={<ProductList />} />
-          <Route path="orders" element={<OrderList />} />
-          <Route path="learning-paths" element={<LearningPathConfig />} />
-          <Route path="live" element={<LiveDesk />} />
-          <Route path="users" element={<UserManagement />} />
-          <Route path="materials" element={<MaterialLibrary />} />
-          <Route path="checkin" element={<CheckinList />} />
-          <Route path="checkin/:id" element={<CheckinDetail />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route index element={<Dashboard />} />
+            <Route path="customers" element={<CustomerList />} />
+            <Route path="customers/:id" element={<CustomerDetail />} />
+            <Route path="customers/:id/children/:childId" element={<ChildDetail />} />
+            <Route path="groups" element={<GroupManagement />} />
+            <Route path="products" element={<ProductList />} />
+            <Route path="orders" element={<OrderList />} />
+            <Route path="learning-paths" element={<LearningPathConfig />} />
+            <Route path="live" element={<LiveDesk />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="materials" element={<MaterialLibrary />} />
+            <Route path="checkin" element={<CheckinList />} />
+            <Route path="checkin/:id" element={<CheckinDetail />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

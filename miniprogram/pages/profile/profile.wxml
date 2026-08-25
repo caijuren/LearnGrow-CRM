@@ -13,8 +13,9 @@
 
   <block wx:if="{{isLoggedIn}}">
     <view class="profile-header">
-      <view class="profile-avatar avatar avatar-lg">
-        {{userInfo.nickname ? userInfo.nickname[0] : '我'}}
+      <view wx:if="{{!editing}}" class="profile-avatar avatar avatar-lg">
+        <image wx:if="{{userInfo.avatar_url}}" class="profile-avatar-img" src="{{baseUrl}}{{userInfo.avatar_url}}" mode="aspectFill" />
+        <text wx:else>{{userInfo.nickname ? userInfo.nickname[0] : '我'}}</text>
       </view>
       <view wx:if="{{!editing}}" class="profile-info">
         <view class="profile-name text-xl font-bold text-white">{{userInfo.nickname || '微信用户'}}</view>
@@ -24,11 +25,19 @@
         <view class="edit-btn" bindtap="startEdit">✏️ 编辑资料</view>
       </view>
       <view wx:else class="profile-edit-form">
+        <button
+          class="profile-avatar-edit"
+          open-type="chooseAvatar"
+          bind:chooseavatar="onChooseAvatar"
+        >
+          <image wx:if="{{editAvatarUrl}}" class="profile-avatar-img" src="{{editAvatarUrl}}" mode="aspectFill" />
+          <text wx:else>{{editNickname ? editNickname[0] : '我'}}</text>
+        </button>
         <view class="edit-form-item">
           <input class="edit-input" placeholder="昵称" value="{{editNickname}}" bindinput="onNicknameInput" />
         </view>
         <view class="edit-form-item">
-          <input class="edit-input" placeholder="孩子昵称（选填）" value="{{editChildName}}" bindinput="onChildNameInput" />
+          <input class="edit-input" placeholder="孩子昵称" value="{{editChildName}}" bindinput="onChildNameInput" />
         </view>
         <view class="flex gap-2">
           <button class="edit-btn-save btn-small" bindtap="saveProfile" loading="{{saving}}">保存</button>

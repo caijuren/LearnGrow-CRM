@@ -446,7 +446,14 @@ export interface CheckinEvent {
   end_date: string;
   required_text: string | null;
   reward_rules: string | null;
+  allow_makeup?: number | boolean;
+  makeup_window_days?: number;
+  makeup_limit_per_user?: number;
+  makeup_requires_review?: number | boolean;
+  makeup_counts_for_streak?: number | boolean;
   status: CheckinEventStatus;
+  is_deleted?: number | boolean;
+  deleted_at?: string | null;
   participant_count?: number;
   total_days?: number;
   created_at: string;
@@ -458,6 +465,7 @@ export interface CheckinParticipant {
   event_id: number;
   member_id: number | null;
   customer_id: number | null;
+  wx_user_id: number | null;
   nickname: string;
   child_name: string | null;
   joined_at: string;
@@ -473,6 +481,10 @@ export interface CheckinRecord {
   participant_id: number;
   checkin_date: string;
   note: string | null;
+  image_url?: string | null;
+  status?: 'pending' | 'approved' | 'rejected';
+  review_note?: string | null;
+  is_makeup?: number | boolean;
   created_at: string;
 }
 
@@ -569,6 +581,9 @@ export interface WxCheckinEvent {
   my_checkin_days: number;
   my_current_streak: number;
   today_checked: boolean;
+  can_makeup?: boolean;
+  makeup_window_days?: number;
+  makeup_remaining?: number;
 }
 
 export interface WxCheckinRecord {
@@ -576,6 +591,9 @@ export interface WxCheckinRecord {
   checkin_date: string;
   note: string | null;
   image_url: string | null;
+  status?: 'pending' | 'approved' | 'rejected';
+  review_note?: string | null;
+  is_makeup?: number | boolean;
   created_at: string;
 }
 
@@ -586,7 +604,15 @@ export interface WxMyCheckin {
   checkin_days: number;
   current_streak: number;
   max_streak: number;
-  calendar: { date: string; checked: boolean }[];
+  calendar: {
+    date: string;
+    checked: boolean;
+    status?: 'pending' | 'approved' | 'rejected' | null;
+    review_note?: string | null;
+    is_makeup?: boolean;
+    can_makeup?: boolean;
+    missed?: boolean;
+  }[];
 }
 
 export interface WxRankingItem {

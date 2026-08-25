@@ -21,12 +21,12 @@ const STATUS_FILTERS: { value: GroupStatus | ''; label: string; icon: any }[] = 
 ];
 
 const GROUP_COLORS = [
-  'from-rose-400 to-pink-500',
-  'from-pink-400 to-fuchsia-500',
-  'from-fuchsia-400 to-purple-500',
-  'from-violet-400 to-indigo-500',
-  'from-amber-400 to-orange-500',
-  'from-emerald-400 to-teal-500',
+  'bg-brand-600',
+  'bg-sky-600',
+  'bg-violet-600',
+  'bg-emerald-600',
+  'bg-amber-600',
+  'bg-slate-700',
 ];
 
 const MEMBER_ROLES: { value: GroupMemberRole; label: string }[] = [
@@ -86,104 +86,249 @@ function GroupCard({ group, onClick, onEdit, onDelete }: {
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }) {
-  const color = GROUP_COLORS[group.id % GROUP_COLORS.length];
   const activeCount = group.active_members?.filter(m => m.role === 'active' || m.role === 'koc').length || 0;
   const kocCount = group.active_members?.filter(m => m.role === 'koc').length || 0;
+
+  const statusStyle: Record<string, { bg: string; color: string }> = {
+    active: { bg: 'rgb(16 185 129 / 0.1)', color: 'rgb(5 150 105)' },
+    building: { bg: 'rgb(59 130 246 / 0.1)', color: 'rgb(37 99 235)' },
+    dormant: { bg: 'rgb(107 114 128 / 0.1)', color: 'rgb(75 85 99)' },
+    closed: { bg: 'rgb(239 68 68 / 0.1)', color: 'rgb(220 38 38)' },
+  };
+
+  const status = statusStyle[group.status] || statusStyle.dormant;
 
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-slate-100 hover:border-rose-200 group overflow-hidden"
+      className="cursor-pointer transition-all duration-150 group overflow-hidden"
+      style={{
+        backgroundColor: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border-default)',
+        borderRadius: 'var(--radius-md)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-border-strong)';
+        e.currentTarget.style.boxShadow = '0 1px 3px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.04)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-border-default)';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
     >
-      <div className={`h-24 bg-gradient-to-br ${color} relative p-4`}>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-50" />
-        <div className="relative flex items-start justify-between">
-          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-            <MessageSquare className="w-6 h-6 text-white" />
+      <div className="p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <div
+            className="shrink-0 flex items-center justify-center"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'var(--color-primary-soft)',
+              color: 'var(--color-primary)',
+            }}
+          >
+            <MessageSquare size={17} strokeWidth={1.8} />
           </div>
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${GROUP_STATUS_COLORS[group.status]}`}>
-            {GROUP_STATUS_LABELS[group.status]}
-          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <h3
+                className="truncate flex-1"
+                style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  lineHeight: 1.4,
+                }}
+              >
+                {group.name}
+              </h3>
+              <span
+                className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 500,
+                  backgroundColor: status.bg,
+                  color: status.color,
+                }}
+              >
+                {GROUP_STATUS_LABELS[group.status]}
+              </span>
+            </div>
+            {group.purpose && (
+              <p
+                className="line-clamp-2"
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--color-text-tertiary)',
+                  lineHeight: 1.5,
+                }}
+              >
+                {group.purpose}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="p-4 -mt-4 relative">
-        <div className="bg-white rounded-xl p-3 mb-3 shadow-sm border border-slate-100">
-          <h3 className="text-base font-bold text-slate-900 mb-1 truncate group-hover:text-rose-600 transition-colors">
-            {group.name}
-          </h3>
-          {group.purpose && (
-            <p className="text-xs text-slate-500 line-clamp-2">{group.purpose}</p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-4 mb-3">
-          <div className="flex items-center gap-1.5 text-sm text-slate-600">
-            <Users className="w-4 h-4 text-slate-400" />
-            <span className="font-semibold">{group.member_count}</span>
-            <span className="text-slate-400 text-xs">人</span>
+        <div
+          className="flex items-center gap-4 pt-3"
+          style={{ borderTop: '1px solid var(--color-border-subtle)' }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Users size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+            <span
+              style={{
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              {group.member_count}
+            </span>
+            <span
+              style={{
+                fontSize: '0.6875rem',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              人
+            </span>
           </div>
           {activeCount > 0 && (
-            <div className="flex items-center gap-1.5 text-sm text-orange-600">
-              <Flame className="w-4 h-4" />
-              <span className="font-semibold">{activeCount}</span>
-              <span className="text-orange-400 text-xs">活跃</span>
+            <div className="flex items-center gap-1.5">
+              <Flame size={13} strokeWidth={1.8} style={{ color: 'rgb(249 115 22)' }} />
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  color: 'rgb(234 88 12)',
+                }}
+              >
+                {activeCount}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                活跃
+              </span>
             </div>
           )}
           {kocCount > 0 && (
-            <div className="flex items-center gap-1.5 text-sm text-amber-600">
-              <Star className="w-4 h-4" />
-              <span className="font-semibold">{kocCount}</span>
-              <span className="text-amber-400 text-xs">KOC</span>
+            <div className="flex items-center gap-1.5">
+              <Star size={13} strokeWidth={1.8} style={{ color: 'rgb(245 158 11)', fill: 'currentColor' }} />
+              <span
+                style={{
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  color: 'rgb(217 119 6)',
+                }}
+              >
+                {kocCount}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
+                KOC
+              </span>
             </div>
           )}
         </div>
 
         {group.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          <div className="flex flex-wrap gap-1 mt-3">
             {group.tags.slice(0, 3).map(tag => (
-              <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-rose-50 text-rose-600">
+              <span
+                key={tag}
+                className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 500,
+                  backgroundColor: 'var(--color-bg-surface)',
+                  color: 'var(--color-text-secondary)',
+                  border: '1px solid var(--color-border-default)',
+                }}
+              >
                 {tag}
               </span>
             ))}
             {group.tags.length > 3 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500">
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 500,
+                  color: 'var(--color-text-tertiary)',
+                }}
+              >
                 +{group.tags.length - 3}
               </span>
             )}
           </div>
         )}
+      </div>
 
-        {group.active_members && group.active_members.length > 0 && (
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-slate-400 mr-1">核心成员:</span>
-            <div className="flex -space-x-2">
-              {group.active_members.slice(0, 5).map((m, i) => (
-                <div
-                  key={m.id}
-                  className={`w-7 h-7 rounded-full bg-gradient-to-br ${GROUP_COLORS[(group.id + i) % GROUP_COLORS.length]} flex items-center justify-center text-white text-xs font-bold border-2 border-white shadow-sm`}
-                  title={m.nickname || m.wechat_name}
-                >
-                  {(m.nickname || m.wechat_name)[0]}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-          <span className="text-xs text-slate-400 flex items-center gap-1">
-            <ChevronRight className="w-3 h-3" />
-            点击查看详情
-          </span>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={onEdit} className="btn-icon-sm">
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={onDelete} className="btn-icon-sm text-red-400 hover:text-red-600 hover:bg-red-50">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+      <div
+        className="flex items-center justify-between px-4 py-2"
+        style={{
+          borderTop: '1px solid var(--color-border-subtle)',
+          backgroundColor: 'var(--color-bg-subtle)',
+        }}
+      >
+        <span
+          className="flex items-center gap-0.5"
+          style={{
+            fontSize: '0.6875rem',
+            color: 'var(--color-text-tertiary)',
+          }}
+        >
+          <ChevronRight size={12} strokeWidth={1.8} />
+          查看详情
+        </span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={onEdit}
+            className="transition-colors"
+            style={{
+              padding: '4px',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-text-tertiary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)';
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-tertiary)';
+            }}
+          >
+            <Edit2 size={13} strokeWidth={1.8} />
+          </button>
+          <button
+            onClick={onDelete}
+            className="transition-colors"
+            style={{
+              padding: '4px',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--color-text-tertiary)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgb(239 68 68 / 0.08)';
+              e.currentTarget.style.color = 'rgb(220 38 38)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.color = 'var(--color-text-tertiary)';
+            }}
+          >
+            <Trash2 size={13} strokeWidth={1.8} />
+          </button>
         </div>
       </div>
     </div>
@@ -237,9 +382,9 @@ function TagInput({ tags, setTags, suggestions }: {
     <div>
       <div className="flex flex-wrap gap-1.5 mb-2 min-h-[32px] p-2 border border-slate-200 rounded-xl bg-white">
         {tags.map(tag => (
-          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-600 rounded-md text-xs font-medium">
+          <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-brand-50 text-brand-600 rounded-md text-xs font-medium">
             {tag}
-            <button onClick={() => removeTag(tag)} className="hover:text-rose-800">
+            <button onClick={() => removeTag(tag)} className="hover:text-brand-800">
               <X className="w-3 h-3" />
             </button>
           </span>
@@ -263,7 +408,7 @@ function TagInput({ tags, setTags, suggestions }: {
           <button
             key={s}
             onClick={() => addTag(s)}
-            className="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+            className="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors"
           >
             + {s}
           </button>
@@ -426,79 +571,79 @@ export default function GroupManagement() {
   if (selectedGroup) {
     const groupColor = GROUP_COLORS[selectedGroup.id % GROUP_COLORS.length];
     return (
-      <div className="page-container page-enter">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="page-shell page-enter">
+        <div className="page-inner">
+        <div className="flex items-center gap-3">
           <button onClick={clearSelectedGroup} className="btn-secondary btn-sm">
             ← 返回列表
           </button>
         </div>
 
-        <div className={`bg-gradient-to-br ${groupColor} rounded-3xl p-6 text-white relative overflow-hidden shadow-xl`}>
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQyIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMCAxMCBMIDQwIDEwIE0gMTAgMCBMIDEwIDQwIE0gMCAyMCBMIDQwIDIwIE0gMjAgMCBMIDIwIDQwIE0gMCAzMCBMIDQwIDMwIE0gMzAgMCBMIDMwIDQwIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQyKSIvPjwvc3ZnPg==')] opacity-40" />
-          <div className="relative flex items-start justify-between gap-4">
+        <div className="panel p-5">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-lg ${groupColor} flex items-center justify-center`}>
                   <MessageSquare className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-extrabold">{selectedGroup.name}</h1>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-white/20 text-white mt-1`}>
+                  <h1 className="text-xl font-semibold text-slate-950">{selectedGroup.name}</h1>
+                  <span className={`badge border mt-1 ${GROUP_STATUS_COLORS[selectedGroup.status]}`}>
                     {GROUP_STATUS_LABELS[selectedGroup.status]}
                   </span>
                 </div>
               </div>
               {selectedGroup.purpose && (
-                <p className="text-white/90 text-base mb-2">{selectedGroup.purpose}</p>
+                <p className="text-slate-700 text-base mb-2">{selectedGroup.purpose}</p>
               )}
               {selectedGroup.description && (
-                <p className="text-white/70 text-sm">{selectedGroup.description}</p>
+                <p className="text-slate-500 text-sm">{selectedGroup.description}</p>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => openEditGroup(selectedGroup)} className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl text-white text-sm font-medium transition-colors flex items-center gap-2">
+              <button onClick={() => openEditGroup(selectedGroup)} className="btn-secondary">
                 <Edit2 className="w-4 h-4" />
                 编辑群信息
               </button>
-              <button onClick={() => setDeleteConfirm({ type: 'group', id: selectedGroup.id })} className="px-4 py-2 bg-white/10 hover:bg-red-500/30 backdrop-blur-sm rounded-xl text-white/80 hover:text-white text-sm font-medium transition-colors flex items-center gap-2">
+              <button onClick={() => setDeleteConfirm({ type: 'group', id: selectedGroup.id })} className="btn-danger">
                 <Trash2 className="w-4 h-4" />
                 解散群
               </button>
             </div>
           </div>
 
-          <div className="relative grid grid-cols-4 gap-4 mt-6">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
-              <div className="text-white/70 text-xs mb-1">群人数</div>
-              <div className="text-2xl font-extrabold">{selectedGroup.member_count}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-5">
+            <div className="metric-card">
+              <div className="text-slate-500 text-xs mb-1">群人数</div>
+              <div className="text-2xl font-bold text-slate-900">{selectedGroup.member_count}</div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
-              <div className="text-white/70 text-xs mb-1">活跃成员</div>
-              <div className="text-2xl font-extrabold text-orange-200">
+            <div className="metric-card">
+              <div className="text-slate-500 text-xs mb-1">活跃成员</div>
+              <div className="text-2xl font-bold text-orange-600">
                 {selectedGroup.active_members?.filter(m => m.role === 'active' || m.role === 'koc').length || 0}
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
-              <div className="text-white/70 text-xs mb-1">KOC数量</div>
-              <div className="text-2xl font-extrabold text-amber-200">
+            <div className="metric-card">
+              <div className="text-slate-500 text-xs mb-1">KOC数量</div>
+              <div className="text-2xl font-bold text-amber-600">
                 {selectedGroup.active_members?.filter(m => m.role === 'koc').length || 0}
               </div>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
-              <div className="text-white/70 text-xs mb-1">群管/助理</div>
-              <div className="text-2xl font-extrabold text-emerald-200">
+            <div className="metric-card">
+              <div className="text-slate-500 text-xs mb-1">群管/助理</div>
+              <div className="text-2xl font-bold text-emerald-600">
                 {selectedGroup.active_members?.filter(m => m.role === 'admin' || m.role === 'assistant').length || 0}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="col-span-2 space-y-6">
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-rose-500" />
+                  <Users className="w-5 h-5 text-brand-500" />
                   群成员管理
                 </h3>
                 <div className="flex items-center gap-2">
@@ -524,8 +669,8 @@ export default function GroupManagement() {
                   {selectedGroup.active_members.map(member => {
                     const mc = GROUP_COLORS[(selectedGroup.id + member.id) % GROUP_COLORS.length];
                     return (
-                      <div key={member.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl hover:bg-rose-50/50 transition-colors group">
-                        <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${mc} flex items-center justify-center shadow-sm shrink-0`}>
+                      <div key={member.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl hover:bg-brand-50/50 transition-colors group">
+                        <div className={`w-10 h-10 rounded-lg ${mc} flex items-center justify-center shadow-sm shrink-0`}>
                           <span className="text-white font-bold">{(member.nickname || member.wechat_name)[0]}</span>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -591,7 +736,7 @@ export default function GroupManagement() {
             {selectedGroup.notes && (
               <div className="card p-5 border-l-4 border-l-rose-400">
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-rose-500" />
+                  <FileText className="w-4 h-4 text-brand-500" />
                   运营笔记
                 </h4>
                 <p className="text-sm text-slate-600 whitespace-pre-wrap">{selectedGroup.notes}</p>
@@ -616,7 +761,7 @@ export default function GroupManagement() {
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {selectedGroup.tags.map(t => (
-                    <span key={t} className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium">
+                    <span key={t} className="px-3 py-1 bg-brand-50 text-brand-600 rounded-lg text-xs font-medium">
                       {t}
                     </span>
                   ))}
@@ -672,7 +817,7 @@ export default function GroupManagement() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                活跃度评分: <span className="text-rose-500 font-bold">{memberForm.activity_score}</span>
+                活跃度评分: <span className="text-brand-500 font-bold">{memberForm.activity_score}</span>
               </label>
               <input
                 type="range"
@@ -680,7 +825,7 @@ export default function GroupManagement() {
                 max="100"
                 value={memberForm.activity_score}
                 onChange={e => setMemberForm({ ...memberForm, activity_score: parseInt(e.target.value) })}
-                className="w-full accent-rose-500"
+                className="w-full accent-brand-600"
               />
               <div className="flex justify-between text-xs text-slate-400 mt-1">
                 <span>潜水</span>
@@ -757,7 +902,7 @@ export default function GroupManagement() {
             ) : (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  群成员昵称列表 <span className="text-rose-500">*</span>
+                  群成员昵称列表 <span className="text-brand-500">*</span>
                 </label>
                 <textarea
                   value={batchText}
@@ -772,111 +917,290 @@ export default function GroupManagement() {
             )}
           </div>
         </Modal>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page-container page-enter">
-      <div className="page-header mb-6">
+    <div className="page-shell page-enter">
+      <div className="page-inner">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">微信群管理</h1>
-          <p className="text-slate-500 mt-1">管理你的微信群，记录群定位、活跃成员，方便私域运营</p>
+          <h1
+            style={{
+              fontSize: '1.375rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3,
+            }}
+          >
+            微信群管理
+          </h1>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '4px',
+            }}
+          >
+            管理你的微信群，记录群定位、活跃成员，方便私域运营
+          </p>
         </div>
         <button onClick={openAddGroup} className="btn-primary">
-          <Plus className="w-5 h-5" />
+          <Plus size={15} strokeWidth={2} />
           新建群
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="stat-card" style={{ '--stat-accent': 'rgba(244,63,94,0.08)' } as any}>
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div
+          className="p-4"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-rose-100 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5 text-rose-600" />
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'var(--color-primary-soft)',
+                color: 'var(--color-primary)',
+              }}
+            >
+              <MessageSquare size={16} strokeWidth={1.8} />
             </div>
             <div>
-              <div className="text-2xl font-extrabold text-slate-900 kpi-value">{stats.total}</div>
-              <div className="text-xs text-slate-500">微信群总数</div>
+              <div
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {stats.total}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                  marginTop: '2px',
+                }}
+              >
+                微信群总数
+              </div>
             </div>
           </div>
         </div>
-        <div className="stat-card" style={{ '--stat-accent': 'rgba(34,197,94,0.08)' } as any}>
+        <div
+          className="p-4"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center">
-              <Flame className="w-5 h-5 text-green-600" />
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgb(16 185 129 / 0.1)',
+                color: 'rgb(5 150 105)',
+              }}
+            >
+              <Flame size={16} strokeWidth={1.8} />
             </div>
             <div>
-              <div className="text-2xl font-extrabold text-slate-900 kpi-value">{stats.active}</div>
-              <div className="text-xs text-slate-500">运营中</div>
+              <div
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {stats.active}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                  marginTop: '2px',
+                }}
+              >
+                运营中
+              </div>
             </div>
           </div>
         </div>
-        <div className="stat-card" style={{ '--stat-accent': 'rgba(59,130,246,0.08)' } as any}>
+        <div
+          className="p-4"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center">
-              <Hammer className="w-5 h-5 text-blue-600" />
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgb(59 130 246 / 0.1)',
+                color: 'rgb(37 99 235)',
+              }}
+            >
+              <Hammer size={16} strokeWidth={1.8} />
             </div>
             <div>
-              <div className="text-2xl font-extrabold text-slate-900 kpi-value">{stats.building}</div>
-              <div className="text-xs text-slate-500">建群中</div>
+              <div
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {stats.building}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                  marginTop: '2px',
+                }}
+              >
+                建群中
+              </div>
             </div>
           </div>
         </div>
-        <div className="stat-card" style={{ '--stat-accent': 'rgba(139,92,246,0.08)' } as any}>
+        <div
+          className="p-4"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-violet-100 flex items-center justify-center">
-              <Users className="w-5 h-5 text-violet-600" />
+            <div
+              className="flex items-center justify-center shrink-0"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgb(139 92 246 / 0.1)',
+                color: 'rgb(109 40 217)',
+              }}
+            >
+              <Users size={16} strokeWidth={1.8} />
             </div>
             <div>
-              <div className="text-2xl font-extrabold text-slate-900 kpi-value">{stats.totalMembers}</div>
-              <div className="text-xs text-slate-500">总群成员</div>
+              <div
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-primary)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {stats.totalMembers}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  color: 'var(--color-text-tertiary)',
+                  marginTop: '2px',
+                }}
+              >
+                总群成员
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="card p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 flex-1">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder="搜索群名称、定位..."
-                className="input pl-9"
-              />
-            </div>
-            <button onClick={handleSearch} className="btn-secondary btn-sm">搜索</button>
-          </div>
-          <div className="tab-list">
-            {STATUS_FILTERS.map(f => (
+      {/* 搜索 + 状态筛选 */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
+        <div className="relative flex-1 max-w-xs">
+          <Search
+            size={14}
+            strokeWidth={1.8}
+            style={{
+              position: 'absolute',
+              left: '0.875rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--color-text-tertiary)',
+            }}
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            placeholder="搜索群名称、定位..."
+            className="input pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-0.5 flex-wrap">
+          {STATUS_FILTERS.map(f => {
+            const isActive = (groupFilters.status || '') === f.value;
+            return (
               <button
                 key={f.value}
                 onClick={() => setGroupFilters({ status: f.value || undefined })}
-                className={`tab-item flex items-center gap-1.5 ${(groupFilters.status || '') === f.value ? 'active' : ''}`}
+                className="transition-all flex items-center gap-1.5"
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.75rem',
+                  fontWeight: isActive ? 600 : 500,
+                  backgroundColor: isActive ? 'var(--color-primary-soft)' : 'transparent',
+                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
-                <f.icon className="w-3.5 h-3.5" />
+                <f.icon size={13} strokeWidth={1.8} />
                 {f.label}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
       {groups.length === 0 ? (
-        <div className="card p-12">
+        <div
+          className="p-12 flex items-center justify-center"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
           <Empty
-            icon={<MessageSquare className="w-9 h-9 text-slate-300" />}
+            icon={<MessageSquare size={36} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
             title="还没有微信群"
             description="点击右上角「新建群」开始记录你的微信群，方便管理群定位和活跃成员"
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 stagger-children">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {groups.map(group => (
             <GroupCard
               key={group.id}
@@ -1011,6 +1335,7 @@ export default function GroupManagement() {
             : '确定要删除这个成员记录吗？'}
         </p>
       </Modal>
+      </div>
     </div>
   );
 }

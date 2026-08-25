@@ -24,8 +24,8 @@
     "compileHotReLoad": false,
     "lazyloadPlaceholderEnable": false,
     "useMultiFrameRuntime": true,
-    "useApiHook": true,
-    "useApiHostProcess": true,
+    "useApiHook": false,
+    "useApiHostProcess": false,
     "babelSetting": {
       "ignore": [],
       "disablePlugins": [],
@@ -48,9 +48,9 @@
     "disableSWC": true
   },
   "compileType": "miniprogram",
-  "libVersion": "3.16.1",
+  "libVersion": "3.8.12",
   "appid": "wxdf0f1e4f73b76ec8",
-  "projectname": "learngrow-checkin",
+  "projectname": "yuanlaishitang-checkin",
   "isGameTourist": false,
   "condition": {
     "search": {

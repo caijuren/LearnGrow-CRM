@@ -3,6 +3,22 @@
     <view class="text-xl font-bold text-white">🏆 打卡排行榜</view>
   </view>
 
+  <view wx:if="{{myRank}}" class="my-rank-card">
+    <view>
+      <view class="my-rank-label">我的排名</view>
+      <view class="my-rank-title">第 {{myRank.rank}} 名</view>
+      <view class="my-rank-subtitle">
+        已打卡{{myRank.checkin_days}}天
+        <text wx:if="{{myRank.current_streak >= 2}}"> · 连续{{myRank.current_streak}}天</text>
+      </view>
+    </view>
+    <view class="my-rank-gap">
+      <text wx:if="{{myRank.rank === 1}}">领先中</text>
+      <text wx:elif="{{myRank.gap_to_previous === 0}}">并列</text>
+      <text wx:else>差{{myRank.gap_to_previous}}天</text>
+    </view>
+  </view>
+
   <view wx:if="{{ranking.length >= 3}}" class="podium">
     <view class="podium-item second">
       <view class="podium-rank">🥈</view>
@@ -29,7 +45,7 @@
       <view class="empty-icon">🏆</view>
       <view>暂无排名数据</view>
     </view>
-    <view wx:for="{{ranking}}" wx:key="rank" wx:if="{{index >= 3}}" class="ranking-item {{item.is_me ? 'is-me' : ''}}">
+    <view wx:for="{{ranking}}" wx:key="rank" class="ranking-item {{item.is_me ? 'is-me' : ''}}">
       <view class="rank-num">{{item.rank}}</view>
       <view class="user-avatar">{{item.nickname[0]}}</view>
       <view class="user-info flex-1">

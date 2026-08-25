@@ -13,6 +13,7 @@ import {
   type FollowUpMethod, type ProgressStatus, type ChildLearningProgress,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Modal from '@/components/Modal';
 
 const PROGRESS_STATUS_LABELS: Record<ProgressStatus, string> = {
   not_started: '未开始',
@@ -269,7 +270,7 @@ export default function ChildDetail() {
 
   if (!child) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50/30 to-white p-4 md:p-6">
+      <div className="page-shell page-enter">
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => navigate('/customers')}
@@ -306,7 +307,7 @@ export default function ChildDetail() {
   const genderLabel = child.gender === 'boy' ? '男孩' : child.gender === 'girl' ? '女孩' : '未知';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50/30 to-white p-4 md:p-6">
+    <div className="page-shell page-enter">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -378,7 +379,7 @@ export default function ChildDetail() {
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   <span className="text-xs text-slate-400 mr-1">薄弱科目:</span>
                   {child.weak_subjects.map(subject => (
-                    <span key={subject} className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium">
+                    <span key={subject} className="px-2 py-0.5 bg-brand-50 text-brand-600 rounded-lg text-xs font-medium">
                       {subject}
                     </span>
                   ))}
@@ -535,7 +536,7 @@ export default function ChildDetail() {
                                         {isPurchased ? (
                                           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                         ) : (
-                                          <Target className="w-4 h-4 text-rose-400" />
+                                          <Target className="w-4 h-4 text-brand-400" />
                                         )}
                                         <span className={`text-sm font-medium ${isPurchased ? 'text-slate-500 line-through' : 'text-slate-700'}`}>
                                           {product.name}
@@ -575,7 +576,7 @@ export default function ChildDetail() {
                             {hasUnpurchasedProducts(progress) && (
                               <button
                                 onClick={() => navigate(`/customers/${child.customer_id}?tab=orders`)}
-                                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-sm font-medium shadow-md shadow-rose-200 transition-all"
+                                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-medium shadow-sm/30 transition-all"
                               >
                                 <ShoppingCart className="w-4 h-4" />
                                 推荐购买
@@ -710,22 +711,22 @@ export default function ChildDetail() {
       </div>
 
       {showAdvance && currentProgress && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !submitting && setShowAdvance(false)}>
-          <div
-            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-900">推进到下一阶段</h2>
-              <button
-                onClick={() => setShowAdvance(false)}
-                disabled={submitting}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
+        <Modal
+          isOpen={showAdvance && !!currentProgress}
+          onClose={() => !submitting && setShowAdvance(false)}
+          title="推进到下一阶段"
+          size="lg"
+          footer={
+            <>
+              <button onClick={() => setShowAdvance(false)} disabled={submitting} className="btn-secondary">取消</button>
+              <button onClick={handleAdvance} disabled={submitting} className="btn-primary">
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                确认推进
               </button>
-            </div>
-            <div className="p-5 space-y-4">
+            </>
+          }
+        >
+            <div className="space-y-4">
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -765,44 +766,26 @@ export default function ChildDetail() {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setShowAdvance(false)}
-                disabled={submitting}
-                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAdvance}
-                disabled={submitting}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                确认推进
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {showEditChild && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !submitting && setShowEditChild(false)}>
-          <div
-            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-900">编辑孩子资料</h2>
-              <button
-                onClick={() => setShowEditChild(false)}
-                disabled={submitting}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
+        <Modal
+          isOpen={showEditChild}
+          onClose={() => !submitting && setShowEditChild(false)}
+          title="编辑孩子资料"
+          size="lg"
+          footer={
+            <>
+              <button onClick={() => setShowEditChild(false)} disabled={submitting} className="btn-secondary">取消</button>
+              <button onClick={handleSaveEditChild} disabled={!editChildForm.nickname.trim() || !editChildForm.grade || submitting} className="btn-primary">
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                保存
               </button>
-            </div>
-            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+            </>
+          }
+        >
+            <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-600 mb-1.5 block">昵称 *</label>
                 <input
@@ -875,7 +858,7 @@ export default function ChildDetail() {
                       onClick={() => toggleWeakSubject(subject)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                         editChildForm.weak_subjects.includes(subject)
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          ? 'bg-brand-50 text-brand-700 border-brand-200'
                           : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                       }`}
                     >
@@ -887,7 +870,7 @@ export default function ChildDetail() {
                       key={subject}
                       type="button"
                       onClick={() => toggleWeakSubject(subject)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-rose-50 text-rose-700 border-rose-200 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-brand-50 text-brand-700 border-brand-200 flex items-center gap-1"
                     >
                       {subject}
                       <X className="w-3 h-3" />
@@ -922,75 +905,41 @@ export default function ChildDetail() {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setShowEditChild(false)}
-                disabled={submitting}
-                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveEditChild}
-                disabled={!editChildForm.nickname.trim() || !editChildForm.grade || submitting}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                保存
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      {showDeleteChild && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !deleteSubmitting && setShowDeleteChild(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">确认删除孩子？</h3>
-              <p className="text-sm text-slate-500 mb-1">
-                即将删除孩子 <span className="font-semibold text-slate-700">{child.nickname}</span>
-              </p>
-              <p className="text-xs text-red-500">此操作不可撤销</p>
-            </div>
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setShowDeleteChild(false)}
-                disabled={deleteSubmitting}
-                className="flex-1 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDeleteChild}
-                disabled={deleteSubmitting}
-                className="flex-1 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {deleteSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                确认删除
-              </button>
-            </div>
+      <Modal
+        isOpen={showDeleteChild}
+        onClose={() => !deleteSubmitting && setShowDeleteChild(false)}
+        title="确认删除孩子"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setShowDeleteChild(false)} disabled={deleteSubmitting} className="btn-secondary flex-1">取消</button>
+            <button onClick={handleDeleteChild} disabled={deleteSubmitting} className="btn-danger flex-1 bg-red-500 text-white hover:bg-red-600">
+              {deleteSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              确认删除
+            </button>
+          </>
+        }
+      >
+        <div className="text-center py-1">
+          <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center mx-auto mb-3">
+            <Trash2 className="w-6 h-6 text-red-500" />
           </div>
+          <p className="text-sm text-slate-600">即将删除孩子 <span className="font-semibold text-slate-800">{child.nickname}</span></p>
+          <p className="text-xs text-red-500 mt-1">此操作不可撤销</p>
         </div>
-      )}
+      </Modal>
 
       {showAddPath && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !addPathSubmitting && setShowAddPath(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-bold text-slate-900">选择学习路径</h2>
-              <button
-                onClick={() => setShowAddPath(false)}
-                disabled={addPathSubmitting}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
-            </div>
-            <div className="p-5 max-h-[60vh] overflow-y-auto">
+        <Modal
+          isOpen={showAddPath}
+          onClose={() => !addPathSubmitting && setShowAddPath(false)}
+          title="选择学习路径"
+          size="lg"
+        >
+            <div>
               {availablePaths.length > 0 ? (
                 <div className="space-y-3">
                   {availablePaths.map(path => (
@@ -1019,8 +968,7 @@ export default function ChildDetail() {
                 <p className="text-center text-sm text-slate-500 py-8">暂无更多可用学习路径</p>
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

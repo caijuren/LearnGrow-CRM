@@ -16,13 +16,14 @@ import {
   type OrderType, type Child, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import SharedModal from '@/components/Modal';
 
 const AVATAR_COLORS = [
-  'from-rose-400 to-pink-500',
-  'from-pink-400 to-fuchsia-500',
-  'from-fuchsia-400 to-purple-500',
-  'from-purple-400 to-violet-500',
-  'from-violet-400 to-indigo-500',
+  'bg-brand-500',
+  'bg-sky-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-slate-500',
 ];
 
 const METHOD_ICONS: Record<FollowUpMethod, typeof MessageCircle> = {
@@ -34,7 +35,7 @@ const METHOD_ICONS: Record<FollowUpMethod, typeof MessageCircle> = {
 };
 
 const SUGGESTION_COLORS = [
-  { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'bg-rose-100 text-rose-600', badge: 'bg-rose-100 text-rose-700' },
+  { bg: 'bg-brand-50', border: 'border-brand-200', icon: 'bg-brand-100 text-brand-600', badge: 'bg-brand-100 text-brand-700' },
   { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700' },
   { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
   { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700' },
@@ -400,9 +401,9 @@ export default function CustomerDetail() {
 
   if (loading && !customer) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 text-rose-500 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto" />
           <p className="text-sm text-slate-500 mt-3">加载中...</p>
         </div>
       </div>
@@ -411,7 +412,7 @@ export default function CustomerDetail() {
 
   if (!customer) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
+      <div className="page-shell page-enter">
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => navigate('/customers')}
@@ -420,13 +421,13 @@ export default function CustomerDetail() {
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <Empty
-            icon={<User className="w-10 h-10 text-rose-300" />}
+            icon={<User className="w-10 h-10 text-brand-300" />}
             title="客户不存在"
             description="该客户可能已被删除"
             action={
               <button
                 onClick={() => navigate('/customers')}
-                className="bg-gradient-to-r from-rose-500 to-pink-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
+                className="bg-brand-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
               >
                 返回客户列表
               </button>
@@ -446,230 +447,245 @@ export default function CustomerDetail() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/customers')}
-              className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md flex items-center justify-center transition-all"
-            >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">客户详情</h1>
-              <p className="text-sm text-slate-500 mt-0.5">微信私域客户管理</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowDelete(true)}
-            className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md hover:bg-red-50 flex items-center justify-center transition-all text-slate-600 hover:text-red-600"
-            title="删除"
-          >
-            <Trash2 className="w-5 h-5" />
+    <div className="page-shell page-enter">
+      <div className="max-w-5xl mx-auto">
+        {/* 面包屑导航 */}
+        <div className="flex items-center gap-1.5 mb-4 t-caption">
+          <button onClick={() => navigate('/customers')}
+                  style={{ color: 'var(--color-text-secondary)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+                  className="transition-colors">
+            客户管理
           </button>
+          <ChevronRight size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+          <span className="t-body-strong" style={{ color: 'var(--color-text-primary)' }}>客户详情</span>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4">
-          <div className="flex items-start gap-4">
-            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${avatarColor} flex items-center justify-center shadow-lg shrink-0`}>
-              <span className="text-2xl font-bold text-white">{customer.name[0]}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h2 className="text-lg font-bold text-slate-900">{customer.name}</h2>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${STAGE_COLORS[customer.stage]}`}>
-                  {STAGE_LABELS[customer.stage]}
-                </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${IMPORTANCE_COLORS[customer.importance]}`}>
-                  {IMPORTANCE_LABELS[customer.importance]}
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <Users className="w-3 h-3" />
-                  {WECHAT_ACCOUNT_LABELS[customer.wechat_account]}
-                </span>
-                {customer.source && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                    {SOURCE_LABELS[customer.source]}
-                  </span>
-                )}
+        {/* 客户信息卡 */}
+        <div className="panel mb-4">
+          <div className="px-5 py-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                   style={{ backgroundColor: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
+                <span className="text-lg font-semibold">{customer.name[0]}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-slate-500 flex-wrap">
-                {customer.wechat_id && (
-                  <span className="flex items-center gap-1 text-emerald-600 font-medium">
-                    <MessageCircle className="w-4 h-4" />
-                    {customer.wechat_id}
-                    {customer.wechat_remark && <span className="text-slate-400">({customer.wechat_remark})</span>}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <h2 className="t-title">{customer.name}</h2>
+                  <span className={`badge ${
+                    customer.stage === 'purchased' || customer.stage === 'repurchased' ? 'badge-success' :
+                    customer.stage === 'interested' ? 'badge-warning' :
+                    customer.stage === 'in_group' ? 'badge-primary' : 'badge-neutral'
+                  }`}>
+                    {STAGE_LABELS[customer.stage]}
                   </span>
-                )}
-                {customer.phone && (
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
-                    {customer.phone}
+                  <span className={`badge ${
+                    customer.importance === 'vip' ? 'badge-warning' :
+                    customer.importance === 'watch' ? 'badge-neutral' : 'badge-success'
+                  }`}>
+                    {IMPORTANCE_LABELS[customer.importance]}
                   </span>
-                )}
-                {customer.wechat_add_date && (
-                  <span className="flex items-center gap-1 text-xs text-slate-400">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {customer.wechat_add_date} 添加
-                  </span>
-                )}
-              </div>
-              {customer.next_talk_topic && (
-                <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-100 flex items-start gap-2">
-                  <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-700">
-                    <span className="font-semibold">下次聊:</span> {customer.next_talk_topic}
-                  </p>
                 </div>
-              )}
-              {customer.tags && customer.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {customer.tags.map(tag => (
-                    <span key={tag} className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium">
-                      {tag}
+                <div className="flex items-center gap-4 flex-wrap t-small" style={{ color: 'var(--color-text-secondary)' }}>
+                  {customer.wechat_id && (
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      <span style={{ color: 'var(--color-text-primary)' }}>{customer.wechat_id}</span>
+                      {customer.wechat_remark && <span style={{ color: 'var(--color-text-tertiary)' }}>({customer.wechat_remark})</span>}
                     </span>
-                  ))}
+                  )}
+                  {customer.phone && (
+                    <span className="flex items-center gap-1.5">
+                      <Phone size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      <span style={{ color: 'var(--color-text-primary)' }}>{customer.phone}</span>
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <Users size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                    {WECHAT_ACCOUNT_LABELS[customer.wechat_account]}
+                  </span>
+                  {customer.source && (
+                    <span className="flex items-center gap-1.5">
+                      <Tag size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      {SOURCE_LABELS[customer.source]}
+                    </span>
+                  )}
+                  {customer.wechat_add_date && (
+                    <span className="flex items-center gap-1.5">
+                      <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      {customer.wechat_add_date} 添加
+                    </span>
+                  )}
                 </div>
-              )}
-              {customer.remark && (
-                <p className="text-sm text-slate-600 mt-3 p-3 bg-slate-50 rounded-xl">
-                  {customer.remark}
-                </p>
-              )}
+              </div>
+              {/* 关键指标 */}
+              <div className="hidden sm:flex items-center gap-6 shrink-0 pl-5"
+                   style={{ borderLeft: '1px solid var(--color-border-subtle)' }}>
+                <div className="text-center">
+                  <div className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</div>
+                  <div className="t-caption mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>累计消费</div>
+                </div>
+                <div className="text-center">
+                  <div className="t-kpi">{customer.order_count || 0}</div>
+                  <div className="t-caption mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>订单数</div>
+                </div>
+              </div>
             </div>
+
+            {/* 标签 & 备注 */}
+            {(customer.tags?.length > 0 || customer.remark || customer.next_talk_topic) && (
+              <div className="mt-4 pt-4 space-y-2.5"
+                   style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                {customer.next_talk_topic && (
+                  <div className="flex items-start gap-2">
+                    <Lightbulb size={14} strokeWidth={1.8} style={{ color: 'var(--color-warning)', marginTop: '2px' }} className="shrink-0" />
+                    <div className="t-small">
+                      <span className="t-body-strong">下次跟进话题：</span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>{customer.next_talk_topic}</span>
+                    </div>
+                  </div>
+                )}
+                {customer.tags && customer.tags.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <Tag size={14} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="shrink-0" />
+                    <div className="flex flex-wrap gap-1.5">
+                      {customer.tags.map(tag => (
+                        <span key={tag} className="chip chip-outline">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {customer.remark && (
+                  <div className="flex items-start gap-2">
+                    <FileText size={14} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="shrink-0" />
+                    <p className="t-small flex-1" style={{ color: 'var(--color-text-secondary)' }}>{customer.remark}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-slate-100">
-            <button
-              onClick={() => setShowEdit(true)}
-              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-slate-50 transition-colors text-slate-600 hover:text-rose-600"
-            >
-              <Edit2 className="w-5 h-5" />
-              <span className="text-xs">编辑</span>
-            </button>
-            <button
-              onClick={() => {
-                setEditForm(f => ({ ...f, stage: customer.stage }));
-                setShowEdit(true);
-              }}
-              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-slate-50 transition-colors text-slate-600 hover:text-emerald-600"
-            >
-              <ChevronRight className="w-5 h-5" />
-              <span className="text-xs">推进阶段</span>
-            </button>
-            <button
-              onClick={() => setShowFollowUp(true)}
-              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-rose-50 transition-colors text-slate-600 hover:text-rose-600"
-            >
-              <FileText className="w-5 h-5" />
-              <span className="text-xs">记跟进</span>
-            </button>
-            <button
-              onClick={() => setShowOrder(true)}
-              className="flex flex-col items-center gap-1 p-2 rounded-xl hover:bg-amber-50 transition-colors text-slate-600 hover:text-amber-600"
-            >
-              <ShoppingBag className="w-5 h-5" />
-              <span className="text-xs">记订单</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-100">
-            <div className="text-center p-3 bg-rose-50/50 rounded-xl">
-              <div className="text-xl font-bold text-rose-600">¥{customer.total_spent?.toLocaleString() || 0}</div>
-              <div className="text-xs text-slate-500 mt-0.5">累计消费</div>
+          {/* 操作栏 */}
+          <div className="px-5 py-3 border-t flex items-center justify-between"
+               style={{ borderColor: 'var(--color-border-subtle)', backgroundColor: 'var(--color-bg-subtle)' }}>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setShowFollowUp(true)} className="btn-primary btn-sm">
+                <FileText size={14} strokeWidth={1.8} />
+                记录跟进
+              </button>
+              <button onClick={() => setShowOrder(true)} className="btn-secondary btn-sm">
+                <ShoppingBag size={14} strokeWidth={1.8} />
+                记录订单
+              </button>
+              <button onClick={() => setShowEdit(true)} className="btn-ghost btn-sm">
+                <Edit2 size={14} strokeWidth={1.8} />
+                编辑资料
+              </button>
+              <button
+                onClick={() => {
+                  setEditForm(f => ({ ...f, stage: customer.stage }));
+                  setShowEdit(true);
+                }}
+                className="btn-ghost btn-sm"
+              >
+                <ChevronRight size={14} strokeWidth={1.8} />
+                推进阶段
+              </button>
             </div>
-            <div className="text-center p-3 bg-pink-50/50 rounded-xl">
-              <div className="text-xl font-bold text-pink-600">{customer.order_count || 0}</div>
-              <div className="text-xs text-slate-500 mt-0.5">订单数</div>
-            </div>
+            <button
+              onClick={() => setShowDelete(true)}
+              className="btn-ghost btn-sm"
+              style={{ color: 'var(--color-danger)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
+            >
+              <Trash2 size={14} strokeWidth={1.8} />
+              删除
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <button
-            onClick={() => setShowFollowUp(true)}
-            className="bg-white hover:bg-rose-50 border-2 border-rose-100 hover:border-rose-200 rounded-2xl p-4 flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center shadow-md shadow-rose-200 group-hover:scale-105 transition-transform">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-bold text-slate-800">快速记录跟进</div>
-              <div className="text-xs text-slate-500">微信聊天/电话/群聊</div>
-            </div>
-          </button>
-          <button
-            onClick={() => setShowOrder(true)}
-            className="bg-white hover:bg-amber-50 border-2 border-amber-100 hover:border-amber-200 rounded-2xl p-4 flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md shadow-amber-200 group-hover:scale-105 transition-transform">
-              <ShoppingBag className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-bold text-slate-800">记录订单</div>
-              <div className="text-xs text-slate-500">购买转化</div>
-            </div>
-          </button>
+        {/* 移动端关键指标 */}
+        <div className="sm:hidden grid grid-cols-2 gap-3 mb-4">
+          <div className="panel py-3 px-4 text-center">
+            <p className="t-caption mb-1" style={{ color: 'var(--color-text-tertiary)' }}>累计消费</p>
+            <p className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</p>
+          </div>
+          <div className="panel py-3 px-4 text-center">
+            <p className="t-caption mb-1" style={{ color: 'var(--color-text-tertiary)' }}>订单数</p>
+            <p className="t-kpi">{customer.order_count || 0}</p>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Baby className="w-4 h-4 text-emerald-500" />
+        <div className="panel mb-4">
+          <div className="px-5 py-4 border-b flex items-center justify-between"
+               style={{ borderColor: 'var(--color-border-subtle)' }}>
+            <h3 className="panel-title">
+              <Baby size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
               孩子
             </h3>
             <button
               onClick={openAddChild}
-              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors"
+              className="btn-secondary btn-sm"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus size={13} strokeWidth={1.8} />
               添加孩子
             </button>
           </div>
+          <div className="px-5 py-4">
           {customer.children && customer.children.length > 0 ? (
             <div className="space-y-3">
               {customer.children.map(child => {
-                const childAvatarColor = AVATAR_COLORS[child.id % AVATAR_COLORS.length];
                 const childEmoji = child.gender === 'boy' ? '👦' : child.gender === 'girl' ? '👧' : '🧒';
                 return (
                   <div
                     key={child.id}
-                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl hover:bg-slate-100/80 transition-colors cursor-pointer group"
+                    className="flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group"
+                    style={{ backgroundColor: 'var(--color-bg-subtle)' }}
                     onClick={() => navigate(`/customers/${customer.id}/children/${child.id}`)}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)'}
                   >
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${childAvatarColor} flex items-center justify-center shadow-md shrink-0 text-xl relative`}>
-                      <span>{childEmoji}</span>
-                      <span className="absolute -bottom-1 -right-1 bg-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold text-slate-700 shadow-sm border border-slate-200">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative"
+                         style={{ backgroundColor: 'var(--color-primary-soft)' }}>
+                      <span className="text-xl">{childEmoji}</span>
+                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                            style={{
+                              backgroundColor: 'var(--color-bg-surface)',
+                              color: 'var(--color-text-secondary)',
+                              border: '1px solid var(--color-border-subtle)',
+                            }}>
                         {child.nickname[0]}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-slate-800">{child.nickname}</span>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                        <span className="t-body-strong">{child.nickname}</span>
+                        <span className="badge badge-success">
                           {child.grade}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 flex-wrap">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
                         {child.region && <span>{child.region}</span>}
                         {child.textbook_version && <span>· {child.textbook_version}</span>}
                       </div>
                       {child.weak_subjects && child.weak_subjects.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {child.weak_subjects.map(subject => (
-                            <span key={subject} className="px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-medium">
-                              {subject}
-                            </span>
+                            <span key={subject} className="chip chip-outline">{subject}</span>
                           ))}
                         </div>
                       )}
                     </div>
                     <button
                       onClick={e => { e.stopPropagation(); openEditChild(child); }}
-                      className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors opacity-0 group-hover:opacity-100"
+                      className="w-8 h-8 rounded-md flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
+                      style={{ color: 'var(--color-text-tertiary)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 size={14} strokeWidth={1.8} />
                     </button>
                   </div>
                 );
@@ -677,47 +693,59 @@ export default function CustomerDetail() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <Baby className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">还没添加孩子信息</p>
+              <div className="w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center"
+                   style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                <Baby size={20} strokeWidth={1.5} />
+              </div>
+              <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>还没添加孩子信息</p>
             </div>
           )}
+          </div>
         </div>
 
         {customer.suggestions && customer.suggestions.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-amber-500" />
+            <h3 className="panel-title mb-3 flex items-center gap-2">
+              <Lightbulb size={15} strokeWidth={1.8} style={{ color: 'var(--color-warning)' }} />
               可以推什么
             </h3>
             <div className="space-y-3">
               {customer.suggestions.map((suggestion, index) => {
-                const color = SUGGESTION_COLORS[index % SUGGESTION_COLORS.length];
+                const bgColors = [
+                  { bg: 'rgb(91 92 226 / 0.06)', border: 'rgb(91 92 226 / 0.15)', icon: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
+                  { bg: 'rgb(232 178 78 / 0.1)', border: 'rgb(232 178 78 / 0.25)', icon: 'var(--color-warning-soft)', iconColor: 'var(--color-warning-text)' },
+                  { bg: 'rgb(41 167 102 / 0.08)', border: 'rgb(41 167 102 / 0.2)', icon: 'var(--color-success-soft)', iconColor: 'var(--color-success)' },
+                  { bg: 'rgb(59 130 246 / 0.08)', border: 'rgb(59 130 246 / 0.2)', icon: 'rgb(59 130 246 / 0.12)', iconColor: 'rgb(37 99 235)' },
+                ];
+                const color = bgColors[index % bgColors.length];
                 return (
-                  <div key={index} className={`${color.bg} border ${color.border} rounded-2xl p-4`}>
+                  <div key={index} className="panel p-4"
+                       style={{ backgroundColor: color.bg, borderColor: color.border }}>
                     <div className="flex items-start gap-3">
-                      <div className={`w-8 h-8 rounded-lg ${color.icon} flex items-center justify-center shrink-0`}>
-                        <Lightbulb className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                           style={{ backgroundColor: color.icon, color: color.iconColor }}>
+                        <Lightbulb size={15} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800">{suggestion.title}</span>
+                          <span className="t-body-strong">{suggestion.title}</span>
                           {suggestion.product && (
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${color.badge}`}>
-                              {suggestion.product.name}
-                            </span>
+                            <span className="badge badge-primary">{suggestion.product.name}</span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 mb-2">{suggestion.reason}</p>
-                        <div className="bg-white/70 rounded-xl p-3 relative group">
-                          <p className="text-xs text-slate-700 leading-relaxed pr-8">{suggestion.script}</p>
+                        <p className="t-caption mb-2" style={{ color: 'var(--color-text-secondary)' }}>{suggestion.reason}</p>
+                        <div className="rounded-lg p-3 relative group"
+                             style={{ backgroundColor: 'var(--color-bg-surface)' }}>
+                          <p className="t-small leading-relaxed pr-8" style={{ color: 'var(--color-text-primary)' }}>{suggestion.script}</p>
                           <button
                             onClick={() => copyScript(suggestion.script, index)}
-                            className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-white shadow-sm hover:shadow flex items-center justify-center transition-all"
+                            className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center transition-all btn-icon-sm"
+                            style={{ backgroundColor: 'var(--color-bg-subtle)' }}
                           >
                             {copiedIndex === index ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                              <Check size={13} strokeWidth={2} style={{ color: 'var(--color-success)' }} />
                             ) : (
-                              <Copy className="w-3.5 h-3.5 text-slate-400" />
+                              <Copy size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
                             )}
                           </button>
                         </div>
@@ -730,84 +758,71 @@ export default function CustomerDetail() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="flex border-b border-slate-100">
+        <div className="panel overflow-hidden">
+          <div className="tab-list" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
             <button
               onClick={() => { setActiveTab('orders'); setSearchParams({ tab: 'orders' }); }}
-              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                activeTab === 'orders'
-                  ? 'text-rose-600 border-b-2 border-rose-500 bg-rose-50/50'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`tab-item ${activeTab === 'orders' ? 'active' : ''}`}
             >
-              <ShoppingCart className="w-4 h-4" />
-              买过啥
+              <ShoppingCart size={14} strokeWidth={1.8} />
+              订单记录
               {sortedOrders.length > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                  activeTab === 'orders' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {sortedOrders.length}
-                </span>
+                <span className="tab-count">{sortedOrders.length}</span>
               )}
             </button>
             <button
               onClick={() => { setActiveTab('followups'); setSearchParams({ tab: 'followups' }); }}
-              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                activeTab === 'followups'
-                  ? 'text-rose-600 border-b-2 border-rose-500 bg-rose-50/50'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`tab-item ${activeTab === 'followups' ? 'active' : ''}`}
             >
-              <MessageCircle className="w-4 h-4" />
-              聊过啥
+              <MessageCircle size={14} strokeWidth={1.8} />
+              跟进记录
               {sortedFollowUps.length > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                  activeTab === 'followups' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {sortedFollowUps.length}
-                </span>
+                <span className="tab-count">{sortedFollowUps.length}</span>
               )}
             </button>
           </div>
 
-          <div className="p-4">
+          <div className="px-5 py-4">
             {activeTab === 'orders' ? (
               sortedOrders.length > 0 ? (
-                <div className="space-y-3">
+                <div className="divide-y -mx-5 -mt-4" style={{ borderColor: 'var(--color-border-subtle)' }}>
                   {sortedOrders.map(order => (
-                    <div key={order.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100/80 transition-colors group">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
-                          <ShoppingBag className="w-5 h-5 text-amber-600" />
+                    <div key={order.id} className="px-5 py-3 flex items-center justify-between transition-colors group">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                             style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                          <ShoppingBag size={14} strokeWidth={1.8} />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-semibold text-slate-800">{order.product_name}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${ORDER_TYPE_COLORS[order.order_type]}`}>
+                            <span className="t-body-strong">{order.product_name}</span>
+                            <span className={`badge ${
+                              order.order_type === 'first' ? 'badge-primary' :
+                              order.order_type === 'repurchase' ? 'badge-success' : 'badge-warning'
+                            }`}>
                               {ORDER_TYPE_LABELS[order.order_type]}
                             </span>
                             {order.child_name && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700">
-                                给{order.child_name}
-                              </span>
+                              <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>· {order.child_name}</span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
+                          <div className="t-caption mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                            <Calendar size={11} strokeWidth={1.8} />
                             {formatDate(order.purchase_date)}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="text-base font-bold text-slate-900">¥{order.amount?.toLocaleString()}</div>
-                        </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="t-kpi-sm">¥{order.amount?.toLocaleString()}</span>
                         <button
                           onClick={() => setDeleteConfirm({ type: 'order', id: order.id })}
-                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                          className="p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
+                          style={{ color: 'var(--color-text-tertiary)' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
                           title="删除订单"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 size={13} strokeWidth={1.8} />
                         </button>
                       </div>
                     </div>
@@ -815,64 +830,63 @@ export default function CustomerDetail() {
                 </div>
               ) : (
                 <Empty
-                  icon={<ShoppingCart className="w-8 h-8 text-slate-300" />}
+                  icon={<ShoppingCart size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
                   title="暂无订单记录"
-                  description="还没有记录过订单"
+                  description="点击上方「记录订单」添加第一笔订单"
                 />
               )
             ) : (
               sortedFollowUps.length > 0 ? (
-                <div className="relative pl-10">
-                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-rose-200 via-pink-200 to-transparent" />
+                <div className="relative pl-6 -mx-5 -mt-4">
+                  <div className="absolute left-[22px] top-4 bottom-4 w-px" style={{ backgroundColor: 'var(--color-border-default)' }} />
                   {sortedFollowUps.map((followUp, index) => {
                     const Icon = METHOD_ICONS[followUp.method];
                     const isLive = followUp.is_live_note || followUp.method === 'live';
                     return (
-                      <div key={followUp.id} className="relative mb-5 last:mb-0">
-                        <div className={`absolute -left-10 top-1 w-8 h-8 rounded-full ${
-                          isLive ? 'bg-gradient-to-br from-rose-400 to-pink-500' : 'bg-gradient-to-br from-slate-200 to-slate-300'
-                        } border-4 border-white shadow-md flex items-center justify-center z-10`}>
-                          <Icon className={`w-4 h-4 ${isLive ? 'text-white' : 'text-slate-600'}`} />
-                        </div>
-                        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 group relative">
-                          <button
-                            onClick={() => setDeleteConfirm({ type: 'followup', id: followUp.id })}
-                            className="absolute top-2 right-2 p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                            title="删除跟进"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
-                              isLive ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-700'
-                            }`}>
-                              {isLive && <Radio className="w-3 h-3 inline mr-0.5" />}
+                      <div key={followUp.id} className="relative pl-8 pr-4 py-3 last:pb-0 first:pt-4 group">
+                        <div className="absolute left-3 top-3.5 w-4 h-4 rounded-full border-2 z-10"
+                             style={{
+                               backgroundColor: isLive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                               borderColor: 'var(--color-bg-surface)',
+                               boxShadow: `0 0 0 1px ${isLive ? 'var(--color-primary)' : 'var(--color-border-default)'}`,
+                             }} />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="t-caption flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+                              <Icon size={12} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                              {isLive && <Radio size={11} strokeWidth={1.8} style={{ color: 'var(--color-primary)' }} />}
                               {FOLLOW_UP_METHOD_LABELS[followUp.method]}
                             </span>
-                            <span className="text-xs text-slate-400">{formatDate(followUp.date)}</span>
+                            <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>· {formatDate(followUp.date)}</span>
                             {followUp.result && (
-                              <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                                followUp.result === 'closed' ? 'bg-emerald-100 text-emerald-700' :
-                                followUp.result === 'considering' ? 'bg-sky-100 text-sky-700' :
-                                followUp.result === 'no_need' ? 'bg-slate-100 text-slate-600' :
-                                'bg-amber-100 text-amber-700'
-                              }`}>
-                                {FOLLOW_UP_RESULT_LABELS[followUp.result]}
-                              </span>
+                              <>
+                                <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>·</span>
+                                <span className="t-small font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                                  {FOLLOW_UP_RESULT_LABELS[followUp.result]}
+                                </span>
+                              </>
                             )}
                             {followUp.next_follow_date && (
-                              <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">
-                                <Clock className="w-3 h-3" />
-                                下次: {formatDate(followUp.next_follow_date)}
-                              </span>
+                              <>
+                                <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>·</span>
+                                <span className="flex items-center gap-1 t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                                  <Clock size={11} strokeWidth={1.8} />
+                                  下次: {formatDate(followUp.next_follow_date)}
+                                </span>
+                              </>
                             )}
-                            {followUp.child_name && (
-                              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-sky-100 text-sky-700">
-                                给{followUp.child_name}
-                              </span>
-                            )}
+                            <button
+                              onClick={() => setDeleteConfirm({ type: 'followup', id: followUp.id })}
+                              className="ml-auto p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
+                              style={{ color: 'var(--color-text-tertiary)' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                              title="删除跟进"
+                            >
+                              <Trash2 size={13} strokeWidth={1.8} />
+                            </button>
                           </div>
-                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{followUp.content}</p>
+                          <p className="t-small leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-text-primary)' }}>{followUp.content}</p>
                         </div>
                       </div>
                     );
@@ -880,9 +894,9 @@ export default function CustomerDetail() {
                 </div>
               ) : (
                 <Empty
-                  icon={<MessageCircle className="w-8 h-8 text-slate-300" />}
+                  icon={<MessageCircle size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
                   title="暂无跟进记录"
-                  description="记录与客户的每一次沟通"
+                  description="点击上方「记录跟进」开始记录沟通内容"
                 />
               )
             )}
@@ -891,34 +905,53 @@ export default function CustomerDetail() {
       </div>
 
       {showFollowUp && (
-        <Modal title="记跟进" onClose={() => setShowFollowUp(false)}>
+        <Modal
+          title="记跟进"
+          onClose={() => setShowFollowUp(false)}
+          footer={
+            <>
+              <button onClick={() => setShowFollowUp(false)} className="btn-secondary">取消</button>
+              <button
+                onClick={handleAddFollowUp}
+                disabled={!followUpForm.method || !followUpForm.content.trim() || submitting}
+                className="btn-primary"
+              >
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
+                保存
+              </button>
+            </>
+          }
+        >
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">跟进方式 *</label>
+              <label className="form-label">跟进方式 *</label>
               <div className="grid grid-cols-5 gap-2">
                 {(Object.entries(FOLLOW_UP_METHOD_LABELS) as [FollowUpMethod, string][]).map(([method, label]) => {
                   const Icon = METHOD_ICONS[method];
+                  const selected = followUpForm.method === method;
                   return (
                     <button
                       key={method}
                       onClick={() => setFollowUpForm(f => ({ ...f, method }))}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                        followUpForm.method === method
-                          ? 'border-rose-300 bg-rose-50 text-rose-600'
-                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                      }`}
+                      className="flex flex-col items-center gap-1 p-2 rounded-lg border transition-all"
+                      style={{
+                        borderColor: selected ? 'rgb(91 92 226 / 0.4)' : 'var(--color-border-default)',
+                        backgroundColor: selected ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
+                        color: selected ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+                      }}
                     >
-                      <Icon className="w-5 h-5" />
-                      <span className="text-[10px] font-medium">{label}</span>
+                      <Icon size={18} strokeWidth={1.8} />
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 500 }}>{label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">跟进内容 *</label>
+              <label className="form-label">跟进内容 *</label>
               <textarea
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm resize-none"
+                className="input resize-none"
+                style={{ minHeight: '100px', paddingTop: '0.625rem', paddingBottom: '0.625rem' }}
                 rows={4}
                 placeholder="记录沟通内容..."
                 value={followUpForm.content}
@@ -927,9 +960,9 @@ export default function CustomerDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">跟进结果</label>
+                <label className="form-label">跟进结果</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={followUpForm.result}
                   onChange={e => setFollowUpForm(f => ({ ...f, result: e.target.value as FollowUpResult | '' }))}
                 >
@@ -940,10 +973,10 @@ export default function CustomerDetail() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">下次跟进日期</label>
+                <label className="form-label">下次跟进日期</label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  className="input"
                   value={followUpForm.next_follow_date}
                   onChange={e => setFollowUpForm(f => ({ ...f, next_follow_date: e.target.value }))}
                 />
@@ -951,9 +984,9 @@ export default function CustomerDetail() {
             </div>
             {customer.children && customer.children.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">关联孩子</label>
+                <label className="form-label">关联孩子</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={followUpForm.child_id}
                   onChange={e => setFollowUpForm(f => ({ ...f, child_id: e.target.value }))}
                 >
@@ -965,32 +998,32 @@ export default function CustomerDetail() {
               </div>
             )}
           </div>
-          <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50 -mx-5 -mb-5 mt-5">
-            <button
-              onClick={() => setShowFollowUp(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleAddFollowUp}
-              disabled={!followUpForm.method || !followUpForm.content.trim() || submitting}
-              className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              保存
-            </button>
-          </div>
         </Modal>
       )}
 
       {showOrder && (
-        <Modal title="记订单" onClose={() => setShowOrder(false)}>
+        <Modal
+          title="记订单"
+          onClose={() => setShowOrder(false)}
+          footer={
+            <>
+              <button onClick={() => setShowOrder(false)} className="btn-secondary">取消</button>
+              <button
+                onClick={handleAddOrder}
+                disabled={!orderForm.product_id || !orderForm.amount || submitting}
+                className="btn-primary"
+              >
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
+                保存
+              </button>
+            </>
+          }
+        >
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">选择产品 *</label>
+              <label className="form-label">选择产品 *</label>
               <select
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                className="input"
                 value={orderForm.product_id}
                 onChange={e => setOrderForm(f => ({ ...f, product_id: e.target.value }))}
               >
@@ -1002,19 +1035,19 @@ export default function CustomerDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">金额 *</label>
+                <label className="form-label">金额 *</label>
                 <input
                   type="number"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  className="input"
                   placeholder="订单金额"
                   value={orderForm.amount}
                   onChange={e => setOrderForm(f => ({ ...f, amount: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">订单类型</label>
+                <label className="form-label">订单类型</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={orderForm.order_type}
                   onChange={e => setOrderForm(f => ({ ...f, order_type: e.target.value as OrderType | '' }))}
                 >
@@ -1026,9 +1059,9 @@ export default function CustomerDetail() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注</label>
+              <label className="form-label">备注</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                className="input"
                 placeholder="订单备注（选填）"
                 value={orderForm.remark}
                 onChange={e => setOrderForm(f => ({ ...f, remark: e.target.value }))}
@@ -1036,9 +1069,9 @@ export default function CustomerDetail() {
             </div>
             {customer.children && customer.children.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">为哪个孩子购买</label>
+                <label className="form-label">为哪个孩子购买</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={orderForm.child_id}
                   onChange={e => setOrderForm(f => ({ ...f, child_id: e.target.value }))}
                 >
@@ -1050,65 +1083,69 @@ export default function CustomerDetail() {
               </div>
             )}
           </div>
-          <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50 -mx-5 -mb-5 mt-5">
-            <button
-              onClick={() => setShowOrder(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleAddOrder}
-              disabled={!orderForm.product_id || !orderForm.amount || submitting}
-              className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              保存
-            </button>
-          </div>
         </Modal>
       )}
 
       {showEdit && (
-        <Modal title="编辑客户信息" onClose={() => setShowEdit(false)}>
-          <div className="space-y-4 max-h-[65vh] overflow-y-auto">
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-              <h4 className="text-xs font-bold text-emerald-700 mb-3 flex items-center gap-1">
-                <Users className="w-3.5 h-3.5" />
-                微信私域信息
-              </h4>
+        <Modal
+          title="编辑客户信息"
+          onClose={() => setShowEdit(false)}
+          footer={
+            <>
+              <button onClick={() => setShowEdit(false)} className="btn-secondary">取消</button>
+              <button
+                onClick={handleEdit}
+                disabled={!editForm.name.trim() || submitting}
+                className="btn-primary"
+              >
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
+                保存
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
+            {/* 微信私域 */}
+            <div
+              className="p-3 rounded-lg border"
+              style={{ backgroundColor: 'rgb(16 185 129 / 0.04)', borderColor: 'rgb(16 185 129 / 0.12)' }}
+            >
+              <div className="flex items-center gap-1.5 mb-3" style={{ color: 'rgb(5 150 105)' }}>
+                <Users size={14} strokeWidth={2} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>微信私域信息</span>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">微信号</label>
+                  <label className="form-label">微信号</label>
                   <input
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    className="input"
                     value={editForm.wechat_id}
                     onChange={e => setEditForm(f => ({ ...f, wechat_id: e.target.value }))}
                     placeholder="客户微信号"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">微信备注名</label>
+                  <label className="form-label">微信备注名</label>
                   <input
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    className="input"
                     value={editForm.wechat_remark}
                     onChange={e => setEditForm(f => ({ ...f, wechat_remark: e.target.value }))}
                     placeholder="你的微信备注"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">添加日期</label>
+                  <label className="form-label">添加日期</label>
                   <input
                     type="date"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                    className="input"
                     value={editForm.wechat_add_date}
                     onChange={e => setEditForm(f => ({ ...f, wechat_add_date: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-slate-600 mb-1 block">所属微信</label>
+                  <label className="form-label">所属微信</label>
                   <select
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm bg-white"
+                    className="input"
                     value={editForm.wechat_account}
                     onChange={e => setEditForm(f => ({ ...f, wechat_account: e.target.value as WechatAccount }))}
                   >
@@ -1120,34 +1157,43 @@ export default function CustomerDetail() {
               </div>
             </div>
 
-            <div className="p-3 bg-rose-50 rounded-xl border border-rose-100">
-              <h4 className="text-xs font-bold text-rose-700 mb-3 flex items-center gap-1">
-                <ChevronRight className="w-3.5 h-3.5" />
-                客户阶段管理
-              </h4>
+            {/* 客户阶段 */}
+            <div
+              className="p-3 rounded-lg border"
+              style={{ backgroundColor: 'var(--color-primary-soft)', borderColor: 'rgb(91 92 226 / 0.12)' }}
+            >
+              <div className="flex items-center gap-1.5 mb-3" style={{ color: 'var(--color-primary)' }}>
+                <ChevronRight size={14} strokeWidth={2} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>客户阶段管理</span>
+              </div>
               <div className="grid grid-cols-4 gap-2 mb-3">
-                {Object.entries(STAGE_LABELS).map(([k, v]) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setEditForm(f => ({ ...f, stage: k as CustomerStage }))}
-                    className={`px-2 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      editForm.stage === k
-                        ? 'bg-white border-rose-300 text-rose-700 shadow-sm'
-                        : 'bg-rose-50/50 border-transparent text-slate-600 hover:bg-white'
-                    }`}
-                  >
-                    {v}
-                  </button>
-                ))}
+                {Object.entries(STAGE_LABELS).map(([k, v]) => {
+                  const active = editForm.stage === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setEditForm(f => ({ ...f, stage: k as CustomerStage }))}
+                      className="px-2 py-1.5 rounded-md text-xs font-medium border transition-all"
+                      style={{
+                        backgroundColor: active ? 'var(--color-bg-surface)' : 'transparent',
+                        borderColor: active ? 'rgb(91 92 226 / 0.4)' : 'transparent',
+                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                        boxShadow: active ? '0 1px 2px rgb(16 24 40 / 0.04)' : 'none',
+                      }}
+                    >
+                      {v}
+                    </button>
+                  );
+                })}
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1 block flex items-center gap-1">
-                  <Lightbulb className="w-3 h-3 text-amber-500" />
+                <label className="form-label flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  <Lightbulb size={12} strokeWidth={1.8} style={{ color: 'rgb(245 158 11)' }} />
                   下次聊什么话题
                 </label>
                 <input
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-amber-300 focus:ring-2 focus:ring-amber-100 outline-none transition-all text-sm"
+                  className="input"
                   value={editForm.next_talk_topic}
                   onChange={e => setEditForm(f => ({ ...f, next_talk_topic: e.target.value }))}
                   placeholder="记录下次聊天的切入点"
@@ -1155,45 +1201,46 @@ export default function CustomerDetail() {
               </div>
             </div>
 
+            {/* 基础信息 */}
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">客户称呼 *</label>
+              <label className="form-label">客户称呼 *</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                className="input"
                 value={editForm.name}
                 onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">微信昵称</label>
+                <label className="form-label">微信昵称</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  className="input"
                   value={editForm.nickname}
                   onChange={e => setEditForm(f => ({ ...f, nickname: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">手机号</label>
+                <label className="form-label">手机号</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                  className="input"
                   value={editForm.phone}
                   onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">抖音昵称</label>
+              <label className="form-label">抖音昵称</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm"
+                className="input"
                 value={editForm.douyin_nickname}
                 onChange={e => setEditForm(f => ({ ...f, douyin_nickname: e.target.value }))}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">来源渠道</label>
+                <label className="form-label">来源渠道</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={editForm.source}
                   onChange={e => setEditForm(f => ({ ...f, source: e.target.value as CustomerSource | '' }))}
                 >
@@ -1204,9 +1251,9 @@ export default function CustomerDetail() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">重要程度</label>
+                <label className="form-label">重要程度</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={editForm.importance}
                   onChange={e => setEditForm(f => ({ ...f, importance: e.target.value as Importance }))}
                 >
@@ -1216,41 +1263,53 @@ export default function CustomerDetail() {
                 </select>
               </div>
             </div>
+
+            {/* 标签 */}
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block flex items-center gap-1">
-                <Tag className="w-3 h-3" />
+              <label className="form-label flex items-center gap-1">
+                <Tag size={12} strokeWidth={1.8} />
                 标签
               </label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {COMMON_TAGS.map(tag => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleEditTag(tag)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                      editForm.tags.includes(tag)
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {COMMON_TAGS.map(tag => {
+                  const active = editForm.tags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleEditTag(tag)}
+                      className="px-2.5 py-1 rounded-md text-xs font-medium border transition-all"
+                      style={{
+                        backgroundColor: active ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
+                        borderColor: active ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
+                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
                 {editForm.tags.filter(t => !COMMON_TAGS.includes(t)).map(tag => (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => toggleEditTag(tag)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium border bg-pink-50 text-pink-700 border-pink-200 flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-md text-xs font-medium border flex items-center gap-1"
+                    style={{
+                      backgroundColor: 'rgb(236 72 153 / 0.06)',
+                      borderColor: 'rgb(236 72 153 / 0.2)',
+                      color: 'rgb(219 39 119)',
+                    }}
                   >
                     {tag}
-                    <X className="w-3 h-3" />
+                    <X size={10} strokeWidth={2} />
                   </button>
                 ))}
               </div>
               <div className="flex gap-2">
                 <input
-                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-xs"
+                  className="input flex-1"
+                  style={{ fontSize: '0.75rem' }}
                   placeholder="自定义标签"
                   value={customTag}
                   onChange={e => setCustomTag(e.target.value)}
@@ -1259,95 +1318,65 @@ export default function CustomerDetail() {
                 <button
                   type="button"
                   onClick={addEditCustomTag}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition-colors"
+                  className="btn-secondary"
+                  style={{ fontSize: '0.75rem', paddingLeft: '0.75rem', paddingRight: '0.75rem' }}
                 >
                   添加
                 </button>
               </div>
             </div>
+
+            {/* 备注 */}
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注</label>
+              <label className="form-label">备注</label>
               <textarea
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-rose-300 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-sm resize-none"
+                className="input resize-none"
+                style={{ paddingTop: '0.625rem', paddingBottom: '0.625rem' }}
                 rows={2}
                 value={editForm.remark}
                 onChange={e => setEditForm(f => ({ ...f, remark: e.target.value }))}
               />
             </div>
           </div>
-          <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50 -mx-5 -mb-5 mt-5">
-            <button
-              onClick={() => setShowEdit(false)}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleEdit}
-              disabled={!editForm.name.trim() || submitting}
-              className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              保存
-            </button>
-          </div>
         </Modal>
       )}
 
       {showDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !submitting && setShowDelete(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">确认删除客户？</h3>
-              <p className="text-sm text-slate-500 mb-1">
-                即将删除客户 <span className="font-semibold text-slate-700">{customer.name}</span>
-              </p>
-              <p className="text-xs text-red-500">此操作不可撤销</p>
-            </div>
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setShowDelete(false)}
-                disabled={submitting}
-                className="flex-1 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={submitting}
-                className="flex-1 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+        <Modal
+          title="确认删除客户"
+          onClose={() => !submitting && setShowDelete(false)}
+          footer={
+            <>
+              <button onClick={() => setShowDelete(false)} disabled={submitting} className="btn-secondary flex-1">取消</button>
+              <button onClick={handleDelete} disabled={submitting} className="btn-danger-solid flex-1">
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 确认删除
               </button>
+            </>
+          }
+        >
+          <div className="text-center py-2">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: 'rgb(239 68 68 / 0.08)' }}
+            >
+              <Trash2 size={24} strokeWidth={1.8} style={{ color: 'rgb(239 68 68)' }} />
             </div>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+              即将删除客户 <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{customer.name}</span>
+            </p>
+            <p className="text-xs mt-1" style={{ color: 'rgb(239 68 68)' }}>此操作不可撤销</p>
           </div>
-        </div>
+        </Modal>
       )}
 
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !submitting && setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">
-                确认删除{deleteConfirm.type === 'order' ? '订单' : '跟进记录'}？
-              </h3>
-              <p className="text-sm text-slate-500">此操作不可撤销</p>
-            </div>
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                disabled={submitting}
-                className="flex-1 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
+        <Modal
+          title={`确认删除${deleteConfirm.type === 'order' ? '订单' : '跟进记录'}`}
+          onClose={() => !submitting && setDeleteConfirm(null)}
+          footer={
+            <>
+              <button onClick={() => setDeleteConfirm(null)} disabled={submitting} className="btn-secondary flex-1">取消</button>
               <button
                 onClick={async () => {
                   if (!deleteConfirm || !customer || !id) return;
@@ -1367,53 +1396,95 @@ export default function CustomerDetail() {
                   }
                 }}
                 disabled={submitting}
-                className="flex-1 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="btn-danger-solid flex-1"
               >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 确认删除
               </button>
+            </>
+          }
+        >
+          <div className="text-center py-2">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
+              style={{ backgroundColor: 'rgb(239 68 68 / 0.08)' }}
+            >
+              <AlertTriangle size={24} strokeWidth={1.8} style={{ color: 'rgb(239 68 68)' }} />
             </div>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>此操作不可撤销</p>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showAddChild && (
-        <Modal title={editingChild ? '编辑孩子' : '添加孩子'} onClose={() => { if (!submitting) { setShowAddChild(false); setChildForm(emptyChildForm); setEditingChild(null); } }}>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+        <Modal
+          title={editingChild ? '编辑孩子' : '添加孩子'}
+          onClose={() => { if (!submitting) { setShowAddChild(false); setChildForm(emptyChildForm); setEditingChild(null); } }}
+          footer={
+            <>
+              <button
+                onClick={() => { setShowAddChild(false); setChildForm(emptyChildForm); setEditingChild(null); }}
+                disabled={submitting}
+                className="btn-secondary"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveChild}
+                disabled={!childForm.nickname.trim() || !childForm.grade || submitting}
+                className="btn-primary"
+              >
+                {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
+                保存
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">昵称 *</label>
+              <label className="form-label">昵称 *</label>
               <input
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                className="input"
                 placeholder="孩子昵称"
                 value={childForm.nickname}
                 onChange={e => setChildForm(f => ({ ...f, nickname: e.target.value }))}
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">性别</label>
+              <label className="form-label">性别</label>
               <div className="grid grid-cols-2 gap-2">
-                {(['boy', 'girl'] as const).map(g => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setChildForm(f => ({ ...f, gender: g }))}
-                    className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 transition-all text-sm font-medium ${
-                      childForm.gender === g
-                        ? g === 'boy' ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-pink-300 bg-pink-50 text-pink-700'
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="text-lg">{g === 'boy' ? '👦' : '👧'}</span>
-                    {GENDERS[g]}
-                  </button>
-                ))}
+                {(['boy', 'girl'] as const).map(g => {
+                  const active = childForm.gender === g;
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setChildForm(f => ({ ...f, gender: g }))}
+                      className="flex items-center justify-center gap-1.5 p-2.5 rounded-lg border transition-all text-sm font-medium"
+                      style={{
+                        borderColor: active
+                          ? g === 'boy' ? 'rgb(56 189 248 / 0.5)' : 'rgb(244 114 182 / 0.5)'
+                          : 'var(--color-border-default)',
+                        backgroundColor: active
+                          ? g === 'boy' ? 'rgb(56 189 248 / 0.08)' : 'rgb(244 114 182 / 0.08)'
+                          : 'var(--color-bg-surface)',
+                        color: active
+                          ? g === 'boy' ? 'rgb(14 165 233)' : 'rgb(236 72 153)'
+                          : 'var(--color-text-tertiary)',
+                      }}
+                    >
+                      <span className="text-lg">{g === 'boy' ? '👦' : '👧'}</span>
+                      {GENDERS[g]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">年级 *</label>
+                <label className="form-label">年级 *</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={childForm.grade}
                   onChange={e => setChildForm(f => ({ ...f, grade: e.target.value }))}
                 >
@@ -1424,10 +1495,10 @@ export default function CustomerDetail() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">出生日期</label>
+                <label className="form-label">出生日期</label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                  className="input"
                   value={childForm.birth_date}
                   onChange={e => setChildForm(f => ({ ...f, birth_date: e.target.value }))}
                 />
@@ -1435,9 +1506,9 @@ export default function CustomerDetail() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">地区</label>
+                <label className="form-label">地区</label>
                 <select
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm bg-white"
+                  className="input"
                   value={childForm.region}
                   onChange={e => setChildForm(f => ({ ...f, region: e.target.value }))}
                 >
@@ -1448,9 +1519,9 @@ export default function CustomerDetail() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 block">教材版本</label>
+                <label className="form-label">教材版本</label>
                 <input
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm"
+                  className="input"
                   placeholder="如：人教PEP版"
                   value={childForm.textbook_version}
                   onChange={e => setChildForm(f => ({ ...f, textbook_version: e.target.value }))}
@@ -1464,37 +1535,47 @@ export default function CustomerDetail() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">薄弱科目</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {SUBJECTS.map(subject => (
-                  <button
-                    key={subject}
-                    type="button"
-                    onClick={() => toggleWeakSubject(subject)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      childForm.weak_subjects.includes(subject)
-                        ? 'bg-rose-50 text-rose-700 border-rose-200'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {subject}
-                  </button>
-                ))}
+              <label className="form-label">薄弱科目</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {SUBJECTS.map(subject => {
+                  const active = childForm.weak_subjects.includes(subject);
+                  return (
+                    <button
+                      key={subject}
+                      type="button"
+                      onClick={() => toggleWeakSubject(subject)}
+                      className="px-3 py-1.5 rounded-md text-xs font-medium border transition-all"
+                      style={{
+                        backgroundColor: active ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
+                        borderColor: active ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
+                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {subject}
+                    </button>
+                  );
+                })}
                 {childForm.weak_subjects.filter(s => !SUBJECTS.includes(s)).map(subject => (
                   <button
                     key={subject}
                     type="button"
                     onClick={() => toggleWeakSubject(subject)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border bg-rose-50 text-rose-700 border-rose-200 flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-md text-xs font-medium border flex items-center gap-1"
+                    style={{
+                      backgroundColor: 'var(--color-primary-soft)',
+                      borderColor: 'rgb(91 92 226 / 0.3)',
+                      color: 'var(--color-primary)',
+                    }}
                   >
                     {subject}
-                    <X className="w-3 h-3" />
+                    <X size={10} strokeWidth={2} />
                   </button>
                 ))}
               </div>
               <div className="flex gap-2">
                 <input
-                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-xs"
+                  className="input flex-1"
+                  style={{ fontSize: '0.75rem' }}
                   placeholder="自定义科目"
                   value={childForm.custom_subject}
                   onChange={e => setChildForm(f => ({ ...f, custom_subject: e.target.value }))}
@@ -1503,16 +1584,18 @@ export default function CustomerDetail() {
                 <button
                   type="button"
                   onClick={addCustomSubject}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition-colors"
+                  className="btn-secondary"
+                  style={{ fontSize: '0.75rem', paddingLeft: '0.75rem', paddingRight: '0.75rem' }}
                 >
                   添加
                 </button>
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 mb-1.5 block">备注</label>
+              <label className="form-label">备注</label>
               <textarea
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none transition-all text-sm resize-none"
+                className="input resize-none"
+                style={{ paddingTop: '0.625rem', paddingBottom: '0.625rem', minHeight: '80px' }}
                 rows={3}
                 placeholder="其他备注信息（选填）"
                 value={childForm.notes}
@@ -1520,47 +1603,12 @@ export default function CustomerDetail() {
               />
             </div>
           </div>
-          <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-100 bg-slate-50/50 -mx-5 -mb-5 mt-5">
-            <button
-              onClick={() => { setShowAddChild(false); setChildForm(emptyChildForm); setEditingChild(null); }}
-              disabled={submitting}
-              className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSaveChild}
-              disabled={!childForm.nickname.trim() || !childForm.grade || submitting}
-              className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              保存
-            </button>
-          </div>
         </Modal>
       )}
     </div>
   );
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors"
-          >
-            <X className="w-5 h-5 text-slate-400" />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
-  );
+function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+  return <SharedModal isOpen onClose={onClose} title={title} size="lg" footer={footer}>{children}</SharedModal>;
 }
