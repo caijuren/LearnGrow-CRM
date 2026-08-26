@@ -57,7 +57,8 @@
       <scroll-view scroll-x class="records-scroll">
         <view class="records-list flex gap-2">
           <view wx:for="{{item.records}}" wx:for-item="record" wx:key="id" class="record-item">
-            <image wx:if="{{record.image_url}}" class="record-image" src="{{baseUrl}}{{record.image_url}}" mode="aspectFill" />
+            <image wx:if="{{record.image_url && record.media_type !== 'video'}}" class="record-image" src="{{baseUrl}}{{record.image_url}}" mode="aspectFill" />
+            <view wx:elif="{{record.image_url}}" class="record-placeholder record-video">▶</view>
             <view wx:else class="record-placeholder">✓</view>
             <view class="record-date">{{record.checkin_date.slice(5)}}</view>
           </view>

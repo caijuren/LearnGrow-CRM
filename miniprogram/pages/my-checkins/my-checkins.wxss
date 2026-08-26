@@ -144,6 +144,12 @@
   border: 2rpx solid rgba(52, 211, 153, 0.15);
 }
 
+.record-video {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(139, 92, 246, 0.08));
+  color: #a78bfa;
+  border: 2rpx solid rgba(139, 92, 246, 0.25);
+}
+
 .record-date {
   font-size: 22rpx;
   color: #64748b;

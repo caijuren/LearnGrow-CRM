@@ -13,6 +13,7 @@ Page({
     checkinImage: '',
     checkinImageUrl: '',
     checkinImageHash: '',
+    checkinMediaType: 'image',
     makeupDate: '',
     submitting: false,
     isEditingTodayRecord: false,
@@ -348,58 +349,57 @@ Page({
     }
   },
 
-  async chooseImage() {
+  async chooseMedia() {
     if (!app.requireLogin()) return;
     const that = this;
     wx.showActionSheet({
-      itemList: ['拍照', '从相册选择'],
+      itemList: ['拍照 / 拍视频', '从相册选择'],
       success: async (res) => {
         try {
-          let sourceType = [];
-          if (res.tapIndex === 0) {
-            sourceType = ['camera'];
-          } else {
-            sourceType = ['album'];
-          }
+          const sourceType = res.tapIndex === 0 ? ['camera'] : ['album'];
 
           const chooseRes = await new Promise((resolve, reject) => {
-            wx.chooseImage({
+            wx.chooseMedia({
               count: 1,
-              sizeType: ['compressed'],
+              mediaType: ['image', 'video'],
               sourceType: sourceType,
+              maxDuration: 60,
+              camera: 'back',
               success: resolve,
               fail: reject
             });
           });
 
-          const tempFilePath = chooseRes.tempFilePaths[0];
-          that.setData({ checkinImage: tempFilePath });
+          const tempFile = chooseRes.tempFiles[0];
+          const tempFilePath = tempFile.tempFilePath;
+          const mediaType = chooseRes.type || tempFile.fileType || 'image';
+          that.setData({ checkinImage: tempFilePath, checkinMediaType: mediaType });
 
           wx.showLoading({ title: '上传中...' });
-          const uploadRes = await api.uploadImage(tempFilePath);
+          const uploadRes = await api.uploadMedia(tempFilePath);
           wx.hideLoading();
 
           if (uploadRes.same_day_duplicate) {
-            that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '' });
-            wx.showToast({ title: '今天已上传过相同图片', icon: 'none' });
+            that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '', checkinMediaType: 'image' });
+            wx.showToast({ title: '今天已上传过相同文件', icon: 'none' });
             return;
           }
 
           if (uploadRes.similar_record) {
             const dateStr = uploadRes.similar_record.checkin_date;
             wx.showModal({
-              title: '图片重复提醒',
-              content: `检测到和 ${dateStr} 的打卡图片相同，是否继续？`,
+              title: '重复提醒',
+              content: `检测到和 ${dateStr} 的打卡文件相同，是否继续？`,
               confirmText: '继续',
               cancelText: '重新选择',
               success: (modalRes) => {
                 if (modalRes.confirm) {
                   that.setData({
                     checkinImageUrl: uploadRes.url,
-                    checkinImageHash: uploadRes.image_hash || ''
+                    checkinImageHash: uploadRes.media_hash || ''
                   });
                 } else {
-                  that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '' });
+                  that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '', checkinMediaType: 'image' });
                 }
               }
             });
@@ -408,7 +408,7 @@ Page({
 
           that.setData({
             checkinImageUrl: uploadRes.url,
-            checkinImageHash: uploadRes.image_hash || ''
+            checkinImageHash: uploadRes.media_hash || ''
           });
         } catch (e) {
           wx.hideLoading();
@@ -427,7 +427,8 @@ Page({
       checkinNote: record.note || '',
       checkinImageUrl: record.image_url || '',
       checkinImageHash: record.image_hash || '',
-      checkinImage: record.image_url ? (this.data.baseUrl + record.image_url) : ''
+      checkinImage: record.image_url ? (this.data.baseUrl + record.image_url) : '',
+      checkinMediaType: record.media_type || 'image'
     });
     wx.pageScrollTo({ selector: '.checkin-form', duration: 300 });
   },
@@ -439,7 +440,8 @@ Page({
       checkinNote: '',
       checkinImage: '',
       checkinImageUrl: '',
-      checkinImageHash: ''
+      checkinImageHash: '',
+      checkinMediaType: 'image'
     });
   },
 
@@ -454,7 +456,7 @@ Page({
     }
 
     if (!this.data.checkinImageUrl) {
-      wx.showToast({ title: '请上传打卡图片', icon: 'error' });
+      wx.showToast({ title: '请上传打卡图片或视频', icon: 'error' });
       return;
     }
     const wasMakeup = !!this.data.makeupDate;
@@ -466,6 +468,7 @@ Page({
         result = await api.updateCheckinRecord(this.data.editingRecordId, {
           image_url: this.data.checkinImageUrl || null,
           image_hash: this.data.checkinImageHash || null,
+          media_type: this.data.checkinMediaType || 'image',
           note: this.data.checkinNote || null
         });
         toastTitle = result.pending_review ? '已修改，等待老师审核' : '今日打卡已修改';
@@ -475,7 +478,8 @@ Page({
           checkin_date: this.data.makeupDate || undefined,
           note: this.data.checkinNote || null,
           image_url: this.data.checkinImageUrl || null,
-          image_hash: this.data.checkinImageHash || null
+          image_hash: this.data.checkinImageHash || null,
+          media_type: this.data.checkinMediaType || 'image'
         });
         toastTitle = this.data.makeupDate ? '补卡已提交' : `第${result.checkin_number}次打卡成功！`;
         if (result.pending_review) {
@@ -491,7 +495,7 @@ Page({
         icon: 'success',
         duration: 2500
       });
-      this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '', checkinImageHash: '', makeupDate: '', isEditingTodayRecord: false, editingRecordId: null });
+      this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '', checkinImageHash: '', checkinMediaType: 'image', makeupDate: '', isEditingTodayRecord: false, editingRecordId: null });
       this.loadData();
       if (!this.data.isEditingTodayRecord && !result.pending_review && !wasMakeup) {
         setTimeout(() => this.showSharePrompt(), 600);

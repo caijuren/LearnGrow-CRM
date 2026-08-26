@@ -59,76 +59,11 @@
 .login-card {
   background: #111522;
   border-radius: 28rpx;
-  padding: 56rpx 40rpx 40rpx;
+  padding: 48rpx 40rpx 40rpx;
   box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.32);
   border: 2rpx solid #1F2937;
   position: relative;
   z-index: 1;
-}
-
-.welcome-title {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #f8fafc;
-  text-align: center;
-  margin-bottom: 16rpx;
-}
-
-.welcome-desc {
-  font-size: 26rpx;
-  color: #94a3b8;
-  text-align: center;
-  line-height: 1.6;
-  margin-bottom: 48rpx;
-}
-
-.btn-wechat {
-  width: 100%;
-  height: 96rpx;
-  background: #07c160;
-  color: white;
-  border-radius: 48rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  border: none;
-  margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.25);
-}
-
-.btn-wechat::after {
-  border: none;
-}
-
-.wx-icon {
-  font-size: 32rpx;
-}
-
-.btn-skip {
-  width: 100%;
-  height: 92rpx;
-  background: #090B12;
-  color: #94a3b8;
-  border-radius: 46rpx;
-  font-size: 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid #1F2937;
-  margin-bottom: 32rpx;
-}
-
-.btn-skip::after {
-  border: none;
-}
-
-.btn-skip:active {
-  border-color: #F43F7A;
-  color: #F43F7A;
-  background: rgba(244, 63, 122, 0.08);
 }
 
 .agreement {
@@ -138,6 +73,7 @@
   font-size: 24rpx;
   color: #94a3b8;
   padding: 0 24rpx;
+  margin-bottom: 40rpx;
 }
 
 .checkbox {
@@ -175,12 +111,58 @@
   font-weight: 500;
 }
 
-.footer-tip {
-  margin-top: 40rpx;
-  text-align: center;
-  font-size: 24rpx;
-  color: #64748b;
-  line-height: 1.6;
+.btn-wechat {
+  width: 100%;
+  height: 96rpx;
+  background: #07c160;
+  color: white;
+  border-radius: 48rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  border: none;
+  margin-bottom: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-wechat::after {
+  border: none;
+}
+
+.btn-wechat.btn-disabled {
+  background: rgba(7, 193, 96, 0.35);
+  box-shadow: none;
+}
+
+.wx-icon {
+  font-size: 32rpx;
+}
+
+.btn-skip {
+  width: 100%;
+  height: 92rpx;
+  background: #090B12;
+  color: #94a3b8;
+  border-radius: 46rpx;
+  font-size: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid #1F2937;
+}
+
+.btn-skip::after {
+  border: none;
+}
+
+.btn-skip:active {
+  border-color: #F43F7A;
+  color: #F43F7A;
+  background: rgba(244, 63, 122, 0.08);
 }
 
 /* 昵称设置弹窗 */
@@ -238,7 +220,7 @@
 .avatar-picker {
   width: 152rpx;
   height: 152rpx;
-  border-radius: 50%;
+  border-radius: 28rpx;
   padding: 0;
   margin: 0 auto 40rpx;
   background: #0B0F1A;
@@ -260,7 +242,7 @@
 .avatar-picker-img {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
+  border-radius: 28rpx;
 }
 
 .avatar-placeholder {

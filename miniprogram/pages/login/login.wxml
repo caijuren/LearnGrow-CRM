@@ -6,18 +6,6 @@
   </view>
 
   <view class="login-card">
-    <view class="welcome-title">欢迎使用</view>
-    <view class="welcome-desc">使用微信账号快速登录，记录孩子的每一次成长</view>
-
-    <button class="btn-wechat" bindtap="handleWxLogin" loading="{{loading}}">
-      <text class="wx-icon">💬</text>
-      <text>微信一键登录</text>
-    </button>
-
-    <button class="btn-skip" bindtap="goBack">
-      先逛逛，看看活动
-    </button>
-
     <view class="agreement" bindtap="toggleAgree">
       <view class="checkbox {{agreed ? 'checked' : ''}}">
         <text wx:if="{{agreed}}">✓</text>
@@ -27,10 +15,15 @@
         <text class="link" catchtap="goToPrivacy">《用户隐私保护指引》</text>
       </view>
     </view>
-  </view>
 
-  <view class="footer-tip">
-    <text>💡 登录后可在「我的」设置昵称和孩子名字</text>
+    <button class="btn-wechat {{agreed ? '' : 'btn-disabled'}}" bindtap="handleWxLogin" loading="{{loading}}">
+      <text class="wx-icon">💬</text>
+      <text>微信一键登录</text>
+    </button>
+
+    <button class="btn-skip" bindtap="goBack">
+      先逛逛，看看活动
+    </button>
   </view>
 
   <!-- 昵称设置弹窗 -->

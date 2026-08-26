@@ -135,6 +135,13 @@
   border-radius: 16rpx;
 }
 
+.checkin-video {
+  width: 100%;
+  height: 400rpx;
+  border-radius: 16rpx;
+  background: #090B12;
+}
+
 .form-item {
   margin-bottom: 32rpx;
 }
@@ -206,6 +213,12 @@
 .preview-image {
   width: 100%;
   height: 100%;
+}
+
+.preview-video {
+  width: 100%;
+  height: 100%;
+  background: #000;
 }
 
 .upload-placeholder {
@@ -809,6 +822,13 @@
   border-radius: 16rpx;
   background: #090B12;
   display: block;
+}
+
+.feed-video {
+  width: 100%;
+  height: 320rpx;
+  border-radius: 16rpx;
+  background: #090B12;
 }
 
 .feed-actions {

@@ -42,8 +42,8 @@ const navSections: NavSection[] = [
     label: '客户运营',
     items: [
       { to: '/customers', label: '客户管理', icon: <Users size={16} strokeWidth={1.8} />, badge: '5' },
-      { to: '/wechat-groups', label: '微信群管理', icon: <MessageCircle size={16} strokeWidth={1.8} /> },
-      { to: '/checkin-stats', label: '群打卡统计', icon: <BarChart3 size={16} strokeWidth={1.8} /> },
+      { to: '/groups', label: '微信群管理', icon: <MessageCircle size={16} strokeWidth={1.8} /> },
+      { to: '/checkin', label: '群打卡统计', icon: <BarChart3 size={16} strokeWidth={1.8} /> },
     ],
   },
   {
@@ -57,13 +57,13 @@ const navSections: NavSection[] = [
     label: '内容中心',
     items: [
       { to: '/learning-paths', label: '学习路径', icon: <GraduationCap size={16} strokeWidth={1.8} /> },
-      { to: '/library', label: '资料库', icon: <Library size={16} strokeWidth={1.8} /> },
+      { to: '/materials', label: '资料库', icon: <Library size={16} strokeWidth={1.8} /> },
     ],
   },
   {
     label: '运营工具',
     items: [
-      { to: '/live-studio', label: '直播工作台', icon: <Video size={16} strokeWidth={1.8} /> },
+      { to: '/live', label: '直播工作台', icon: <Video size={16} strokeWidth={1.8} /> },
     ],
   },
 ];

@@ -69,6 +69,28 @@ function uploadImage(filePath) {
   });
 }
 
+function uploadMedia(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: BASE_URL + '/api/wx/upload-media',
+      filePath: filePath,
+      name: 'file',
+      header: {
+        'Authorization': `Bearer ${app.globalData.token}`
+      },
+      success: (res) => {
+        const data = JSON.parse(res.data);
+        if (data.success) {
+          resolve(data.data);
+        } else {
+          reject(new Error(data.error || '上传失败'));
+        }
+      },
+      fail: reject
+    });
+  });
+}
+
 function login(data) {
   return request({
     url: '/api/wx/login',
@@ -186,6 +208,7 @@ function getDaysLeft(endDate) {
 module.exports = {
   request,
   uploadImage,
+  uploadMedia,
   login,
   updateProfile,
   getEvents,

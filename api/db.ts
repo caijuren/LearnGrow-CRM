@@ -576,6 +576,7 @@ sqlite.exec(`
     note TEXT,
     image_url TEXT,
     image_hash TEXT,
+    media_type TEXT NOT NULL DEFAULT 'image' CHECK(media_type IN ('image', 'video')),
     is_makeup INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
@@ -615,6 +616,9 @@ if (!existingCheckinRecordCols.includes('display_name')) {
 }
 if (!existingCheckinRecordCols.includes('image_hash')) {
   sqlite.exec("ALTER TABLE checkin_records ADD COLUMN image_hash TEXT");
+}
+if (!existingCheckinRecordCols.includes('media_type')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN media_type TEXT NOT NULL DEFAULT 'image' CHECK(media_type IN ('image', 'video'))");
 }
 
 const existingCheckinParticipantCols = (sqlite.prepare("PRAGMA table_info(checkin_participants)").all() as any[]).map(c => c.name);

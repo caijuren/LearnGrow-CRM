@@ -71,6 +71,24 @@ function detectImageExtension(buffer: Buffer): '.jpg' | '.png' | '.gif' | '.webp
   return null;
 }
 
+type MediaType = 'image' | 'video';
+type MediaExt = '.jpg' | '.png' | '.gif' | '.webp' | '.mp4' | '.mov';
+
+function detectMedia(buffer: Buffer): { type: MediaType; ext: MediaExt } | null {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return { type: 'image', ext: '.jpg' };
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { type: 'image', ext: '.png' };
+  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString('ascii') === 'GIF87a' || buffer.subarray(0, 6).toString('ascii') === 'GIF89a')) return { type: 'image', ext: '.gif' };
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return { type: 'image', ext: '.webp' };
+
+  if (buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = buffer.subarray(8, 12).toString('ascii').replace(/\0/g, '').trim();
+    if (brand === 'qt' || brand.startsWith('qt')) return { type: 'video', ext: '.mov' };
+    return { type: 'video', ext: '.mp4' };
+  }
+
+  return null;
+}
+
 function mapCustomer(c: any): Customer {
   return {
     ...c,
@@ -200,10 +218,18 @@ const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
+const APP_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
+    return String(pkg.version || 'dev');
+  } catch {
+    return 'dev';
+  }
+})();
 const app = Fastify({ trustProxy: true, logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:mm:ss Z', ignore: 'pid,hostname' } } } });
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
-await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
+await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 
 await app.register(fastifyStatic, {
   root: uploadsDir,
@@ -226,7 +252,8 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.get('/api/health', async () => ({ success: true, message: 'ok' }));
+app.get('/api/health', async () => ({ success: true, message: 'ok', version: APP_VERSION }));
+app.get('/api/version', async () => ok({ version: APP_VERSION }));
 
 app.post('/api/auth/login', async (request, reply) => {
   if (!allowAdminLogin(request, reply)) return;
@@ -1659,12 +1686,14 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
 
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
-  const { event_id, note, image_url, image_hash, checkin_date, display_name } = request.body;
+  const { event_id, note, image_url, image_hash, checkin_date, display_name, media_type } = request.body;
 
   if (!event_id) return reply.code(400).send({ success: false, error: '活动不能为空' });
   if (!image_url || !String(image_url).trim()) {
-    return reply.code(400).send({ success: false, error: '请上传打卡图片' });
+    return reply.code(400).send({ success: false, error: '请上传打卡图片或视频' });
   }
+
+  const finalMediaType = media_type === 'video' ? 'video' : 'image';
 
   const today = bjtToday();
   const targetDate = checkin_date || today;
@@ -1714,9 +1743,9 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
       const recordStatus = isMakeup && event.makeup_requires_review ? 'pending' : 'approved';
       db.prepare(`
         UPDATE checkin_records
-        SET note = ?, image_url = ?, image_hash = ?, is_makeup = ?, status = ?, display_name = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
+        SET note = ?, image_url = ?, image_hash = ?, media_type = ?, is_makeup = ?, status = ?, display_name = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
         WHERE id = ?
-      `).run(note || null, image_url || null, image_hash || null, isMakeup ? 1 : 0, recordStatus, display_name || null, (existing as any).id);
+      `).run(note || null, image_url || null, image_hash || null, finalMediaType, isMakeup ? 1 : 0, recordStatus, display_name || null, (existing as any).id);
       return ok({
         ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get((existing as any).id) as object),
         checkin_number: null,
@@ -1732,9 +1761,9 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
   const recordStatus = isMakeup && event.makeup_requires_review ? 'pending' : 'approved';
   
   const r = db.prepare(`
-    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, image_hash, is_makeup, status, display_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(event_id, participant.id, targetDate, note || null, image_url || null, image_hash || null, isMakeup ? 1 : 0, recordStatus, finalDisplayName);
+    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, image_hash, media_type, is_makeup, status, display_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(event_id, participant.id, targetDate, note || null, image_url || null, image_hash || null, finalMediaType, isMakeup ? 1 : 0, recordStatus, finalDisplayName);
 
   const newBadges: any[] = [];
   const allApprovedRecords = recordStatus === 'approved'
@@ -1849,6 +1878,7 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
         note: r.note,
         image_url: r.image_url,
         image_hash: r.image_hash,
+        media_type: r.media_type || 'image',
         display_name: r.display_name,
         status: r.status,
         review_note: r.review_note,
@@ -1907,11 +1937,13 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
 app.put('/api/wx/checkin-records/:id', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const recordId = parseInt(request.params.id);
-  const { image_url, image_hash, note } = request.body;
+  const { image_url, image_hash, note, media_type } = request.body;
 
   if (!image_url || !String(image_url).trim()) {
-    return reply.code(400).send({ success: false, error: '请上传打卡图片' });
+    return reply.code(400).send({ success: false, error: '请上传打卡图片或视频' });
   }
+
+  const finalMediaType = media_type === 'video' ? 'video' : 'image';
 
   const record = db.prepare(`
     SELECT r.*, e.status as event_status, e.start_date, e.end_date, e.makeup_requires_review, p.wx_user_id
@@ -1936,9 +1968,9 @@ app.put('/api/wx/checkin-records/:id', { preHandler: [wxAuthMiddleware] }, async
 
   db.prepare(`
     UPDATE checkin_records
-    SET image_url = ?, image_hash = COALESCE(?, image_hash), note = ?, status = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
+    SET image_url = ?, image_hash = COALESCE(?, image_hash), media_type = ?, note = ?, status = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
     WHERE id = ?
-  `).run(image_url, image_hash || null, note || null, newStatus, recordId);
+  `).run(image_url, image_hash || null, finalMediaType, note || null, newStatus, recordId);
 
   return ok({
     ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId) as object),
@@ -1953,7 +1985,7 @@ app.get('/api/wx/checkin-events/:id/feed', { preHandler: [wxOptionalAuthMiddlewa
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
   const records = db.prepare(`
-    SELECT r.id, r.checkin_date, r.note, r.image_url, r.created_at, r.is_makeup, r.display_name,
+    SELECT r.id, r.checkin_date, r.note, r.image_url, r.media_type, r.created_at, r.is_makeup, r.display_name,
            p.nickname, wu.avatar_url
     FROM checkin_records r
     JOIN checkin_participants p ON r.participant_id = p.id
@@ -1992,6 +2024,7 @@ app.get('/api/wx/checkin-events/:id/feed', { preHandler: [wxOptionalAuthMiddlewa
     checkin_date: r.checkin_date,
     note: r.note,
     image_url: r.image_url,
+    media_type: r.media_type || 'image',
     created_at: r.created_at,
     is_makeup: !!r.is_makeup,
     nickname: r.nickname,
@@ -2065,6 +2098,69 @@ app.post('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware]
   });
 });
 
+app.post('/api/wx/upload-media', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  if (!allowUpload(request.wxUser.id)) {
+    return reply.code(429).send({ success: false, error: '上传太频繁，请稍后再试' });
+  }
+  const data = await request.file();
+  if (!data) return reply.code(400).send({ success: false, error: '未收到媒体文件' });
+
+  let buffer: Buffer;
+  try {
+    buffer = await data.toBuffer();
+  } catch {
+    return reply.code(413).send({ success: false, error: '文件不能超过 50MB' });
+  }
+  if (data.file.truncated || buffer.length === 0) return reply.code(413).send({ success: false, error: '文件不能超过 50MB' });
+
+  const media = detectMedia(buffer);
+  if (!media) return reply.code(400).send({ success: false, error: '仅支持 JPG/PNG/GIF/WEBP/MP4/MOV 格式' });
+
+  const maxSize = media.type === 'image' ? 10 * 1024 * 1024 : 50 * 1024 * 1024;
+  if (buffer.length > maxSize) {
+    return reply.code(413).send({ success: false, error: media.type === 'image' ? '图片不能超过 10MB' : '视频不能超过 50MB' });
+  }
+
+  const mediaHash = createHash('sha256').update(buffer).digest('hex');
+  const today = bjtToday();
+  const userId = request.wxUser.id;
+
+  const sameDayRecord = db.prepare(`
+    SELECT r.id, r.checkin_date, r.display_name, r.note
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    WHERE p.wx_user_id = ? AND r.image_hash = ? AND r.checkin_date = ?
+    LIMIT 1
+  `).get(userId, mediaHash, today) as any;
+
+  const similarRecord = sameDayRecord ? null : db.prepare(`
+    SELECT r.id, r.checkin_date, r.display_name, r.note
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    WHERE p.wx_user_id = ? AND r.image_hash = ? AND r.checkin_date != ?
+    ORDER BY r.checkin_date DESC
+    LIMIT 1
+  `).get(userId, mediaHash, today) as any;
+
+  const uniqueName = `checkin_${randomUUID()}${media.ext}`;
+  const filePath = path.join(uploadsDir, uniqueName);
+
+  await fs.promises.writeFile(filePath, buffer);
+
+  return ok({
+    url: `/uploads/${uniqueName}`,
+    media_type: media.type,
+    media_hash: mediaHash,
+    same_day_duplicate: !!sameDayRecord,
+    similar_record: similarRecord ? {
+      checkin_date: similarRecord.checkin_date,
+      display_name: similarRecord.display_name,
+      note: similarRecord.note
+    } : null
+  });
+});
+
+// 保留旧版图片上传接口兼容旧客户端
 app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   if (!allowUpload(request.wxUser.id)) {
     return reply.code(429).send({ success: false, error: '上传太频繁，请稍后再试' });

@@ -114,7 +114,10 @@
       <view class="text-warning font-bold text-lg mt-2" style="font-size: 36rpx;">今日打卡待审核</view>
       <view class="text-muted mt-1" style="font-size: 28rpx;">老师通过后会计入打卡天数</view>
       <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
-      <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+      <block wx:if="{{todayRecord.image_url}}">
+        <image wx:if="{{todayRecord.media_type !== 'video'}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+        <video wx:else class="checkin-video mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" object-fit="cover" controls="{{true}}" />
+      </block>
     </view>
 
     <view wx:elif="{{todayChecked && !isEditingTodayRecord}}" class="checked-status">
@@ -122,7 +125,10 @@
       <view class="text-success font-bold text-lg mt-2" style="font-size: 36rpx;">今日已打卡</view>
       <view class="text-muted mt-1" style="font-size: 28rpx;">明天继续加油哦~</view>
       <view wx:if="{{todayRecord.note}}" class="note-text mt-2">{{todayRecord.note}}</view>
-      <image wx:if="{{todayRecord.image_url}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+      <block wx:if="{{todayRecord.image_url}}">
+        <image wx:if="{{todayRecord.media_type !== 'video'}}" class="checkin-image mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" mode="aspectFill" />
+        <video wx:else class="checkin-video mt-2" src="{{baseUrl}}{{todayRecord.image_url}}" object-fit="cover" controls="{{true}}" />
+      </block>
       <button class="btn-secondary mt-3" bindtap="startEditTodayRecord">修改今日打卡</button>
     </view>
 
@@ -147,12 +153,15 @@
       </view>
 
       <view class="form-item mt-3">
-        <view class="label">打卡图片 <text style="color: #f43f5e;">*</text></view>
-        <view class="upload-area {{!checkinImage ? 'upload-area-empty' : ''}}" bindtap="chooseImage">
-          <image wx:if="{{checkinImage}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
+        <view class="label">打卡图片/视频 <text style="color: #f43f5e;">*</text></view>
+        <view class="upload-area {{!checkinImage ? 'upload-area-empty' : ''}}" bindtap="chooseMedia">
+          <block wx:if="{{checkinImage}}">
+            <image wx:if="{{checkinMediaType !== 'video'}}" class="preview-image" src="{{checkinImage}}" mode="aspectFill" />
+            <video wx:else class="preview-video" src="{{checkinImage}}" object-fit="cover" controls="{{false}}" show-center-play-btn="{{true}}" />
+          </block>
           <view wx:else class="upload-placeholder">
             <text class="upload-icon">+</text>
-            <text class="text-muted mt-2" style="font-size: 26rpx;">上传图片</text>
+            <text class="text-muted mt-2" style="font-size: 26rpx;">上传图片或视频</text>
           </view>
         </view>
       </view>
@@ -241,7 +250,10 @@
             <text class="feed-date">{{item.formattedDate}}</text>
           </view>
           <view wx:if="{{item.note}}" class="feed-note">{{item.note}}</view>
-          <image wx:if="{{item.image_url}}" class="feed-image" src="{{baseUrl}}{{item.image_url}}" mode="widthFix" data-url="{{baseUrl}}{{item.image_url}}" bindtap="previewFeedImage"/>
+          <block wx:if="{{item.image_url}}">
+            <image wx:if="{{item.media_type !== 'video'}}" class="feed-image" src="{{baseUrl}}{{item.image_url}}" mode="widthFix" data-url="{{baseUrl}}{{item.image_url}}" bindtap="previewFeedImage"/>
+            <video wx:else class="feed-video" src="{{baseUrl}}{{item.image_url}}" object-fit="cover" controls="{{true}}" />
+          </block>
           <view class="feed-actions">
             <button class="feed-like {{item.liked_by_me ? 'liked' : ''}}" catchtap="toggleFeedLike" data-id="{{item.id}}">
               <text>{{item.liked_by_me ? '已鼓励' : '鼓励'}}</text>
