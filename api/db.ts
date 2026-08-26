@@ -7,13 +7,14 @@ import bcrypt from 'bcryptjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dataDir = path.join(__dirname, '..', 'data');
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
 const dbPath = path.join(dataDir, 'learngrow.db');
 const sqlite = new Database(dbPath);
+const isProduction = process.env.NODE_ENV === 'production';
 
 sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('foreign_keys = ON');
@@ -342,7 +343,7 @@ if (textbookCount === 0) {
 }
 
 const productCount = (sqlite.prepare('SELECT COUNT(*) as count FROM products').get() as any).count;
-if (productCount === 0) {
+if (!isProduction && productCount === 0) {
   const insertProduct = sqlite.prepare(`
     INSERT INTO products (name, tier, category, price, commission_percent, selling_points, related_product_ids, description, image_url, sales_count)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -365,7 +366,7 @@ if (productCount === 0) {
 }
 
 const customerCount = (sqlite.prepare('SELECT COUNT(*) as count FROM customers').get() as any).count;
-if (customerCount === 0) {
+if (!isProduction && customerCount === 0) {
   const insertCustomer = sqlite.prepare(`
     INSERT INTO customers (name, nickname, phone, douyin_nickname, source, importance, tags, remark, total_spent, order_count, last_order_date, last_follow_date)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -460,7 +461,7 @@ if (customerCount === 0) {
 }
 
 const childCount = (sqlite.prepare('SELECT COUNT(*) as count FROM children').get() as any).count;
-if (childCount === 0) {
+if (!isProduction && childCount === 0) {
   const insertChild = sqlite.prepare(`
     INSERT INTO children (customer_id, nickname, gender, grade, region, textbook_version, weak_subjects, notes)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -507,11 +508,27 @@ sqlite.exec(`
 
 const userCount = (sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
 if (userCount === 0) {
-  const hash = bcrypt.hashSync('admin123', 10);
+  const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+  if (isProduction && (!initialAdminPassword || initialAdminPassword.length < 12)) {
+    throw new Error('生产环境初始化管理员时必须配置至少12位 INITIAL_ADMIN_PASSWORD');
+  }
+  const hash = bcrypt.hashSync(initialAdminPassword || 'admin123', 10);
   sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
     .run('admin', hash, 'admin', '主播');
-  sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
-    .run('assistant', bcrypt.hashSync('assist123', 10), 'assistant', '小助理');
+  if (!isProduction) {
+    sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
+      .run('assistant', bcrypt.hashSync('assist123', 10), 'assistant', '小助理');
+  }
+}
+
+if (isProduction) {
+  const seededUsers = sqlite.prepare("SELECT username, password FROM users WHERE username IN ('admin', 'assistant')").all() as any[];
+  for (const user of seededUsers) {
+    const defaultPassword = user.username === 'admin' ? 'admin123' : 'assist123';
+    if (bcrypt.compareSync(defaultPassword, user.password)) {
+      throw new Error(`生产环境检测到默认账号 ${user.username} 仍在使用默认密码，请先重置密码`);
+    }
+  }
 }
 
 sqlite.exec(`
@@ -523,7 +540,14 @@ sqlite.exec(`
     end_date TEXT NOT NULL,
     required_text TEXT,
     reward_rules TEXT,
+    allow_makeup INTEGER NOT NULL DEFAULT 0,
+    makeup_window_days INTEGER NOT NULL DEFAULT 3,
+    makeup_limit_per_user INTEGER NOT NULL DEFAULT 3,
+    makeup_requires_review INTEGER NOT NULL DEFAULT 1,
+    makeup_counts_for_streak INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'ended')),
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (group_id) REFERENCES wechat_groups(id) ON DELETE SET NULL
@@ -551,6 +575,8 @@ sqlite.exec(`
     checkin_date TEXT NOT NULL,
     note TEXT,
     image_url TEXT,
+    image_hash TEXT,
+    is_makeup INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
     FOREIGN KEY (participant_id) REFERENCES checkin_participants(id) ON DELETE CASCADE,
@@ -569,6 +595,9 @@ const existingCheckinRecordCols = (sqlite.prepare("PRAGMA table_info(checkin_rec
 if (!existingCheckinRecordCols.includes('image_url')) {
   sqlite.exec("ALTER TABLE checkin_records ADD COLUMN image_url TEXT");
 }
+if (!existingCheckinRecordCols.includes('is_makeup')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN is_makeup INTEGER NOT NULL DEFAULT 0");
+}
 if (!existingCheckinRecordCols.includes('status')) {
   sqlite.exec("ALTER TABLE checkin_records ADD COLUMN status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('pending', 'approved', 'rejected'))");
 }
@@ -580,6 +609,12 @@ if (!existingCheckinRecordCols.includes('reviewed_at')) {
 }
 if (!existingCheckinRecordCols.includes('review_note')) {
   sqlite.exec("ALTER TABLE checkin_records ADD COLUMN review_note TEXT");
+}
+if (!existingCheckinRecordCols.includes('display_name')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN display_name TEXT");
+}
+if (!existingCheckinRecordCols.includes('image_hash')) {
+  sqlite.exec("ALTER TABLE checkin_records ADD COLUMN image_hash TEXT");
 }
 
 const existingCheckinParticipantCols = (sqlite.prepare("PRAGMA table_info(checkin_participants)").all() as any[]).map(c => c.name);
@@ -594,6 +629,32 @@ if (!existingCheckinParticipantCols.includes('reward_distributed_at')) {
 }
 if (!existingCheckinParticipantCols.includes('reward_note')) {
   sqlite.exec("ALTER TABLE checkin_participants ADD COLUMN reward_note TEXT");
+}
+
+const existingCheckinEventCols = (sqlite.prepare("PRAGMA table_info(checkin_events)").all() as any[]).map(c => c.name);
+if (!existingCheckinEventCols.includes('allow_makeup')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN allow_makeup INTEGER NOT NULL DEFAULT 0");
+}
+if (!existingCheckinEventCols.includes('makeup_window_days')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN makeup_window_days INTEGER NOT NULL DEFAULT 3");
+}
+if (!existingCheckinEventCols.includes('makeup_limit_per_user')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN makeup_limit_per_user INTEGER NOT NULL DEFAULT 3");
+}
+if (!existingCheckinEventCols.includes('makeup_requires_review')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN makeup_requires_review INTEGER NOT NULL DEFAULT 1");
+}
+if (!existingCheckinEventCols.includes('makeup_counts_for_streak')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN makeup_counts_for_streak INTEGER NOT NULL DEFAULT 0");
+}
+if (!existingCheckinEventCols.includes('is_deleted')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0");
+}
+if (!existingCheckinEventCols.includes('deleted_at')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN deleted_at TEXT");
+}
+if (!existingCheckinEventCols.includes('is_deleted')) {
+  sqlite.exec("CREATE INDEX IF NOT EXISTS idx_checkin_events_is_deleted ON checkin_events(is_deleted)");
 }
 
 sqlite.exec(`
@@ -662,6 +723,39 @@ sqlite.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_subscribe_records_user ON wx_subscribe_records(wx_user_id);
   CREATE INDEX IF NOT EXISTS idx_subscribe_records_status ON wx_subscribe_records(status);
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS checkin_reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wx_user_id INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    remind_time TEXT NOT NULL DEFAULT '20:00',
+    is_enabled INTEGER NOT NULL DEFAULT 1,
+    last_sent_date TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (wx_user_id) REFERENCES wx_users(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
+    UNIQUE(wx_user_id, event_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_checkin_reminders_user ON checkin_reminders(wx_user_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_reminders_event ON checkin_reminders(event_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_reminders_enabled ON checkin_reminders(is_enabled);
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS checkin_record_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL,
+    wx_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (record_id) REFERENCES checkin_records(id) ON DELETE CASCADE,
+    FOREIGN KEY (wx_user_id) REFERENCES wx_users(id) ON DELETE CASCADE,
+    UNIQUE(record_id, wx_user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_checkin_record_likes_record ON checkin_record_likes(record_id);
+  CREATE INDEX IF NOT EXISTS idx_checkin_record_likes_user ON checkin_record_likes(wx_user_id);
 `);
 
 sqlite.exec(`

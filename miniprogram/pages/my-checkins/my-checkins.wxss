@@ -8,13 +8,15 @@
 
 .page-header .text-xl {
   font-size: 40rpx;
+  color: #f8fafc;
 }
 
 .checkin-card {
   position: relative;
   overflow: hidden;
   border: none;
-  box-shadow: 0 8rpx 32rpx rgba(244, 63, 94, 0.06);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
+  background: linear-gradient(180deg, rgba(244, 63, 122, 0.08) 0%, #111522 40%);
 }
 
 .checkin-card::before {
@@ -24,7 +26,8 @@
   left: 0;
   right: 0;
   height: 6rpx;
-  background: linear-gradient(90deg, #f43f5e, #ec4899);
+  background: linear-gradient(90deg, #F43F7A, #8B5CF6);
+  box-shadow: 0 0 16rpx rgba(244, 63, 122, 0.35);
 }
 
 .stats-row {
@@ -35,38 +38,41 @@
 
 .stat-box {
   flex: 1;
-  background: linear-gradient(135deg, #fef2f2 0%, #fdf2f8 100%);
+  background: #090B12;
   border-radius: 20rpx;
   padding: 24rpx 12rpx;
   text-align: center;
+  border: 2rpx solid #1F2937;
 }
 
 .stat-box:nth-child(2) {
-  background: linear-gradient(135deg, #fef3c7 0%, #ffedd5 100%);
+  background: #090B12;
+  border-color: rgba(251, 191, 36, 0.2);
 }
 
 .stat-box:nth-child(3) {
-  background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+  background: #090B12;
+  border-color: rgba(52, 211, 153, 0.2);
 }
 
 .stat-num {
   font-size: 40rpx;
   font-weight: 700;
-  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  background: linear-gradient(135deg, #F43F7A, #8B5CF6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-box:nth-child(2) .stat-num {
-  background: linear-gradient(135deg, #f59e0b, #f97316);
+  background: linear-gradient(135deg, #fbbf24, #f97316);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-box:nth-child(3) .stat-num {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #34d399, #10b981);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -89,13 +95,13 @@
   width: 22rpx;
   height: 22rpx;
   border-radius: 6rpx;
-  background: #f1f5f9;
+  background: #1F2937;
   transition: all 0.2s;
 }
 
 .mini-day.checked {
-  background: linear-gradient(135deg, #f43f5e, #ec4899);
-  box-shadow: 0 2rpx 8rpx rgba(244, 63, 94, 0.2);
+  background: linear-gradient(135deg, #F43F7A, #ec4899);
+  box-shadow: 0 2rpx 8rpx rgba(244, 63, 122, 0.25);
 }
 
 .records-scroll {
@@ -121,80 +127,38 @@
   width: 110rpx;
   height: 110rpx;
   border-radius: 16rpx;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2);
 }
 
 .record-placeholder {
   width: 110rpx;
   height: 110rpx;
   border-radius: 16rpx;
-  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-  color: #15803d;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(52, 211, 153, 0.06));
+  color: #34d399;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 44rpx;
   font-weight: 600;
+  border: 2rpx solid rgba(52, 211, 153, 0.15);
 }
 
 .record-date {
   font-size: 22rpx;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 500;
 }
 
 .recent-records {
   margin-top: 28rpx;
   padding-top: 24rpx;
-  border-top: 2rpx solid #f1f5f9;
+  border-top: 2rpx solid #1F2937;
 }
 
 .recent-records .text-secondary {
   font-size: 26rpx;
-  color: #64748b;
+  color: #94a3b8;
   font-weight: 600;
   margin-bottom: 20rpx;
-}
-
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  display: flex;
-  padding: 16rpx 0 calc(16rpx + env(safe-area-inset-bottom));
-  box-shadow: 0 -4rpx 24rpx rgba(0, 0, 0, 0.04);
-  z-index: 100;
-  border-top: 2rpx solid #f1f5f9;
-}
-
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6rpx;
-  color: #94a3b8;
-  transition: all 0.2s;
-  padding: 8rpx 0;
-}
-
-.nav-item.active {
-  color: #f43f5e;
-}
-
-.nav-item.active .nav-icon {
-  transform: scale(1.1);
-}
-
-.nav-icon {
-  font-size: 48rpx;
-  transition: transform 0.2s;
-}
-
-.nav-text {
-  font-size: 22rpx;
-  font-weight: 500;
 }

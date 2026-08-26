@@ -8,6 +8,7 @@ import {
   ORDER_TYPE_LABELS, ORDER_TYPE_COLORS,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Modal from '@/components/Modal';
 
 export default function OrderList() {
   const navigate = useNavigate();
@@ -55,117 +56,230 @@ export default function OrderList() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
-      <div className="max-w-3xl mx-auto">
+    <div className="page-shell">
+      <div className="page-inner">
+        {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">
+          <h1
+            className="flex items-center gap-2"
+            style={{
+              fontSize: '1.375rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3,
+            }}
+          >
+            <ShoppingCart size={20} strokeWidth={1.8} style={{ color: 'var(--color-primary)' }} />
             订单记录
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            共 <span className="font-semibold text-rose-600">{totalOrders}</span> 笔订单
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '4px',
+              marginLeft: '28px',
+            }}
+          >
+            共 <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{totalOrders}</span> 笔订单
           </p>
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
-            <p className="text-sm text-slate-500 mt-3">加载中...</p>
+          <div
+            className="flex flex-col items-center justify-center py-16"
+            style={{
+              backgroundColor: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            <Loader2 size={20} strokeWidth={1.8} className="animate-spin" style={{ color: 'var(--color-primary)', marginBottom: '8px' }} />
+            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-tertiary)' }}>加载中...</p>
           </div>
         ) : sortedOrders.length > 0 ? (
-          <div className="space-y-3">
-            {sortedOrders.map(order => (
-              <div
-                key={order.id}
-                className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:shadow-md hover:border-rose-200 transition-all duration-300 group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <button
-                        onClick={() => navigate(`/customers/${order.customer_id}`)}
-                        className="flex items-center gap-1 text-sm font-semibold text-slate-800 hover:text-rose-600 transition-colors"
+          <div
+            style={{
+              backgroundColor: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              className="min-w-[720px] grid grid-cols-[1.2fr_1.4fr_120px_120px_56px] gap-4 px-4"
+              style={{
+                paddingTop: '10px',
+                paddingBottom: '10px',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+                textTransform: 'uppercase',
+                color: 'var(--color-text-tertiary)',
+                backgroundColor: 'var(--color-bg-subtle)',
+                borderBottom: '1px solid var(--color-border-default)',
+              }}
+            >
+              <span>客户</span>
+              <span>商品</span>
+              <span>日期</span>
+              <span className="text-right">金额</span>
+              <span />
+            </div>
+            {sortedOrders.map(order => {
+              const orderTypeStyles: Record<string, { bg: string; color: string; label: string }> = {
+                 first: { bg: 'rgb(59 130 246 / 0.12)', color: 'rgb(37 99 235)', label: ORDER_TYPE_LABELS.first },
+                 repurchase: { bg: 'rgb(16 185 129 / 0.12)', color: 'rgb(5 150 105)', label: ORDER_TYPE_LABELS.repurchase },
+                 upsell: { bg: 'rgb(249 115 22 / 0.12)', color: 'rgb(234 88 12)', label: ORDER_TYPE_LABELS.upsell },
+               };
+              const typeStyle = orderTypeStyles[order.order_type] || orderTypeStyles.first;
+
+              return (
+                <div
+                  key={order.id}
+                  className="min-w-[720px] grid grid-cols-[1.2fr_1.4fr_120px_120px_56px] gap-4 items-center px-4 group transition-colors"
+                  style={{
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    borderBottom: '1px solid var(--color-border-subtle)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => navigate(`/customers/${order.customer_id}`)}
+                      className="flex items-center gap-1 transition-colors"
+                      style={{
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        color: 'var(--color-text-primary)',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                    >
+                      <User size={12} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      {order.customer_name}
+                    </button>
+                    <span
+                      className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded-sm"
+                      style={{
+                        fontSize: '0.625rem',
+                        fontWeight: 500,
+                        backgroundColor: typeStyle.bg,
+                        color: typeStyle.color,
+                      }}
+                    >
+                      {typeStyle.label}
+                    </span>
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ShoppingCart size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+                      <span
+                        className="truncate"
+                        style={{
+                          fontSize: '0.8125rem',
+                          color: 'var(--color-text-primary)',
+                          fontWeight: 500,
+                        }}
                       >
-                        <User className="w-3.5 h-3.5" />
-                        {order.customer_name}
-                      </button>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${ORDER_TYPE_COLORS[order.order_type]}`}>
-                        {ORDER_TYPE_LABELS[order.order_type]}
+                        {order.product_name}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 mb-2">
-                      <ShoppingCart className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-sm text-slate-700 font-medium">{order.product_name}</span>
-                    </div>
-
                     {order.remark && (
-                      <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 mb-2 line-clamp-2">
+                      <p
+                        className="mt-2 line-clamp-1 px-2 py-1 rounded-sm"
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--color-text-tertiary)',
+                          backgroundColor: 'var(--color-bg-subtle)',
+                        }}
+                      >
                         {order.remark}
                       </p>
                     )}
-
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(order.purchase_date)}
-                    </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="text-lg font-bold bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent">
+                  <div className="flex items-center gap-1" style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)' }}>
+                    <Calendar size={11} strokeWidth={1.8} />
+                    {formatDate(order.purchase_date)}
+                  </div>
+
+                  <div className="text-right">
+                    <div
+                      style={{
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        color: 'var(--color-primary)',
+                        lineHeight: 1.2,
+                      }}
+                    >
                       ¥{order.amount?.toLocaleString() || 0}
                     </div>
-                    <button
-                      onClick={() => setDeletingOrder(order.id)}
-                      className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                      title="删除订单"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
+
+                  <button
+                    onClick={() => setDeletingOrder(order.id)}
+                    className="p-1.5 rounded-sm transition-all opacity-0 group-hover:opacity-100"
+                    style={{ color: 'var(--color-text-tertiary)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgb(239 68 68 / 0.1)';
+                      e.currentTarget.style.color = 'rgb(220 38 38)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.color = 'var(--color-text-tertiary)';
+                    }}
+                    title="删除订单"
+                  >
+                    <Trash2 size={13} strokeWidth={1.8} />
+                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Empty
-            icon={<ShoppingCart className="w-10 h-10 text-rose-300" />}
+            icon={<ShoppingCart size={32} strokeWidth={1.8} style={{ color: 'var(--color-text-quaternary)' }} />}
             title="暂无订单记录"
             description="在客户详情页可以记录订单，所有订单都会在这里显示"
           />
         )}
       </div>
 
-      {deletingOrder && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !submitting && setDeletingOrder(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-7 h-7 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-2">确认删除订单？</h3>
-              <p className="text-sm text-slate-500 mb-1">此操作不可撤销</p>
-              <p className="text-xs text-red-500">删除后相关统计数据也会更新</p>
-            </div>
-            <div className="flex items-center gap-3 p-5 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => setDeletingOrder(null)}
-                disabled={submitting}
-                className="flex-1 px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={submitting}
-                className="flex-1 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                确认删除
-              </button>
-            </div>
+      <Modal
+        isOpen={deletingOrder !== null}
+        onClose={() => !submitting && setDeletingOrder(null)}
+        title="确认删除订单"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setDeletingOrder(null)} disabled={submitting} className="btn-secondary flex-1">取消</button>
+            <button onClick={handleDelete} disabled={submitting} className="btn-danger-solid flex-1">
+              {submitting && <Loader2 size={13} strokeWidth={2} className="animate-spin" />}
+              确认删除
+            </button>
+          </>
+        }
+      >
+        <div className="text-center py-1">
+          <div
+            className="mx-auto mb-3 flex items-center justify-center"
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'rgb(239 68 68 / 0.1)',
+            }}
+          >
+            <AlertTriangle size={22} strokeWidth={1.8} style={{ color: 'rgb(220 38 38)' }} />
           </div>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)' }}>此操作不可撤销</p>
+          <p style={{ fontSize: '0.75rem', color: 'rgb(220 38 38)', marginTop: '4px' }}>删除后相关统计数据也会更新</p>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 }
 
 .profile-guest {
-  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 60%, #f472b6 100%);
+  background: linear-gradient(135deg, #F43F7A 0%, #8B5CF6 100%);
   border-radius: 32rpx;
   padding: 80rpx 48rpx 72rpx;
   margin-bottom: 32rpx;
@@ -38,13 +38,15 @@
   width: 160rpx;
   height: 160rpx;
   margin: 0 auto 32rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   z-index: 1;
+  border: 2rpx solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 40rpx rgba(244, 63, 122, 0.25);
 }
 
 .guest-avatar {
@@ -80,13 +82,13 @@
   gap: 12rpx;
   height: 92rpx;
   padding: 0 64rpx;
-  background: white;
-  color: #f43f5e;
+  background: #111522;
+  color: #F43F7A;
   border-radius: 46rpx;
   font-size: 30rpx;
   font-weight: 600;
   border: none;
-  box-shadow: 0 8rpx 32rpx rgba(244, 63, 94, 0.3);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.3);
 }
 
 .guest-login-btn::after {
@@ -99,7 +101,7 @@
 }
 
 .profile-header {
-  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 60%, #f472b6 100%);
+  background: linear-gradient(135deg, #F43F7A 0%, #8B5CF6 100%);
   border-radius: 32rpx;
   padding: 48rpx 36rpx;
   margin-bottom: 32rpx;
@@ -124,12 +126,48 @@
 .profile-avatar {
   width: 140rpx;
   height: 140rpx;
+  border-radius: 50%;
   font-size: 56rpx;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.15);
   flex-shrink: 0;
   position: relative;
   z-index: 1;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.2);
+  border: 2rpx solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: white;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+}
+
+.profile-avatar-edit {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  font-size: 56rpx;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.2);
+  border: 2rpx dashed rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: white;
+  padding: 0;
+  margin: 0 auto 24rpx;
+}
+
+.profile-avatar-edit::after {
+  border: none;
 }
 
 .profile-info {
@@ -152,11 +190,12 @@
   align-items: center;
   margin-top: 16rpx;
   padding: 12rpx 28rpx;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 24rpx;
   font-size: 24rpx;
   color: white;
   backdrop-filter: blur(10px);
+  border: 1rpx solid rgba(255, 255, 255, 0.15);
 }
 
 .profile-edit-form {
@@ -172,23 +211,26 @@
 .edit-input {
   width: 100%;
   height: 76rpx;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(9, 11, 18, 0.85);
   border-radius: 16rpx;
   padding: 0 24rpx;
   font-size: 28rpx;
   box-sizing: border-box;
+  color: #f8fafc;
+  border: 1rpx solid rgba(255, 255, 255, 0.15);
 }
 
 .edit-btn-save {
-  background: white !important;
-  color: #f43f5e !important;
+  background: #111522 !important;
+  color: #F43F7A !important;
   font-size: 26rpx !important;
   padding: 14rpx 36rpx !important;
   border-radius: 24rpx !important;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.2) !important;
   margin: 0;
   line-height: 1.4;
   font-weight: 600;
+  border: none !important;
 }
 
 .edit-btn-save::after {
@@ -196,12 +238,12 @@
 }
 
 .edit-btn-cancel {
-  background: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
   color: white !important;
   font-size: 26rpx !important;
   padding: 14rpx 36rpx !important;
   border-radius: 24rpx !important;
-  border: none !important;
+  border: 1rpx solid rgba(255, 255, 255, 0.15) !important;
   margin: 0;
   line-height: 1.4;
 }
@@ -214,7 +256,9 @@
   text-align: center;
   border-radius: 28rpx;
   padding: 36rpx 32rpx;
-  box-shadow: 0 8rpx 32rpx rgba(244, 63, 94, 0.06);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
+  background: #111522;
+  border: 2rpx solid #1F2937;
 }
 
 .stats-card .stats-row {
@@ -234,21 +278,21 @@
 }
 
 .stat-item:nth-child(1) .text-xl {
-  background: linear-gradient(135deg, #f43f5e, #ec4899);
+  background: linear-gradient(135deg, #F43F7A, #8B5CF6);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-item:nth-child(3) .text-xl {
-  background: linear-gradient(135deg, #f59e0b, #f97316);
+  background: linear-gradient(135deg, #fbbf24, #f97316);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .stat-item:nth-child(5) .text-xl {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #34d399, #10b981);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -257,19 +301,19 @@
 .stat-divider {
   width: 2rpx;
   height: 60rpx;
-  background: #f1f5f9;
+  background: #1F2937;
   border-radius: 2rpx;
 }
 
 .stat-label {
   font-size: 24rpx;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 500;
 }
 
 .event-item {
   padding: 28rpx 0;
-  border-bottom: 2rpx solid #f8fafc;
+  border-bottom: 2rpx solid #1F2937;
   transition: opacity 0.2s;
 }
 
@@ -283,14 +327,16 @@
 
 .event-name {
   font-size: 30rpx;
-  color: #1e293b;
+  color: #f8fafc;
 }
 
 .menu-card {
   padding: 0;
   border-radius: 28rpx;
   overflow: hidden;
-  box-shadow: 0 8rpx 32rpx rgba(244, 63, 94, 0.06);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
+  background: #111522;
+  border: 2rpx solid #1F2937;
 }
 
 .menu-item {
@@ -302,7 +348,7 @@
 }
 
 .menu-item:active {
-  background: #fef2f2;
+  background: rgba(244, 63, 122, 0.08);
 }
 
 .menu-icon {
@@ -314,86 +360,44 @@
 .menu-text {
   flex: 1;
   font-size: 30rpx;
-  color: #1e293b;
+  color: #f8fafc;
   font-weight: 500;
 }
 
 .menu-arrow {
-  color: #cbd5e1;
+  color: #64748b;
   font-size: 32rpx;
   font-weight: 300;
 }
 
 .menu-divider {
   height: 2rpx;
-  background: #f8fafc;
+  background: #1F2937;
   margin: 0 32rpx 0 112rpx;
 }
 
 .logout-btn {
   width: 100%;
   margin-top: 28rpx;
-  background: white;
-  color: #f43f5e;
+  background: #111522;
+  color: #F43F7A;
   border-radius: 24rpx;
   font-size: 30rpx;
   padding: 28rpx;
-  border: none;
+  border: 2rpx solid #1F2937;
   font-weight: 500;
-  box-shadow: 0 4rpx 16rpx rgba(244, 63, 94, 0.08);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.2);
   transition: all 0.2s;
 }
 
 .logout-btn:active {
   transform: scale(0.98);
-  background: #fef2f2;
+  background: rgba(244, 63, 122, 0.08);
+  border-color: rgba(244, 63, 122, 0.3);
 }
 
 .logout-btn::after {
   border: none;
-}
-
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  display: flex;
-  padding: 16rpx 0 calc(16rpx + env(safe-area-inset-bottom));
-  box-shadow: 0 -4rpx 24rpx rgba(0, 0, 0, 0.04);
-  z-index: 100;
-  border-top: 2rpx solid #f1f5f9;
-}
-
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6rpx;
-  color: #94a3b8;
-  transition: all 0.2s;
-  padding: 8rpx 0;
-}
-
-.nav-item.active {
-  color: #f43f5e;
-}
-
-.nav-item.active .nav-icon {
-  transform: scale(1.1);
-}
-
-.nav-icon {
-  font-size: 48rpx;
-  transition: transform 0.2s;
-}
-
-.nav-text {
-  font-size: 22rpx;
-  font-weight: 500;
 }
 
 .section-title-bar {
@@ -402,7 +406,7 @@
   margin-bottom: 20rpx;
   font-size: 32rpx;
   font-weight: 700;
-  color: #1e293b;
+  color: #f8fafc;
 }
 
 .section-title-bar text {
@@ -421,9 +425,10 @@
   align-items: center;
   width: calc(20% - 13rpx);
   padding: 16rpx 8rpx;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(245, 158, 11, 0.06) 100%);
   border-radius: 16rpx;
-  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.1);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.12);
+  border: 1rpx solid rgba(251, 191, 36, 0.15);
 }
 
 .user-badge-icon {
@@ -433,7 +438,7 @@
 
 .user-badge-name {
   font-size: 20rpx;
-  color: #92400e;
+  color: #fbbf24;
   font-weight: 500;
   text-align: center;
   line-height: 1.3;

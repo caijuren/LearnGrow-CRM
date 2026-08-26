@@ -1,16 +1,16 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import { z } from 'zod';
-import { authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
+import { adminOnly, authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
 import db from './db.js';
 import bcrypt from 'bcryptjs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import type { Customer, Product, FollowUp, TodoItem, CustomerSuggestion, Customer360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithCustomer, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinParticipant, CheckinRecord, CheckinParticipantStats, CheckinEventDetail, CustomerStage, Material, MaterialCategory } from '../shared/types.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -20,6 +20,55 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
 
 function ok<T>(data: T) {
   return { success: true as const, data };
+}
+
+const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_LOGIN_MAX_ATTEMPTS = 10;
+const adminLoginAttempts = new Map<string, { count: number; resetAt: number }>();
+
+// 上传接口限流：每个用户每分钟最多 N 次（默认 30，可用环境变量 UPLOAD_RATE_PER_MIN 覆盖）
+const UPLOAD_WINDOW_MS = 60 * 1000;
+const UPLOAD_MAX = parseInt(process.env.UPLOAD_RATE_PER_MIN || '30', 10) || 30;
+const uploadAttempts = new Map<number, { count: number; resetAt: number }>();
+function allowUpload(wxUserId: number): boolean {
+  const now = Date.now();
+  const current = uploadAttempts.get(wxUserId);
+  if (!current || current.resetAt <= now) {
+    uploadAttempts.set(wxUserId, { count: 1, resetAt: now + UPLOAD_WINDOW_MS });
+    return true;
+  }
+  if (current.count >= UPLOAD_MAX) return false;
+  current.count += 1;
+  return true;
+}
+
+function allowAdminLogin(request: FastifyRequest, reply: FastifyReply): boolean {
+  const now = Date.now();
+  const key = request.ip;
+  const current = adminLoginAttempts.get(key);
+
+  if (!current || current.resetAt <= now) {
+    adminLoginAttempts.set(key, { count: 1, resetAt: now + ADMIN_LOGIN_WINDOW_MS });
+    return true;
+  }
+
+  if (current.count >= ADMIN_LOGIN_MAX_ATTEMPTS) {
+    const retryAfter = Math.ceil((current.resetAt - now) / 1000);
+    reply.header('Retry-After', String(retryAfter));
+    reply.code(429).send({ success: false, error: '登录尝试过于频繁，请稍后再试' });
+    return false;
+  }
+
+  current.count += 1;
+  return true;
+}
+
+function detectImageExtension(buffer: Buffer): '.jpg' | '.png' | '.gif' | '.webp' | null {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return '.jpg';
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return '.png';
+  if (buffer.length >= 6 && (buffer.subarray(0, 6).toString('ascii') === 'GIF87a' || buffer.subarray(0, 6).toString('ascii') === 'GIF89a')) return '.gif';
+  if (buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return '.webp';
+  return null;
 }
 
 function mapCustomer(c: any): Customer {
@@ -92,9 +141,21 @@ function getCustomerSuggestions(customerId: number, customer: Customer): Custome
   return suggestions;
 }
 
+// 以东八区（北京时间）为准的日期工具，避免 UTC 与本地日期在 00:00-08:00 之间错位导致跨天判断错误
+const BJT_MS = 8 * 3600 * 1000;
+function bjtDateStr(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+function bjtToday(): string {
+  return bjtDateStr(Date.now() + BJT_MS);
+}
+function bjtDaysAgo(n: number): string {
+  return bjtDateStr(Date.now() + BJT_MS - n * 86400000);
+}
+
 function getTodos(): TodoItem[] {
   const todos: TodoItem[] = [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = bjtToday();
   const customers = (db.prepare('SELECT * FROM customers').all() as any[]).map(mapCustomer);
 
   for (const c of customers) {
@@ -139,14 +200,21 @@ const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-const app = Fastify({ logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' } } } });
+const app = Fastify({ trustProxy: true, logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:mm:ss Z', ignore: 'pid,hostname' } } } });
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
-await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
+await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 
 await app.register(fastifyStatic, {
   root: uploadsDir,
   prefix: '/api/uploads/',
+  decorateReply: false,
+});
+
+// Keep the path returned by existing check-in records available to clients.
+await app.register(fastifyStatic, {
+  root: uploadsDir,
+  prefix: '/uploads/',
   decorateReply: false,
 });
 
@@ -161,6 +229,7 @@ if (process.env.NODE_ENV === 'production') {
 app.get('/api/health', async () => ({ success: true, message: 'ok' }));
 
 app.post('/api/auth/login', async (request, reply) => {
+  if (!allowAdminLogin(request, reply)) return;
   const parsed = z.object({ username: z.string().min(1), password: z.string().min(1) }).safeParse(request.body);
   if (!parsed.success) return reply.code(400).send({ success: false, error: '用户名和密码不能为空' });
   const { username, password } = parsed.data;
@@ -178,10 +247,10 @@ app.get('/api/auth/me', { preHandler: [authMiddleware] }, async (request, reply)
 });
 
 app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
-  const today = new Date().toISOString().split('T')[0];
-  const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0];
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  const today = bjtToday();
+  const threeDaysAgo = bjtDaysAgo(3);
+  const sevenDaysAgo = bjtDaysAgo(7);
+  const thirtyDaysAgo = bjtDaysAgo(30);
   const thisMonth = today.slice(0, 7);
   const todayRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE date(purchase_date) = ?").get(today) as any).s;
   const monthRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE substr(purchase_date, 1, 7) = ?").get(thisMonth) as any).s;
@@ -192,7 +261,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const todos = getTodos();
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
-    const dateStr = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+    const dateStr = bjtDaysAgo(i);
     const rev = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE date(purchase_date) = ?").get(dateStr) as any).s;
     last7Days.push({ date: dateStr.slice(5), revenue: rev || 0 });
   }
@@ -245,12 +314,18 @@ app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
 
   router.get('/', async (request: any) => {
-    const { search, importance, stage, tag, page = '1', limit = '20' } = request.query as any;
+    const { search, importance, stage, need_follow, tag, page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
+    const today = bjtToday();
+    const sevenDaysAgo = bjtDaysAgo(7);
     let sql = 'SELECT * FROM customers WHERE 1=1', params: any[] = [];
     if (search) { sql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
     if (importance) { sql += ' AND importance = ?'; params.push(importance); }
     if (stage) { sql += ' AND stage = ?'; params.push(stage); }
+    if (need_follow === 'true') {
+      sql += " AND (next_talk_topic IS NOT NULL AND next_talk_topic != '' OR last_follow_date IS NULL OR last_follow_date < ? OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?)))";
+      params.push(sevenDaysAgo, today);
+    }
     if (tag) { sql += ' AND tags LIKE ?'; params.push(`%"${tag}"%`); }
     sql += " ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, last_follow_date IS NULL, last_follow_date DESC LIMIT ? OFFSET ?";
     params.push(limitNum, offset);
@@ -259,6 +334,10 @@ app.register(async function (router) {
     if (search) { countSql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; cparams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
     if (importance) { countSql += ' AND importance = ?'; cparams.push(importance); }
     if (stage) { countSql += ' AND stage = ?'; cparams.push(stage); }
+    if (need_follow === 'true') {
+      countSql += " AND (next_talk_topic IS NOT NULL AND next_talk_topic != '' OR last_follow_date IS NULL OR last_follow_date < ? OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?)))";
+      cparams.push(sevenDaysAgo, today);
+    }
     if (tag) { countSql += ' AND tags LIKE ?'; cparams.push(`%"${tag}"%`); }
     const total = (db.prepare(countSql).get(...cparams) as any).total;
     return ok({ customers, total });
@@ -468,6 +547,7 @@ app.register(async function (router) {
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
+  router.addHook('preHandler', adminOnly);
   router.get('/', async () => ok(db.prepare('SELECT id, username, role, display_name, created_at FROM users ORDER BY created_at DESC').all()));
   router.post('/', async (request: any, reply: any) => {
     const { username, password, role = 'assistant', display_name } = request.body;
@@ -918,15 +998,16 @@ app.register(async function (router) {
   });
 }, { prefix: '/api/textbooks' });
 
-function calculateStreaks(records: { checkin_date: string }[], startDate: string, endDate: string) {
+function calculateStreaks(records: { checkin_date: string; is_makeup?: number | boolean }[], startDate: string, endDate: string, makeupCountsForStreak = false) {
   const dateSet = new Set(records.map(r => r.checkin_date));
+  const streakDateSet = new Set(records.filter(r => makeupCountsForStreak || !r.is_makeup).map(r => r.checkin_date));
   const checkedDates = Array.from(dateSet).sort();
   
   let currentStreak = 0;
   let maxStreak = 0;
   let tempStreak = 0;
   
-  const today = new Date().toISOString().split('T')[0];
+  const today = bjtToday();
   const end = endDate < today ? endDate : today;
   
   let d = new Date(startDate);
@@ -938,7 +1019,7 @@ function calculateStreaks(records: { checkin_date: string }[], startDate: string
   }
   
   for (let i = allDates.length - 1; i >= 0; i--) {
-    if (dateSet.has(allDates[i])) {
+    if (streakDateSet.has(allDates[i])) {
       tempStreak++;
       if (i === allDates.length - 1 || currentStreak > 0) {
         currentStreak = tempStreak;
@@ -954,7 +1035,7 @@ function calculateStreaks(records: { checkin_date: string }[], startDate: string
   
   tempStreak = 0;
   for (const dateStr of allDates) {
-    if (dateSet.has(dateStr)) {
+    if (streakDateSet.has(dateStr)) {
       tempStreak++;
       maxStreak = Math.max(maxStreak, tempStreak);
     } else {
@@ -963,6 +1044,43 @@ function calculateStreaks(records: { checkin_date: string }[], startDate: string
   }
   
   return { checkin_days: checkedDates.length, current_streak: currentStreak, max_streak: maxStreak, checked_dates: checkedDates };
+}
+
+function normalizeBoolean(value: any): number {
+  return value === true || value === 1 || value === '1' ? 1 : 0;
+}
+
+function dateDiffDays(later: string, earlier: string): number {
+  const laterDate = new Date(`${later}T00:00:00`);
+  const earlierDate = new Date(`${earlier}T00:00:00`);
+  return Math.round((laterDate.getTime() - earlierDate.getTime()) / 86400000);
+}
+
+function getMakeupRuleError(event: any, participantId: number, checkinDate: string, today: string) {
+  if (!event.allow_makeup) return '本活动不支持补卡';
+  if (checkinDate >= today) return '只能补过去漏打的日期';
+  if (checkinDate < event.start_date || checkinDate > event.end_date) return '补卡日期不在活动范围内';
+
+  const windowDays = Number(event.makeup_window_days || 0);
+  if (windowDays <= 0 || dateDiffDays(today, checkinDate) > windowDays) {
+    return `只能补最近${windowDays || 0}天内的漏打`;
+  }
+
+  const makeupLimit = Number(event.makeup_limit_per_user || 0);
+  const usedMakeups = (db.prepare(`
+    SELECT COUNT(*) as count FROM checkin_records
+    WHERE event_id = ? AND participant_id = ? AND is_makeup = 1
+  `).get(event.id, participantId) as any).count;
+  if (makeupLimit <= 0 || usedMakeups >= makeupLimit) {
+    return `每人最多可补卡${makeupLimit || 0}次`;
+  }
+
+  return null;
+}
+
+function canMakeupDate(event: any, participantId: number, checkinDate: string, today: string, checkedDates: Set<string>) {
+  if (checkedDates.has(checkinDate)) return false;
+  return !getMakeupRuleError(event, participantId, checkinDate, today);
 }
 
 function mapCheckinEvent(e: any): CheckinEvent {
@@ -981,7 +1099,7 @@ app.register(async function (router) {
     let sql = `SELECT e.*, g.name as group_name, 
       (SELECT COUNT(*) FROM checkin_participants WHERE event_id = e.id) as participant_count,
       CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
-      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE 1=1`;
+      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.is_deleted = 0`;
     const params: any[] = [];
     if (status) { sql += ' AND e.status = ?'; params.push(status); }
     sql += ' ORDER BY e.created_at DESC';
@@ -993,7 +1111,7 @@ app.register(async function (router) {
     const id = parseInt(request.params.id);
     const event = db.prepare(`SELECT e.*, g.name as group_name,
       CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
-      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.id = ?`).get(id) as any;
+      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.id = ? AND e.is_deleted = 0`).get(id) as any;
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
     const participantsRaw = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(id) as any[];
@@ -1015,7 +1133,8 @@ app.register(async function (router) {
 
     const participants: CheckinParticipantStats[] = participantsRaw.map(p => {
       const pRecords = recordsRaw.filter(r => r.participant_id === p.id);
-      const stats = calculateStreaks(pRecords, event.start_date, event.end_date);
+      const approvedRecords = pRecords.filter(r => r.status === 'approved');
+      const stats = calculateStreaks(approvedRecords, event.start_date, event.end_date, !!event.makeup_counts_for_streak);
       const lastRecord = pRecords.sort((a, b) => b.checkin_date.localeCompare(a.checkin_date))[0];
       return {
         participant: {
@@ -1043,13 +1162,45 @@ app.register(async function (router) {
   });
 
   router.post('/', async (request: any, reply: any) => {
-    const { name, group_id, start_date, end_date, required_text, reward_rules, status = 'active' } = request.body;
+    const {
+      name,
+      group_id,
+      start_date,
+      end_date,
+      required_text,
+      reward_rules,
+      allow_makeup = 0,
+      makeup_window_days = 3,
+      makeup_limit_per_user = 3,
+      makeup_requires_review = 1,
+      makeup_counts_for_streak = 0,
+      status = 'active',
+    } = request.body;
     if (!name || !start_date || !end_date) return reply.code(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
-      INSERT INTO checkin_events (name, group_id, start_date, end_date, required_text, reward_rules, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, group_id || null, start_date, end_date, required_text || null, reward_rules || null, status, now, now);
+      INSERT INTO checkin_events (
+        name, group_id, start_date, end_date, required_text, reward_rules,
+        allow_makeup, makeup_window_days, makeup_limit_per_user, makeup_requires_review, makeup_counts_for_streak,
+        status, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      name,
+      group_id || null,
+      start_date,
+      end_date,
+      required_text || null,
+      reward_rules || null,
+      normalizeBoolean(allow_makeup),
+      Number(makeup_window_days) || 3,
+      Number(makeup_limit_per_user) || 3,
+      normalizeBoolean(makeup_requires_review),
+      normalizeBoolean(makeup_counts_for_streak),
+      status,
+      now,
+      now
+    );
     
     if (group_id) {
       const members = db.prepare('SELECT id, wechat_name, nickname, customer_id FROM wechat_group_members WHERE group_id = ?').all(group_id) as any[];
@@ -1070,8 +1221,21 @@ app.register(async function (router) {
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
-    const { name, group_id, start_date, end_date, required_text, reward_rules, status } = request.body;
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+    const {
+      name,
+      group_id,
+      start_date,
+      end_date,
+      required_text,
+      reward_rules,
+      allow_makeup,
+      makeup_window_days,
+      makeup_limit_per_user,
+      makeup_requires_review,
+      makeup_counts_for_streak,
+      status,
+    } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
     if (group_id !== undefined) { fields.push('group_id = ?'); params.push(group_id); }
@@ -1079,16 +1243,46 @@ app.register(async function (router) {
     if (end_date !== undefined) { fields.push('end_date = ?'); params.push(end_date); }
     if (required_text !== undefined) { fields.push('required_text = ?'); params.push(required_text); }
     if (reward_rules !== undefined) { fields.push('reward_rules = ?'); params.push(reward_rules); }
+    if (allow_makeup !== undefined) { fields.push('allow_makeup = ?'); params.push(normalizeBoolean(allow_makeup)); }
+    if (makeup_window_days !== undefined) { fields.push('makeup_window_days = ?'); params.push(Number(makeup_window_days) || 3); }
+    if (makeup_limit_per_user !== undefined) { fields.push('makeup_limit_per_user = ?'); params.push(Number(makeup_limit_per_user) || 3); }
+    if (makeup_requires_review !== undefined) { fields.push('makeup_requires_review = ?'); params.push(normalizeBoolean(makeup_requires_review)); }
+    if (makeup_counts_for_streak !== undefined) { fields.push('makeup_counts_for_streak = ?'); params.push(normalizeBoolean(makeup_counts_for_streak)); }
     if (status !== undefined) { fields.push('status = ?'); params.push(status); }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    db.prepare(`UPDATE checkin_events SET ${fields.join(', ')} WHERE id = ?`).run(...params);
-    return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(id)));
+    db.prepare(`UPDATE checkin_events SET ${fields.join(', ')} WHERE id = ? AND is_deleted = 0`).run(...params);
+    return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id)));
   });
 
   router.delete('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+    const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id);
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+    db.prepare("UPDATE checkin_events SET is_deleted = 1, deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(id);
+    return ok(null);
+  });
+
+  router.get('/deleted', async () => {
+    const events = db.prepare(`SELECT e.*, g.name as group_name,
+      (SELECT COUNT(*) FROM checkin_participants WHERE event_id = e.id) as participant_count,
+      CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
+      FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.is_deleted = 1 ORDER BY e.deleted_at DESC`).all() as any[];
+    return ok({ events, total: events.length });
+  });
+
+  router.put('/:id/restore', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 1').get(id);
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在或未被删除' });
+    db.prepare("UPDATE checkin_events SET is_deleted = 0, deleted_at = NULL, updated_at = datetime('now') WHERE id = ?").run(id);
+    return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(id)));
+  });
+
+  router.delete('/:id/permanent', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 1').get(id);
+    if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在或不在回收站中' });
     db.prepare('DELETE FROM checkin_records WHERE event_id = ?').run(id);
     db.prepare('DELETE FROM checkin_participants WHERE event_id = ?').run(id);
     db.prepare('DELETE FROM checkin_events WHERE id = ?').run(id);
@@ -1097,7 +1291,7 @@ app.register(async function (router) {
 
   router.post('/:id/participants', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ?').get(eventId)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+    if (!db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { member_id, customer_id, nickname, child_name } = request.body;
     if (!nickname) return reply.code(400).send({ success: false, error: '昵称不能为空' });
     const r = db.prepare(`
@@ -1118,7 +1312,7 @@ app.register(async function (router) {
 
   router.post('/:id/checkin', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { participant_id, checkin_date, note } = request.body;
     if (!participant_id || !checkin_date) return reply.code(400).send({ success: false, error: '参与者和日期不能为空' });
@@ -1148,7 +1342,7 @@ app.register(async function (router) {
 
   router.post('/:id/batch-checkin', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const { checkin_date, participant_ids, note } = request.body;
     if (!checkin_date || !participant_ids || !Array.isArray(participant_ids)) return reply.code(400).send({ success: false, error: '日期和参与者列表不能为空' });
@@ -1291,38 +1485,40 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
   let openid: string;
   const WX_APPID = process.env.WX_APPID;
   const WX_SECRET = process.env.WX_SECRET || process.env.WX_APPSECRET;
+  const isProduction = process.env.NODE_ENV === 'production';
   
-  if (WX_APPID && WX_SECRET && code) {
+  if (!WX_APPID || !WX_SECRET) {
+    if (isProduction) return reply.code(500).send({ success: false, error: '微信登录配置缺失' });
+    openid = `dev_${code || randomUUID()}`;
+  } else if (!code) {
+    if (isProduction) return reply.code(400).send({ success: false, error: '缺少微信登录凭证' });
+    openid = `dev_${randomUUID()}`;
+  } else {
+    let data: any;
     try {
       const res = await fetch(`https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_SECRET}&js_code=${code}&grant_type=authorization_code`);
-      const data = await res.json() as any;
-      if (data.openid) {
-        openid = data.openid;
-      } else {
-        openid = `dev_${code || randomUUID()}`;
-      }
+      data = await res.json();
     } catch (e) {
-      openid = `dev_${code || randomUUID()}`;
+      if (isProduction) return reply.code(502).send({ success: false, error: '微信登录服务暂不可用' });
     }
-  } else {
-    openid = `dev_${code || randomUUID()}`;
+
+    if (!data) {
+      openid = `dev_${code}`;
+    } else if (data.openid) {
+      openid = data.openid;
+    } else if (isProduction) {
+      return reply.code(401).send({ success: false, error: data.errmsg || '微信登录失败' });
+    } else {
+      openid = `dev_${code}`;
+    }
   }
 
   let user = db.prepare('SELECT * FROM wx_users WHERE openid = ?').get(openid) as any;
   const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
   
   if (user) {
-    const updates: string[] = [];
-    const params: any[] = [];
-    if (nickname !== undefined && nickname !== user.nickname) { updates.push('nickname = ?'); params.push(nickname); }
-    if (avatar_url !== undefined && avatar_url !== user.avatar_url) { updates.push('avatar_url = ?'); params.push(avatar_url); }
-    if (child_name !== undefined && child_name !== user.child_name) { updates.push('child_name = ?'); params.push(child_name); }
-    updates.push('last_login_at = ?'); params.push(now);
-    updates.push('updated_at = ?'); params.push(now);
-    params.push(user.id);
-    if (updates.length > 0) {
-      db.prepare(`UPDATE wx_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    }
+    // 只更新登录时间，不覆盖用户已设置的昵称/头像/孩子名字
+    db.prepare('UPDATE wx_users SET last_login_at = ?, updated_at = ? WHERE id = ?').run(now, now, user.id);
     user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(user.id);
   } else {
     const r = db.prepare(`
@@ -1357,24 +1553,49 @@ app.post('/api/wx/update-profile', { preHandler: [wxAuthMiddleware] }, async (re
   if (updates.length > 0) {
     db.prepare(`UPDATE wx_users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
   }
+
+  // 同步更新已加入打卡活动的昵称和孩子名，避免后台显示旧数据
+  if (nickname !== undefined || child_name !== undefined) {
+    const pFields: string[] = [];
+    const pParams: any[] = [];
+    if (nickname !== undefined) { pFields.push('nickname = ?'); pParams.push(nickname); }
+    if (child_name !== undefined) { pFields.push('child_name = ?'); pParams.push(child_name); }
+    pParams.push(user.id);
+    db.prepare(`UPDATE checkin_participants SET ${pFields.join(', ')} WHERE wx_user_id = ?`).run(...pParams);
+  }
+
   const updated = db.prepare('SELECT id, nickname, avatar_url, child_name FROM wx_users WHERE id = ?').get(user.id);
   return ok(updated);
 });
 
 app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any) => {
   const user = request.wxUser;
-  const today = new Date().toISOString().split('T')[0];
+  const today = bjtToday();
   const events = db.prepare(`
     SELECT e.*, 
       (SELECT COUNT(*) FROM checkin_participants WHERE event_id = e.id) as participant_count,
       CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
     FROM checkin_events e
-    WHERE e.status = 'active' AND e.end_date >= date('now', '-1 day')
-    ORDER BY e.end_date ASC, e.created_at DESC
+    WHERE e.is_deleted = 0
+      AND e.status = 'active'
+      AND (
+        (e.start_date > date('now') AND e.start_date <= date('now', '+3 days'))
+        OR (e.start_date <= date('now') AND e.end_date >= date('now'))
+        OR (e.end_date < date('now') AND e.end_date >= date('now', '-5 days'))
+      )
+    ORDER BY e.start_date ASC
   `).all() as any[];
 
   const result = events.map(e => {
     const daysLeft = Math.ceil((new Date(e.end_date).getTime() - new Date(today).getTime()) / 86400000);
+    let eventStatus: string;
+    if (e.start_date > today) {
+      eventStatus = 'upcoming';
+    } else if (e.end_date >= today) {
+      eventStatus = 'ongoing';
+    } else {
+      eventStatus = 'expired';
+    }
     let isJoined = false;
     let myCheckinDays = 0;
     let myCurrentStreak = 0;
@@ -1384,8 +1605,8 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
       const participant = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(e.id, user.id) as any;
       if (participant) {
         isJoined = true;
-        const records = db.prepare('SELECT checkin_date FROM checkin_records WHERE participant_id = ?').all(participant.id) as { checkin_date: string }[];
-        const stats = calculateStreaks(records, e.start_date, e.end_date);
+        const records = db.prepare('SELECT checkin_date, is_makeup FROM checkin_records WHERE participant_id = ? AND status = ?').all(participant.id, 'approved') as { checkin_date: string; is_makeup?: number }[];
+        const stats = calculateStreaks(records, e.start_date, e.end_date, !!e.makeup_counts_for_streak);
         myCheckinDays = stats.checkin_days;
         myCurrentStreak = stats.current_streak;
         todayChecked = records.some(r => r.checkin_date === today);
@@ -1400,6 +1621,7 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
       required_text: e.required_text,
       reward_rules: e.reward_rules,
       status: e.status,
+      event_status: eventStatus,
       participant_count: e.participant_count,
       total_days: e.total_days,
       days_left: daysLeft,
@@ -1407,6 +1629,9 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
       my_checkin_days: myCheckinDays,
       my_current_streak: myCurrentStreak,
       today_checked: todayChecked,
+      can_makeup: !!e.allow_makeup,
+      makeup_window_days: e.makeup_window_days,
+      makeup_remaining: e.makeup_limit_per_user,
     };
   });
 
@@ -1416,10 +1641,10 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
 app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const eventId = parseInt(request.params.id);
-  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
   if (event.status !== 'active') return reply.code(400).send({ success: false, error: '活动已结束' });
-  
+
   const existing = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id);
   if (existing) return reply.code(409).send({ success: false, error: '您已加入该活动' });
   
@@ -1434,42 +1659,91 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
 
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
-  const { event_id, note, image_url } = request.body;
-  
+  const { event_id, note, image_url, image_hash, checkin_date, display_name } = request.body;
+
   if (!event_id) return reply.code(400).send({ success: false, error: '活动不能为空' });
-  
-  const today = new Date().toISOString().split('T')[0];
-  
-  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(event_id) as any;
+  if (!image_url || !String(image_url).trim()) {
+    return reply.code(400).send({ success: false, error: '请上传打卡图片' });
+  }
+
+  const today = bjtToday();
+  const targetDate = checkin_date || today;
+  const isMakeup = targetDate !== today;
+
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(event_id) as any;
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
   if (event.status !== 'active') return reply.code(400).send({ success: false, error: '活动已结束' });
-  
+
   const participant = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(event_id, user.id) as any;
   if (!participant) return reply.code(400).send({ success: false, error: '请先加入活动' });
+
+  // 校验并同步孩子名：登录时已要求填写，缺失时提示补充
+  if (!user.child_name || !String(user.child_name).trim()) {
+    return reply.code(400).send({ success: false, error: '请先补充孩子名称', code: 'CHILD_NAME_REQUIRED' });
+  }
+  if (!participant.child_name) {
+    db.prepare('UPDATE checkin_participants SET child_name = ? WHERE id = ?').run(user.child_name, participant.id);
+    participant.child_name = user.child_name;
+  }
+
+  // 自动填充打卡显示名：优先使用用户传入的，否则用「昵称（孩子名）」
+  const autoDisplayName = participant.child_name
+    ? `${participant.nickname || user.nickname || '微信用户'}（${participant.child_name}）`
+    : (participant.nickname || user.nickname || '微信用户');
+  const finalDisplayName = display_name && String(display_name).trim()
+    ? String(display_name).trim()
+    : autoDisplayName;
   
-  if (today < event.start_date || today > event.end_date) {
+  if (targetDate < event.start_date || targetDate > event.end_date) {
     return reply.code(400).send({ success: false, error: '不在活动时间范围内' });
   }
-  
-  const existing = db.prepare('SELECT * FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(event_id, participant.id, today);
-  if (existing) {
-    return reply.code(400).send({ success: false, error: '今日已打卡，明天再来吧~' });
+  if (targetDate > today) {
+    return reply.code(400).send({ success: false, error: '不能提前打卡' });
+  }
+  if (!isMakeup && today > event.end_date) {
+    return reply.code(400).send({ success: false, error: '活动已结束' });
+  }
+  if (isMakeup) {
+    const makeupError = getMakeupRuleError(event, participant.id, targetDate, today);
+    if (makeupError) return reply.code(400).send({ success: false, error: makeupError });
   }
   
-  const previousRecords = db.prepare('SELECT checkin_date FROM checkin_records WHERE event_id = ? AND participant_id = ? AND status = ? ORDER BY checkin_date DESC').all(event_id, participant.id, 'approved') as any[];
+  const existing = db.prepare('SELECT * FROM checkin_records WHERE event_id = ? AND participant_id = ? AND checkin_date = ?').get(event_id, participant.id, targetDate);
+  if (existing) {
+    if ((existing as any).status === 'rejected') {
+      const recordStatus = isMakeup && event.makeup_requires_review ? 'pending' : 'approved';
+      db.prepare(`
+        UPDATE checkin_records
+        SET note = ?, image_url = ?, image_hash = ?, is_makeup = ?, status = ?, display_name = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
+        WHERE id = ?
+      `).run(note || null, image_url || null, image_hash || null, isMakeup ? 1 : 0, recordStatus, display_name || null, (existing as any).id);
+      return ok({
+        ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get((existing as any).id) as object),
+        checkin_number: null,
+        pending_review: recordStatus === 'pending',
+        new_badges: []
+      });
+    }
+    return reply.code(400).send({ success: false, error: isMakeup ? '该日期已经提交过打卡' : '今日已打卡，明天再来吧~' });
+  }
+  
+  const previousRecords = db.prepare('SELECT checkin_date, is_makeup FROM checkin_records WHERE event_id = ? AND participant_id = ? AND status = ? ORDER BY checkin_date DESC').all(event_id, participant.id, 'approved') as any[];
   const checkinCount = previousRecords.length + 1;
+  const recordStatus = isMakeup && event.makeup_requires_review ? 'pending' : 'approved';
   
   const r = db.prepare(`
-    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, status)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(event_id, participant.id, today, note || null, image_url || null, 'approved');
+    INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, image_hash, is_makeup, status, display_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(event_id, participant.id, targetDate, note || null, image_url || null, image_hash || null, isMakeup ? 1 : 0, recordStatus, finalDisplayName);
 
   const newBadges: any[] = [];
-  const allApprovedRecords = [...previousRecords, { checkin_date: today }];
+  const allApprovedRecords = recordStatus === 'approved'
+    ? [...previousRecords, { checkin_date: targetDate, is_makeup: isMakeup ? 1 : 0 }]
+    : previousRecords;
   const allBadges = db.prepare('SELECT * FROM checkin_badges WHERE event_id = ?').all(event_id) as any[];
   
-  if (allBadges.length > 0) {
-    const streakStats = calculateStreaks(allApprovedRecords, event.start_date, event.end_date);
+  if (recordStatus === 'approved' && allBadges.length > 0) {
+    const streakStats = calculateStreaks(allApprovedRecords, event.start_date, event.end_date, !!event.makeup_counts_for_streak);
     
     for (const badge of allBadges) {
       const alreadyAchieved = db.prepare('SELECT id FROM checkin_badge_achievements WHERE badge_id = ? AND participant_id = ?').get(badge.id, participant.id);
@@ -1494,6 +1768,7 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
   return reply.code(201).send(ok({
     ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid) as object),
     checkin_number: checkinCount,
+    pending_review: recordStatus === 'pending',
     new_badges: newBadges
   }));
 });
@@ -1501,10 +1776,10 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
 app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (request: any) => {
   const user = request.wxUser;
   const participants = db.prepare(`
-    SELECT p.*, e.*, g.name as group_name,
+    SELECT p.*, e.*, p.id AS id, g.name as group_name,
       CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
     FROM checkin_participants p
-    JOIN checkin_events e ON p.event_id = e.id
+    JOIN checkin_events e ON p.event_id = e.id AND e.is_deleted = 0
     LEFT JOIN wechat_groups g ON e.group_id = g.id
     WHERE p.wx_user_id = ?
     ORDER BY e.status ASC, e.end_date DESC
@@ -1512,15 +1787,36 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
 
   const result = participants.map(p => {
     const records = db.prepare('SELECT * FROM checkin_records WHERE participant_id = ? ORDER BY checkin_date DESC').all(p.id) as any[];
-    const stats = calculateStreaks(records, p.start_date, p.end_date);
+    const approvedRecords = records.filter(r => r.status === 'approved');
+    const stats = calculateStreaks(approvedRecords, p.start_date, p.end_date, !!p.makeup_counts_for_streak);
     
-    const calendar: { date: string; checked: boolean }[] = [];
-    const checkedDates = new Set(records.map(r => r.checkin_date));
+    const calendar: {
+      date: string;
+      checked: boolean;
+      status: string | null;
+      review_note: string | null;
+      is_makeup: boolean;
+      can_makeup: boolean;
+      missed: boolean;
+    }[] = [];
+    const recordByDate = new Map(records.map(r => [r.checkin_date, r]));
+    const approvedDates = new Set(approvedRecords.map(r => r.checkin_date));
+    const today = bjtToday();
     let d = new Date(p.start_date);
     const endD = new Date(p.end_date);
     while (d <= endD) {
       const dateStr = d.toISOString().split('T')[0];
-      calendar.push({ date: dateStr, checked: checkedDates.has(dateStr) });
+      const record = recordByDate.get(dateStr);
+      const missed = dateStr < today && !record;
+      calendar.push({
+        date: dateStr,
+        checked: approvedDates.has(dateStr),
+        status: record?.status || null,
+        review_note: record?.review_note || null,
+        is_makeup: !!record?.is_makeup,
+        can_makeup: missed && canMakeupDate(p, p.id, dateStr, today, new Set(recordByDate.keys())),
+        missed,
+      });
       d.setDate(d.getDate() + 1);
     }
 
@@ -1533,6 +1829,11 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
         end_date: p.end_date,
         required_text: p.required_text,
         reward_rules: p.reward_rules,
+        allow_makeup: p.allow_makeup,
+        makeup_window_days: p.makeup_window_days,
+        makeup_limit_per_user: p.makeup_limit_per_user,
+        makeup_requires_review: p.makeup_requires_review,
+        makeup_counts_for_streak: p.makeup_counts_for_streak,
         status: p.status,
         total_days: p.total_days,
       },
@@ -1547,6 +1848,11 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
         checkin_date: r.checkin_date,
         note: r.note,
         image_url: r.image_url,
+        image_hash: r.image_hash,
+        display_name: r.display_name,
+        status: r.status,
+        review_note: r.review_note,
+        is_makeup: !!r.is_makeup,
         created_at: r.created_at,
       })),
       checkin_days: stats.checkin_days,
@@ -1562,7 +1868,7 @@ app.get('/api/wx/my-checkins', { preHandler: [wxAuthMiddleware] }, async (reques
 app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const eventId = parseInt(request.params.id);
-  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
   const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ?').all(eventId) as any[];
@@ -1571,12 +1877,11 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
   const me = user ? db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id) as any : null;
 
   const ranking = participants.map(p => {
-    const pRecords = records.filter(r => r.participant_id === p.id);
-    const stats = calculateStreaks(pRecords, event.start_date, event.end_date);
+    const pRecords = records.filter(r => r.participant_id === p.id && r.status === 'approved');
+    const stats = calculateStreaks(pRecords, event.start_date, event.end_date, !!event.makeup_counts_for_streak);
     return {
       participant_id: p.id,
       nickname: p.nickname,
-      child_name: p.child_name,
       checkin_days: stats.checkin_days,
       current_streak: stats.current_streak,
       is_me: me ? p.id === me.id : false,
@@ -1591,7 +1896,6 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
   const result = ranking.map((r, i) => ({
     rank: i + 1,
     nickname: r.nickname,
-    child_name: r.child_name,
     checkin_days: r.checkin_days,
     current_streak: r.current_streak,
     is_me: r.is_me,
@@ -1600,31 +1904,226 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
   return ok(result);
 });
 
+app.put('/api/wx/checkin-records/:id', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const recordId = parseInt(request.params.id);
+  const { image_url, image_hash, note } = request.body;
+
+  if (!image_url || !String(image_url).trim()) {
+    return reply.code(400).send({ success: false, error: '请上传打卡图片' });
+  }
+
+  const record = db.prepare(`
+    SELECT r.*, e.status as event_status, e.start_date, e.end_date, e.makeup_requires_review, p.wx_user_id
+    FROM checkin_records r
+    JOIN checkin_events e ON r.event_id = e.id
+    JOIN checkin_participants p ON r.participant_id = p.id
+    WHERE r.id = ?
+  `).get(recordId) as any;
+
+  if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在' });
+  if (record.wx_user_id !== user.id) return reply.code(403).send({ success: false, error: '只能修改自己的打卡' });
+
+  const today = bjtToday();
+  if (record.checkin_date !== today) {
+    return reply.code(400).send({ success: false, error: '只能修改今天的打卡记录' });
+  }
+  if (record.event_status !== 'active') {
+    return reply.code(400).send({ success: false, error: '活动已结束' });
+  }
+
+  const newStatus = record.is_makeup && record.makeup_requires_review ? 'pending' : 'approved';
+
+  db.prepare(`
+    UPDATE checkin_records
+    SET image_url = ?, image_hash = COALESCE(?, image_hash), note = ?, status = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
+    WHERE id = ?
+  `).run(image_url, image_hash || null, note || null, newStatus, recordId);
+
+  return ok({
+    ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId) as object),
+    pending_review: newStatus === 'pending'
+  });
+});
+
+app.get('/api/wx/checkin-events/:id/feed', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+
+  const records = db.prepare(`
+    SELECT r.id, r.checkin_date, r.note, r.image_url, r.created_at, r.is_makeup, r.display_name,
+           p.nickname, wu.avatar_url
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    LEFT JOIN wx_users wu ON p.wx_user_id = wu.id
+    WHERE r.event_id = ? AND r.status = 'approved'
+    ORDER BY r.created_at DESC, r.id DESC
+    LIMIT 12
+  `).all(eventId) as any[];
+
+  const recordIds = records.map(r => r.id);
+  const likeCounts = new Map<number, number>();
+  const likedIds = new Set<number>();
+
+  if (recordIds.length > 0) {
+    const placeholders = recordIds.map(() => '?').join(',');
+    const counts = db.prepare(`
+      SELECT record_id, COUNT(*) as count
+      FROM checkin_record_likes
+      WHERE record_id IN (${placeholders})
+      GROUP BY record_id
+    `).all(...recordIds) as any[];
+    for (const row of counts) likeCounts.set(row.record_id, row.count);
+
+    if (user) {
+      const liked = db.prepare(`
+        SELECT record_id
+        FROM checkin_record_likes
+        WHERE wx_user_id = ? AND record_id IN (${placeholders})
+      `).all(user.id, ...recordIds) as any[];
+      for (const row of liked) likedIds.add(row.record_id);
+    }
+  }
+
+  return ok(records.map(r => ({
+    id: r.id,
+    checkin_date: r.checkin_date,
+    note: r.note,
+    image_url: r.image_url,
+    created_at: r.created_at,
+    is_makeup: !!r.is_makeup,
+    nickname: r.nickname,
+    display_name: r.display_name,
+    avatar_url: r.avatar_url,
+    like_count: likeCounts.get(r.id) || 0,
+    liked_by_me: likedIds.has(r.id),
+  })));
+});
+
+app.post('/api/wx/checkin-records/:id/like', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const recordId = parseInt(request.params.id);
+  const record = db.prepare('SELECT id FROM checkin_records WHERE id = ? AND status = ?').get(recordId, 'approved') as any;
+  if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在或未通过审核' });
+
+  const existing = db.prepare('SELECT id FROM checkin_record_likes WHERE record_id = ? AND wx_user_id = ?').get(recordId, user.id) as any;
+  let liked = false;
+  if (existing) {
+    db.prepare('DELETE FROM checkin_record_likes WHERE id = ?').run(existing.id);
+  } else {
+    db.prepare('INSERT INTO checkin_record_likes (record_id, wx_user_id) VALUES (?, ?)').run(recordId, user.id);
+    liked = true;
+  }
+
+  const likeCount = (db.prepare('SELECT COUNT(*) as count FROM checkin_record_likes WHERE record_id = ?').get(recordId) as any).count;
+  return ok({ liked, like_count: likeCount });
+});
+
+app.get('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+
+  const reminder = db.prepare('SELECT * FROM checkin_reminders WHERE wx_user_id = ? AND event_id = ?').get(user.id, eventId) as any;
+  const template = db.prepare(`
+    SELECT template_id FROM wx_subscribe_templates
+    WHERE scene = ? AND is_active = 1
+    ORDER BY id DESC LIMIT 1
+  `).get('checkin_reminder') as any;
+
+  return ok({
+    is_enabled: reminder ? !!reminder.is_enabled : false,
+    remind_time: reminder?.remind_time || '20:00',
+    template_id: template?.template_id || null,
+  });
+});
+
+app.post('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const eventId = parseInt(request.params.id);
+  const { is_enabled, remind_time = '20:00' } = request.body;
+  const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+  if (!/^\d{2}:\d{2}$/.test(remind_time)) return reply.code(400).send({ success: false, error: '提醒时间格式无效' });
+
+  db.prepare(`
+    INSERT INTO checkin_reminders (wx_user_id, event_id, remind_time, is_enabled, created_at, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(wx_user_id, event_id) DO UPDATE SET
+      remind_time = excluded.remind_time,
+      is_enabled = excluded.is_enabled,
+      updated_at = datetime('now')
+  `).run(user.id, eventId, remind_time, normalizeBoolean(is_enabled));
+
+  const reminder = db.prepare('SELECT * FROM checkin_reminders WHERE wx_user_id = ? AND event_id = ?').get(user.id, eventId) as any;
+  return ok({
+    is_enabled: !!reminder.is_enabled,
+    remind_time: reminder.remind_time,
+  });
+});
+
 app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  if (!allowUpload(request.wxUser.id)) {
+    return reply.code(429).send({ success: false, error: '上传太频繁，请稍后再试' });
+  }
   const data = await request.file();
   if (!data) return reply.code(400).send({ success: false, error: '未收到图片' });
 
-  const ext = path.extname(data.filename).toLowerCase();
-  const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-  if (!allowedExts.includes(ext)) return reply.code(400).send({ success: false, error: '只支持图片格式' });
+  let buffer: Buffer;
+  try {
+    buffer = await data.toBuffer();
+  } catch {
+    return reply.code(413).send({ success: false, error: '图片不能超过 10MB' });
+  }
+  if (data.file.truncated || buffer.length === 0) return reply.code(413).send({ success: false, error: '图片不能超过 10MB' });
+
+  const ext = detectImageExtension(buffer);
+  if (!ext) return reply.code(400).send({ success: false, error: '文件内容不是受支持的图片格式' });
+
+  const imageHash = createHash('sha256').update(buffer).digest('hex');
+  const today = bjtToday();
+  const userId = request.wxUser.id;
+
+  const sameDayRecord = db.prepare(`
+    SELECT r.id, r.checkin_date, r.display_name, r.note
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    WHERE p.wx_user_id = ? AND r.image_hash = ? AND r.checkin_date = ?
+    LIMIT 1
+  `).get(userId, imageHash, today) as any;
+
+  const similarRecord = sameDayRecord ? null : db.prepare(`
+    SELECT r.id, r.checkin_date, r.display_name, r.note
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    WHERE p.wx_user_id = ? AND r.image_hash = ? AND r.checkin_date != ?
+    ORDER BY r.checkin_date DESC
+    LIMIT 1
+  `).get(userId, imageHash, today) as any;
 
   const uniqueName = `checkin_${randomUUID()}${ext}`;
   const filePath = path.join(uploadsDir, uniqueName);
 
-  const writeStream = fs.createWriteStream(filePath);
-  await new Promise<void>((resolve, reject) => {
-    data.file.pipe(writeStream);
-    data.file.on('end', resolve);
-    data.file.on('error', reject);
-    writeStream.on('error', reject);
-  });
+  await fs.promises.writeFile(filePath, buffer);
 
-  return ok({ url: `/uploads/${uniqueName}` });
+  return ok({
+    url: `/uploads/${uniqueName}`,
+    image_hash: imageHash,
+    same_day_duplicate: !!sameDayRecord,
+    similar_record: similarRecord ? {
+      checkin_date: similarRecord.checkin_date,
+      display_name: similarRecord.display_name,
+      note: similarRecord.note
+    } : null
+  });
 });
 
 async function getWxAccessToken() {
   const appId = process.env.WX_APPID;
-  const appSecret = process.env.WX_APPSECRET;
+  const appSecret = process.env.WX_SECRET || process.env.WX_APPSECRET;
   if (!appId || !appSecret) return null;
 
   const cached = db.prepare("SELECT value FROM settings WHERE key = 'wx_access_token'").get() as any;
@@ -1672,8 +2171,77 @@ async function sendWxSubscribeMessage(openid: string, templateId: string, data: 
   }
 }
 
+async function runDueCheckinReminders() {
+  const now = new Date();
+  const today = bjtToday();
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const template = db.prepare(`
+    SELECT template_id FROM wx_subscribe_templates
+    WHERE scene = ? AND is_active = 1
+    ORDER BY id DESC LIMIT 1
+  `).get('checkin_reminder') as any;
+  if (!template?.template_id) return { sent: 0, failed: 0, skipped: 0, error: '未配置打卡提醒订阅模板' };
+
+  const reminders = db.prepare(`
+    SELECT cr.*, wu.openid, e.name as event_name, e.end_date, p.id as participant_id
+    FROM checkin_reminders cr
+    JOIN wx_users wu ON cr.wx_user_id = wu.id
+    JOIN checkin_events e ON cr.event_id = e.id
+    JOIN checkin_participants p ON p.event_id = e.id AND p.wx_user_id = cr.wx_user_id
+    WHERE cr.is_enabled = 1
+      AND e.is_deleted = 0
+      AND e.status = 'active'
+      AND e.start_date <= ?
+      AND e.end_date >= ?
+      AND cr.remind_time <= ?
+      AND (cr.last_sent_date IS NULL OR cr.last_sent_date < ?)
+  `).all(today, today, hhmm, today) as any[];
+
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  for (const reminder of reminders) {
+    const checked = db.prepare(`
+      SELECT id FROM checkin_records
+      WHERE event_id = ? AND participant_id = ? AND checkin_date = ? AND status IN ('approved', 'pending')
+    `).get(reminder.event_id, reminder.participant_id, today);
+    if (checked) {
+      skipped++;
+      db.prepare('UPDATE checkin_reminders SET last_sent_date = ?, updated_at = datetime(\'now\') WHERE id = ?').run(today, reminder.id);
+      continue;
+    }
+
+    const result = await sendWxSubscribeMessage(
+      reminder.openid,
+      template.template_id,
+      {
+        thing1: { value: reminder.event_name.slice(0, 20) },
+        time2: { value: reminder.remind_time },
+        thing3: { value: '今天还未打卡，记得来完成哦' },
+      },
+      `pages/event-detail/event-detail?id=${reminder.event_id}&autoCheckin=1`
+    );
+
+    db.prepare(`
+      INSERT INTO wx_subscribe_records (wx_user_id, template_id, scene, status, error_msg, sent_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).run(reminder.wx_user_id, template.template_id, 'checkin_reminder', result.success ? 'sent' : 'failed', result.error || null);
+
+    if (result.success) {
+      sent++;
+      db.prepare('UPDATE checkin_reminders SET last_sent_date = ?, updated_at = datetime(\'now\') WHERE id = ?').run(today, reminder.id);
+    } else {
+      failed++;
+    }
+  }
+
+  return { sent, failed, skipped };
+}
+
 app.get('/api/wx/checkin-events/:id/materials', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
   const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
   const materials = db.prepare(`
     SELECT id, title, description, file_url, file_type, sort_order
     FROM checkin_materials
@@ -1686,6 +2254,8 @@ app.get('/api/wx/checkin-events/:id/materials', { preHandler: [wxOptionalAuthMid
 app.get('/api/wx/checkin-events/:id/badges', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
   const eventId = parseInt(request.params.id);
   const user = request.wxUser;
+  const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
   const badges = db.prepare(`
     SELECT id, name, description, icon, type, target_days
@@ -1716,7 +2286,7 @@ app.get('/api/wx/my-badges', { preHandler: [wxAuthMiddleware] }, async (request:
            b.type as badge_type, b.target_days, e.name as event_name, e.id as event_id
     FROM checkin_badge_achievements ba
     JOIN checkin_badges b ON ba.badge_id = b.id
-    JOIN checkin_events e ON b.event_id = e.id
+    JOIN checkin_events e ON b.event_id = e.id AND e.is_deleted = 0
     JOIN checkin_participants p ON ba.participant_id = p.id
     WHERE p.wx_user_id = ?
     ORDER BY ba.achieved_at DESC
@@ -1724,12 +2294,17 @@ app.get('/api/wx/my-badges', { preHandler: [wxAuthMiddleware] }, async (request:
   return ok(achievements);
 });
 
+app.post('/api/checkin-events/reminders/run', { preHandler: [authMiddleware, adminOnly] }, async () => {
+  const result = await runDueCheckinReminders();
+  return ok(result);
+});
+
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
 
   router.get('/:id/records', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    const { status, page = '1', limit = '20' } = request.query as any;
+    const { status, record_type, page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
 
     let sql = `
@@ -1740,6 +2315,8 @@ app.register(async function (router) {
     `;
     const params: any[] = [eventId];
     if (status) { sql += ' AND r.status = ?'; params.push(status); }
+    if (record_type === 'makeup') { sql += ' AND r.is_makeup = 1'; }
+    if (record_type === 'normal') { sql += ' AND r.is_makeup = 0'; }
     sql += ' ORDER BY r.checkin_date DESC, r.id DESC LIMIT ? OFFSET ?';
     params.push(limitNum, offset);
 
@@ -1748,6 +2325,8 @@ app.register(async function (router) {
     let countSql = 'SELECT COUNT(*) as total FROM checkin_records WHERE event_id = ?';
     const countParams: any[] = [eventId];
     if (status) { countSql += ' AND status = ?'; countParams.push(status); }
+    if (record_type === 'makeup') { countSql += ' AND is_makeup = 1'; }
+    if (record_type === 'normal') { countSql += ' AND is_makeup = 0'; }
     const total = (db.prepare(countSql).get(...countParams) as any).total;
 
     return ok({ records, total });
@@ -1773,7 +2352,7 @@ app.register(async function (router) {
 
   router.get('/:id/export', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(eventId) as any;
+    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
     if (!event) return reply.code(404).send({ success: false, error: '活动不存在' });
 
     const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(eventId) as any[];
@@ -1794,7 +2373,7 @@ app.register(async function (router) {
 
     csvRows.push([]);
     csvRows.push(['--- 打卡明细 ---']);
-    csvRows.push(['昵称', '孩子姓名', '打卡日期', '打卡内容', '状态', '审核备注']);
+    csvRows.push(['昵称', '孩子姓名', '打卡日期', '类型', '打卡内容', '状态', '审核备注']);
 
     for (const r of records) {
       const p = participants.find(p => p.id === r.participant_id);
@@ -1802,6 +2381,7 @@ app.register(async function (router) {
         p?.nickname || '',
         p?.child_name || '',
         r.checkin_date || '',
+        r.is_makeup ? '补卡' : '正常打卡',
         r.note || '',
         r.status === 'approved' ? '已通过' : r.status === 'rejected' ? '已拒绝' : '待审核',
         r.review_note || ''
@@ -1949,11 +2529,11 @@ app.register(async function (router) {
   });
 }, { prefix: '/api/checkin-events' });
 
-app.setErrorHandler((error: any, _request, reply) => {
+app.setErrorHandler((error: any, request, reply) => {
   if (error.statusCode) {
     return reply.code(error.statusCode).send({ success: false, error: error.message });
   }
-  app.log.error(error);
+  app.log.error({ url: request.url, method: request.method, error: error.message, stack: error.stack });
   reply.code(500).send({ success: false, error: '服务器内部错误' });
 });
 
@@ -1969,6 +2549,17 @@ if (process.env.NODE_ENV === 'production') {
   });
 } else {
   app.setNotFoundHandler((_request, reply) => { reply.code(404).send({ success: false, error: 'API不存在' }); });
+}
+
+declare global {
+  var __checkinReminderTimerStarted: boolean | undefined;
+}
+
+if (process.env.NODE_ENV !== 'test' && !globalThis.__checkinReminderTimerStarted) {
+  globalThis.__checkinReminderTimerStarted = true;
+  setInterval(() => {
+    runDueCheckinReminders().catch(err => app.log.error(err));
+  }, 60 * 1000);
 }
 
 export default app;

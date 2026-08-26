@@ -5,6 +5,7 @@ Page({
   data: {
     eventId: null,
     ranking: [],
+    myRank: null,
     isLoggedIn: false
   },
 
@@ -23,7 +24,16 @@ Page({
   async loadRanking() {
     try {
       const ranking = await api.getRanking(this.data.eventId);
-      this.setData({ ranking });
+      const myIndex = ranking.findIndex(item => item.is_me);
+      let myRank = null;
+      if (myIndex >= 0) {
+        const previous = myIndex > 0 ? ranking[myIndex - 1] : null;
+        myRank = {
+          ...ranking[myIndex],
+          gap_to_previous: previous ? Math.max(0, previous.checkin_days - ranking[myIndex].checkin_days) : 0
+        };
+      }
+      this.setData({ ranking, myRank });
     } catch (e) {
       console.error(e);
     }

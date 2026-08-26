@@ -1,13 +1,15 @@
 .privacy-container {
   min-height: 100vh;
-  background: #fff1f2;
+  background: #090B12;
   padding: 24rpx;
 }
 
 .privacy-content {
-  background: white;
+  background: #111522;
   border-radius: 24rpx;
   padding: 32rpx;
+  border: 2rpx solid #1F2937;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
 }
 
 .section {
@@ -17,30 +19,30 @@
 .section-title {
   font-size: 32rpx;
   font-weight: bold;
-  color: #1e293b;
+  color: #f8fafc;
   margin-bottom: 16rpx;
 }
 
 .section-text {
   font-size: 28rpx;
-  color: #64748b;
+  color: #94a3b8;
   line-height: 1.8;
   margin-bottom: 8rpx;
 }
 
 .bold {
   font-weight: bold;
-  color: #334155;
+  color: #cbd5e1;
 }
 
 .footer {
   margin-top: 48rpx;
   padding-top: 32rpx;
-  border-top: 2rpx solid #f1f5f9;
+  border-top: 2rpx solid #1F2937;
   text-align: center;
 }
 
 .footer-text {
   font-size: 24rpx;
-  color: #94a3b8;
+  color: #64748b;
 }

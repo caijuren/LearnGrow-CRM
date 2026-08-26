@@ -12,16 +12,32 @@ Page({
     checkinNote: '',
     checkinImage: '',
     checkinImageUrl: '',
+    checkinImageHash: '',
+    makeupDate: '',
     submitting: false,
+    isEditingTodayRecord: false,
+    editingRecordId: null,
+    showChildSetup: false,
+    setupChildName: '',
+    savingChildName: false,
+    showSuccessActions: false,
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false,
     isJoined: false,
     badges: [],
     achievedBadges: 0,
-    materials: []
+    materials: [],
+    feed: [],
+    reminder: {
+      is_enabled: false,
+      remind_time: '20:00',
+      template_id: null
+    },
+    savingReminder: false
   },
 
   onLoad(options) {
+    wx.showShareMenu({ withShareTicket: true });
     this.setData({ 
       eventId: parseInt(options.id),
       isLoggedIn: app.checkLogin()
@@ -62,7 +78,7 @@ Page({
         const myCheckins = await api.getMyCheckins();
         const myCheckin = myCheckins.find(c => c.event.id === this.data.eventId);
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = api.getChinaTodayStr();
 
         if (myCheckin) {
           isJoined = true;
@@ -72,7 +88,7 @@ Page({
             max_streak: myCheckin.max_streak
           };
           todayRecord = myCheckin.records.find(r => r.checkin_date === today) || null;
-          todayChecked = !!todayRecord;
+          todayChecked = !!todayRecord && (!todayRecord.status || todayRecord.status === 'approved');
           calendarDays = this.buildCalendar(myCheckin.calendar);
         } else {
           calendarDays = this.buildEmptyCalendar(event.start_date, event.end_date);
@@ -93,6 +109,21 @@ Page({
         materials = await api.getEventMaterials(this.data.eventId) || [];
       } catch (e) { console.log('资料加载失败', e); }
 
+      let feed = [];
+      try {
+        feed = (await api.getEventFeed(this.data.eventId) || []).map(item => ({
+          ...item,
+          formattedDate: this.formatFeedDate(item.created_at || item.checkin_date)
+        }));
+      } catch (e) { console.log('动态加载失败', e); }
+
+      let reminder = this.data.reminder;
+      if (app.checkLogin() && isJoined) {
+        try {
+          reminder = await api.getEventReminder(this.data.eventId) || reminder;
+        } catch (e) { console.log('提醒设置加载失败', e); }
+      }
+
       this.setData({
         event,
         myStats,
@@ -102,7 +133,9 @@ Page({
         isJoined,
         badges,
         achievedBadges,
-        materials
+        materials,
+        feed,
+        reminder
       });
     } catch (e) {
       console.error(e);
@@ -127,6 +160,11 @@ Page({
         date: d.date,
         day: date.getDate(),
         checked: d.checked,
+        status: d.status || null,
+        review_note: d.review_note || null,
+        is_makeup: !!d.is_makeup,
+        can_makeup: !!d.can_makeup,
+        missed: !!d.missed,
         isToday: api.isToday(d.date),
         inRange: true
       });
@@ -152,6 +190,11 @@ Page({
         date: dateStr,
         day: d.getDate(),
         checked: false,
+        status: null,
+        review_note: null,
+        is_makeup: false,
+        can_makeup: false,
+        missed: false,
         isToday: api.isToday(dateStr),
         inRange: true
       });
@@ -173,7 +216,136 @@ Page({
   },
 
   onNoteInput(e) {
-    this.setData({ checkinNote: e.detail.value });
+      this.setData({ checkinNote: e.detail.value });
+  },
+
+  onChildNameInput(e) {
+    this.setData({ setupChildName: e.detail.value });
+  },
+
+  async saveChildName() {
+    const childName = this.data.setupChildName.trim();
+    if (!childName) {
+      wx.showToast({ title: '请输入孩子名称', icon: 'none' });
+      return;
+    }
+    this.setData({ savingChildName: true });
+    try {
+      const updated = await api.updateProfile({ child_name: childName });
+      const newUserInfo = { ...app.globalData.userInfo, ...updated };
+      app.setLogin(app.globalData.token, newUserInfo);
+      this.setData({ showChildSetup: false, setupChildName: '', savingChildName: false });
+      wx.showToast({ title: '设置完成', icon: 'success' });
+      // 补充完孩子名后继续打卡
+      this.submitCheckin();
+    } catch (e) {
+      console.error(e);
+      this.setData({ savingChildName: false });
+    }
+  },
+
+  closeChildSetup() {
+    this.setData({ showChildSetup: false, setupChildName: '' });
+  },
+
+  preventClose() {
+    // 阻止弹窗内容点击冒泡到蒙层
+  },
+
+  selectMakeupDate(e) {
+    const { date, canMakeup } = e.currentTarget.dataset;
+    if (!canMakeup) return;
+    this.setData({ makeupDate: date });
+    setTimeout(() => {
+      wx.pageScrollTo({ selector: '.checkin-form', duration: 300 });
+    }, 80);
+  },
+
+  clearMakeupDate() {
+    this.setData({ makeupDate: '' });
+  },
+
+  scrollToCheckin() {
+    wx.pageScrollTo({ selector: '.checkin-card', duration: 300 });
+  },
+
+  async onReminderSwitch(e) {
+    if (!app.requireLogin()) return;
+    const enabled = e.detail.value;
+    if (enabled && this.data.reminder.template_id) {
+      let res = {};
+      try {
+        res = await new Promise((resolve) => {
+          wx.requestSubscribeMessage({
+            tmplIds: [this.data.reminder.template_id],
+            complete: resolve
+          });
+        });
+      } catch (err) {
+        res = { [this.data.reminder.template_id]: 'reject' };
+      }
+      const accepted = res[this.data.reminder.template_id] === 'accept';
+      if (!accepted) {
+        this.setData({ 'reminder.is_enabled': false });
+        wx.showToast({ title: '未授权订阅，未开启提醒', icon: 'none' });
+        return;
+      }
+    }
+    this.saveReminder({ is_enabled: enabled });
+  },
+
+  onReminderTimeChange(e) {
+    this.saveReminder({ remind_time: e.detail.value, is_enabled: this.data.reminder.is_enabled });
+  },
+
+  async saveReminder(patch) {
+    if (!app.requireLogin()) return;
+    const next = {
+      ...this.data.reminder,
+      ...patch
+    };
+    this.setData({ savingReminder: true, reminder: next });
+    try {
+      const saved = await api.saveEventReminder(this.data.eventId, {
+        is_enabled: next.is_enabled,
+        remind_time: next.remind_time
+      });
+      this.setData({ reminder: { ...next, ...saved } });
+      wx.showToast({ title: next.is_enabled ? '提醒已设置' : '提醒已关闭', icon: 'success' });
+    } catch (e) {
+      console.error(e);
+      this.loadData();
+    } finally {
+      this.setData({ savingReminder: false });
+    }
+  },
+
+  async toggleFeedLike(e) {
+    if (!app.requireLogin()) return;
+    const { id } = e.currentTarget.dataset;
+    const feed = this.data.feed.map(item => {
+      if (item.id !== id) return item;
+      const liked = !item.liked_by_me;
+      return {
+        ...item,
+        liked_by_me: liked,
+        like_count: Math.max(0, (item.like_count || 0) + (liked ? 1 : -1))
+      };
+    });
+    this.setData({ feed });
+    try {
+      const result = await api.toggleRecordLike(id);
+      this.setData({
+        feed: this.data.feed.map(item => item.id === id ? {
+          ...item,
+          liked_by_me: result.liked,
+          like_count: result.like_count
+        } : item)
+      });
+    } catch (err) {
+      console.error(err);
+      this.loadData();
+    }
   },
 
   async chooseImage() {
@@ -205,8 +377,39 @@ Page({
 
           wx.showLoading({ title: '上传中...' });
           const uploadRes = await api.uploadImage(tempFilePath);
-          that.setData({ checkinImageUrl: uploadRes.url });
           wx.hideLoading();
+
+          if (uploadRes.same_day_duplicate) {
+            that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '' });
+            wx.showToast({ title: '今天已上传过相同图片', icon: 'none' });
+            return;
+          }
+
+          if (uploadRes.similar_record) {
+            const dateStr = uploadRes.similar_record.checkin_date;
+            wx.showModal({
+              title: '图片重复提醒',
+              content: `检测到和 ${dateStr} 的打卡图片相同，是否继续？`,
+              confirmText: '继续',
+              cancelText: '重新选择',
+              success: (modalRes) => {
+                if (modalRes.confirm) {
+                  that.setData({
+                    checkinImageUrl: uploadRes.url,
+                    checkinImageHash: uploadRes.image_hash || ''
+                  });
+                } else {
+                  that.setData({ checkinImage: '', checkinImageUrl: '', checkinImageHash: '' });
+                }
+              }
+            });
+            return;
+          }
+
+          that.setData({
+            checkinImageUrl: uploadRes.url,
+            checkinImageHash: uploadRes.image_hash || ''
+          });
         } catch (e) {
           wx.hideLoading();
           console.error(e);
@@ -215,19 +418,72 @@ Page({
     });
   },
 
+  startEditTodayRecord() {
+    const record = this.data.todayRecord;
+    if (!record) return;
+    this.setData({
+      isEditingTodayRecord: true,
+      editingRecordId: record.id,
+      checkinNote: record.note || '',
+      checkinImageUrl: record.image_url || '',
+      checkinImageHash: record.image_hash || '',
+      checkinImage: record.image_url ? (this.data.baseUrl + record.image_url) : ''
+    });
+    wx.pageScrollTo({ selector: '.checkin-form', duration: 300 });
+  },
+
+  cancelEditTodayRecord() {
+    this.setData({
+      isEditingTodayRecord: false,
+      editingRecordId: null,
+      checkinNote: '',
+      checkinImage: '',
+      checkinImageUrl: '',
+      checkinImageHash: ''
+    });
+  },
+
   async submitCheckin() {
     if (!app.requireLogin()) return;
+
+    // 校验孩子名：缺失时弹出补充框，补充后自动继续打卡
+    const userInfo = app.globalData.userInfo || {};
+    if (!userInfo.child_name || !String(userInfo.child_name).trim()) {
+      this.setData({ showChildSetup: true, setupChildName: '' });
+      return;
+    }
+
+    if (!this.data.checkinImageUrl) {
+      wx.showToast({ title: '请上传打卡图片', icon: 'error' });
+      return;
+    }
+    const wasMakeup = !!this.data.makeupDate;
     this.setData({ submitting: true });
     try {
-      const result = await api.doCheckin({
-        event_id: this.data.eventId,
-        note: this.data.checkinNote || null,
-        image_url: this.data.checkinImageUrl || null
-      });
-
-      let toastTitle = `第${result.checkin_number}次打卡成功！`;
-      if (result.new_badges && result.new_badges.length > 0) {
-        toastTitle = `🎉 获得${result.new_badges[0].name}徽章！`;
+      let result;
+      let toastTitle;
+      if (this.data.isEditingTodayRecord) {
+        result = await api.updateCheckinRecord(this.data.editingRecordId, {
+          image_url: this.data.checkinImageUrl || null,
+          image_hash: this.data.checkinImageHash || null,
+          note: this.data.checkinNote || null
+        });
+        toastTitle = result.pending_review ? '已修改，等待老师审核' : '今日打卡已修改';
+      } else {
+        result = await api.doCheckin({
+          event_id: this.data.eventId,
+          checkin_date: this.data.makeupDate || undefined,
+          note: this.data.checkinNote || null,
+          image_url: this.data.checkinImageUrl || null,
+          image_hash: this.data.checkinImageHash || null
+        });
+        toastTitle = this.data.makeupDate ? '补卡已提交' : `第${result.checkin_number}次打卡成功！`;
+        if (result.pending_review) {
+          toastTitle = '已提交，等待老师审核';
+        }
+        if (result.new_badges && result.new_badges.length > 0) {
+          toastTitle = `🎉 获得${result.new_badges[0].name}徽章！`;
+        }
       }
 
       wx.showToast({ 
@@ -235,13 +491,225 @@ Page({
         icon: 'success',
         duration: 2500
       });
-      this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '' });
+      this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '', checkinImageHash: '', makeupDate: '', isEditingTodayRecord: false, editingRecordId: null });
       this.loadData();
+      if (!this.data.isEditingTodayRecord && !result.pending_review && !wasMakeup) {
+        setTimeout(() => this.showSharePrompt(), 600);
+      }
     } catch (e) {
       console.error(e);
     } finally {
       this.setData({ submitting: false });
     }
+  },
+
+  showSharePrompt() {
+    this.setData({ showSuccessActions: true });
+  },
+
+  closeSuccessActions() {
+    this.setData({ showSuccessActions: false });
+  },
+
+  onCreatePoster() {
+    this.setData({ showSuccessActions: false });
+    this.createPoster();
+  },
+
+  createPoster() {
+    const event = this.data.event || {};
+    const stats = this.data.myStats || {};
+    const user = app.globalData.userInfo || {};
+    const ctx = wx.createCanvasContext('checkinPoster', this);
+    const width = 640;
+    const height = 1100;
+    const today = api.getChinaTodayStr();
+    const nickname = user.nickname || '我';
+    const checkinDays = stats.checkin_days || 0;
+    const streakDays = stats.current_streak || 0;
+
+    // 背景：深空渐变
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, '#090B12');
+    bgGradient.addColorStop(0.45, '#111522');
+    bgGradient.addColorStop(1, '#1a0b1a');
+    ctx.setFillStyle(bgGradient);
+    ctx.fillRect(0, 0, width, height);
+
+    // 装饰光斑
+    this._drawGlow(ctx, 520, 160, 240, 'rgba(244, 63, 94, 0.22)');
+    this._drawGlow(ctx, 120, 420, 280, 'rgba(139, 92, 246, 0.18)');
+    this._drawGlow(ctx, 480, 760, 200, 'rgba(244, 63, 94, 0.14)');
+
+    // 顶部细线装饰
+    ctx.setStrokeStyle('rgba(244, 63, 94, 0.6)');
+    ctx.setLineWidth(3);
+    ctx.beginPath();
+    ctx.moveTo(60, 84);
+    ctx.lineTo(180, 84);
+    ctx.stroke();
+
+    ctx.setFillStyle('rgba(255, 255, 255, 0.55)');
+    ctx.setFontSize(24);
+    ctx.setTextAlign('left');
+    ctx.fillText(today, 60, 132);
+
+    // 活动名称
+    ctx.setFillStyle('#ffffff');
+    ctx.setFontSize(48);
+    ctx.setTextAlign('left');
+    this.drawWrappedText(ctx, event.name || '学习打卡', 60, 196, 520, 64, 2);
+
+    // 核心数据卡片背景
+    this._drawRoundedRect(ctx, 48, 320, width - 96, 420, 28, 'rgba(17, 21, 34, 0.72)');
+    ctx.setStrokeStyle('rgba(255, 255, 255, 0.08)');
+    ctx.setLineWidth(2);
+    ctx.stroke();
+
+    // 累计打卡大数字
+    const numGradient = ctx.createLinearGradient(0, 360, 0, 520);
+    numGradient.addColorStop(0, '#F43F7A');
+    numGradient.addColorStop(1, '#ec4899');
+    ctx.setFillStyle(numGradient);
+    ctx.setTextAlign('center');
+    ctx.setFontSize(172);
+    ctx.fillText(String(checkinDays), width / 2, 510);
+
+    ctx.setFillStyle('rgba(255, 255, 255, 0.7)');
+    ctx.setFontSize(30);
+    ctx.fillText('累计打卡天数', width / 2, 564);
+
+    // 分隔线
+    ctx.setStrokeStyle('rgba(255, 255, 255, 0.12)');
+    ctx.setLineWidth(2);
+    ctx.beginPath();
+    ctx.moveTo(80, 610);
+    ctx.lineTo(width - 80, 610);
+    ctx.stroke();
+
+    // 连续打卡
+    ctx.setFillStyle('#F59E0B');
+    ctx.setFontSize(64);
+    ctx.fillText(String(streakDays), width / 2, 692);
+
+    ctx.setFillStyle('rgba(255, 255, 255, 0.7)');
+    ctx.setFontSize(26);
+    ctx.fillText('当前连续打卡', width / 2, 736);
+
+    // 进度条
+    const totalDays = event.total_days || 1;
+    const progress = Math.min(checkinDays / totalDays, 1);
+    const barY = 780;
+    const barW = width - 136;
+    const barX = 68;
+    ctx.setFillStyle('rgba(255, 255, 255, 0.12)');
+    this._drawRoundedRect(ctx, barX, barY, barW, 18, 9, 'rgba(255, 255, 255, 0.12)');
+    if (progress > 0) {
+      const progGradient = ctx.createLinearGradient(barX, 0, barX + barW * progress, 0);
+      progGradient.addColorStop(0, '#F43F7A');
+      progGradient.addColorStop(1, '#8B5CF6');
+      this._drawRoundedRect(ctx, barX, barY, barW * progress, 18, 9, progGradient);
+    }
+    ctx.setFillStyle('rgba(255, 255, 255, 0.65)');
+    ctx.setFontSize(22);
+    ctx.setTextAlign('right');
+    ctx.fillText(`${checkinDays}/${totalDays} 天`, width - 68, barY + 46);
+
+    // 鼓励语
+    ctx.setTextAlign('center');
+    ctx.setFillStyle('#ffffff');
+    ctx.setFontSize(34);
+    ctx.fillText(`${nickname} 正在坚持学习`, width / 2, 868);
+
+    ctx.setFillStyle('rgba(255, 255, 255, 0.6)');
+    ctx.setFontSize(26);
+    const slogan = event.required_text || '每天一点进步，看得见的成长';
+    this.drawWrappedText(ctx, slogan, width / 2, 914, 520, 40, 2);
+
+    // 底部品牌区
+    const footerY = 1010;
+    ctx.setStrokeStyle('rgba(255, 255, 255, 0.1)');
+    ctx.beginPath();
+    ctx.moveTo(60, footerY);
+    ctx.lineTo(width - 60, footerY);
+    ctx.stroke();
+
+    ctx.setTextAlign('left');
+    ctx.setFillStyle('#ffffff');
+    ctx.setFontSize(32);
+    ctx.fillText('源来是糖', 60, 1064);
+
+    ctx.setFillStyle('rgba(255, 255, 255, 0.55)');
+    ctx.setFontSize(22);
+    ctx.fillText('长按识别小程序，一起打卡', 60, 1100);
+
+    // 小程序码占位框
+    ctx.setStrokeStyle('rgba(255, 255, 255, 0.2)');
+    ctx.setLineWidth(2);
+    ctx.strokeRect(width - 132, 1032, 80, 80);
+    ctx.setFillStyle('rgba(255, 255, 255, 0.9)');
+    ctx.setFontSize(16);
+    ctx.setTextAlign('center');
+    ctx.fillText('扫码', width - 92, 1078);
+
+    ctx.draw(false, () => {
+      wx.canvasToTempFilePath({
+        canvasId: 'checkinPoster',
+        width,
+        height,
+        destWidth: width * 2,
+        destHeight: height * 2,
+        success: (res) => {
+          wx.saveImageToPhotosAlbum({
+            filePath: res.tempFilePath,
+            success: () => wx.showToast({ title: '海报已保存', icon: 'success' }),
+            fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
+          });
+        },
+        fail: () => wx.showToast({ title: '海报生成失败', icon: 'none' })
+      }, this);
+    });
+  },
+
+  _drawGlow(ctx, x, y, r, color) {
+    const glow = ctx.createCircularGradient(x, y, 0, x, y, r);
+    glow.addColorStop(0, color);
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.setFillStyle(glow);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  _drawRoundedRect(ctx, x, y, w, h, r, fill) {
+    ctx.setFillStyle(fill);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
+    const chars = String(text || '').split('');
+    let line = '';
+    let lines = 0;
+    for (let i = 0; i < chars.length; i++) {
+      const testLine = line + chars[i];
+      if (ctx.measureText(testLine).width > maxWidth && line) {
+        lines++;
+        ctx.fillText(lines >= maxLines ? `${line.slice(0, Math.max(0, line.length - 1))}...` : line, x, y);
+        if (lines >= maxLines) return;
+        line = chars[i];
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    if (line && lines < maxLines) ctx.fillText(line, x, y);
   },
 
   openMaterial(e) {
@@ -283,5 +751,35 @@ Page({
 
   goToLogin() {
     wx.navigateTo({ url: '/pages/login/login' });
+  },
+
+  formatFeedDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) return dateStr;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diff = Math.floor((target - today) / 86400000);
+
+    const pad = n => n.toString().padStart(2, '0');
+    if (diff === 0) return `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    if (diff === -1) return `昨天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  },
+
+  previewFeedImage(e) {
+    const url = e.currentTarget.dataset.url;
+    if (!url) return;
+    wx.previewImage({ urls: [url], current: url });
+  },
+
+  onShareAppMessage() {
+    const event = this.data.event;
+    return {
+      title: event ? `我正在坚持「${event.name}」打卡` : '一起来打卡',
+      path: `/pages/event-detail/event-detail?id=${this.data.eventId}`,
+    };
   }
 });

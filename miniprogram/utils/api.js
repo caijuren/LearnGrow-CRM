@@ -105,12 +105,44 @@ function doCheckin(data) {
   });
 }
 
+function updateCheckinRecord(recordId, data) {
+  return request({
+    url: `/api/wx/checkin-records/${recordId}`,
+    method: 'PUT',
+    data
+  });
+}
+
 function getMyCheckins() {
   return request({ url: '/api/wx/my-checkins' });
 }
 
 function getRanking(eventId) {
   return request({ url: `/api/wx/checkin-events/${eventId}/ranking` });
+}
+
+function getEventFeed(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/feed` });
+}
+
+function getEventReminder(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/reminder` });
+}
+
+function saveEventReminder(eventId, data) {
+  return request({
+    url: `/api/wx/checkin-events/${eventId}/reminder`,
+    method: 'POST',
+    data
+  });
+}
+
+function toggleRecordLike(recordId) {
+  return request({
+    url: `/api/wx/checkin-records/${recordId}/like`,
+    method: 'POST',
+    data: {}
+  });
 }
 
 function getEventMaterials(eventId) {
@@ -135,8 +167,13 @@ function getDayOfWeek(dateStr) {
   return days[new Date(dateStr).getDay()];
 }
 
+function getChinaTodayStr() {
+  // 以东八区（北京时间）为准，避免 00:00-08:00 之间 UTC 与本地日期错位
+  return new Date(Date.now() + 8 * 3600 * 1000).toISOString().split('T')[0];
+}
+
 function isToday(dateStr) {
-  return dateStr === new Date().toISOString().split('T')[0];
+  return dateStr === getChinaTodayStr();
 }
 
 function getDaysLeft(endDate) {
@@ -154,13 +191,19 @@ module.exports = {
   getEvents,
   joinEvent,
   doCheckin,
+  updateCheckinRecord,
   getMyCheckins,
   getRanking,
+  getEventFeed,
+  getEventReminder,
+  saveEventReminder,
+  toggleRecordLike,
   getEventMaterials,
   getEventBadges,
   getMyBadges,
   formatDate,
   getDayOfWeek,
   isToday,
+  getChinaTodayStr,
   getDaysLeft
 };

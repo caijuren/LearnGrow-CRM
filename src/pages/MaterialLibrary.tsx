@@ -5,6 +5,7 @@ import {
   FolderOpen, Upload, Search, FileText, FileImage, FileVideo, File, Download, Trash2,
   X, Tag, Folder, Plus, Filter, FileArchive
 } from 'lucide-react';
+import Modal from '@/components/Modal';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B';
@@ -137,76 +138,144 @@ export default function MaterialLibrary() {
   }, {} as Record<string, number>);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="page-shell">
+      <div className="page-inner">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <FolderOpen className="w-7 h-7 text-indigo-600" />
+          <h1
+            className="flex items-center gap-2"
+            style={{
+              fontSize: '1.375rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3,
+            }}
+          >
+            <FolderOpen size={20} strokeWidth={1.8} style={{ color: 'var(--color-primary)' }} />
             资料库
           </h1>
-          <p className="text-slate-500 mt-1">管理销售资料、内部文档、商品电子内容、规划路径等</p>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '4px',
+              marginLeft: '28px',
+            }}
+          >
+            管理销售资料、内部文档、商品电子内容、规划路径等
+          </p>
         </div>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium shadow-sm"
+          className="btn-primary"
         >
-          <Upload className="w-5 h-5" />
+          <Upload size={15} strokeWidth={1.8} />
           上传资料
         </button>
       </div>
 
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat.key}
-            onClick={() => setMaterialCategory(cat.key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              materialCategory === cat.key
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-            }`}
-          >
-            {cat.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-              materialCategory === cat.key ? 'bg-indigo-500' : 'bg-slate-100 text-slate-500'
-            }`}>
-              {materials.length > 0 ? (cat.key === 'all' ? materials.length : materials.filter(m => m.category === cat.key).length) : 0}
-            </span>
-          </button>
-        ))}
+      {/* 分类 Tab */}
+      <div className="flex items-center gap-0.5 flex-wrap mb-4">
+        {CATEGORIES.map(cat => {
+          const isActive = materialCategory === cat.key;
+          const count = materials.length > 0
+            ? (cat.key === 'all' ? materials.length : materials.filter(m => m.category === cat.key).length)
+            : 0;
+          return (
+            <button
+              key={cat.key}
+              onClick={() => setMaterialCategory(cat.key)}
+              className="transition-all flex items-center gap-1.5"
+              style={{
+                padding: '5px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '0.75rem',
+                fontWeight: isActive ? 600 : 500,
+                backgroundColor: isActive ? 'var(--color-primary-soft)' : 'transparent',
+                color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {cat.label}
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  padding: '1px 6px',
+                  borderRadius: '9999px',
+                  backgroundColor: isActive ? 'rgba(255,255,255,0.6)' : 'var(--color-bg-subtle)',
+                  color: isActive ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
+                  fontWeight: 500,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mb-5">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            placeholder="搜索文件名、描述..."
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-          />
-        </div>
+      {/* 搜索 */}
+      <div className="relative max-w-md mb-5">
+        <Search
+          size={14}
+          strokeWidth={1.8}
+          style={{
+            position: 'absolute',
+            left: '0.875rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--color-text-tertiary)',
+          }}
+        />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          placeholder="搜索文件名、描述..."
+          className="input pl-9"
+        />
       </div>
 
       {loading && materials.length === 0 ? (
-        <div className="text-center py-20 text-slate-400">加载中...</div>
+        <div
+          className="text-center py-16"
+          style={{ color: 'var(--color-text-tertiary)', fontSize: '0.8125rem' }}
+        >
+          加载中...
+        </div>
       ) : materials.length === 0 ? (
-        <div className="text-center py-20">
-          <FolderOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500 mb-4">暂无资料</p>
+        <div
+          className="py-16 flex flex-col items-center justify-center"
+          style={{
+            backgroundColor: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border-default)',
+            borderRadius: 'var(--radius-md)',
+          }}
+        >
+          <FolderOpen size={40} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)', marginBottom: '12px' }} />
+          <p
+            style={{
+              fontSize: '0.875rem',
+              color: 'var(--color-text-secondary)',
+              marginBottom: '12px',
+            }}
+          >
+            暂无资料
+          </p>
           <button
             onClick={() => setShowUpload(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+            className="btn-primary"
           >
-            <Plus className="w-4 h-4" />
+            <Plus size={14} strokeWidth={2} />
             上传第一个资料
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {materials.map(m => (
-            <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow group relative">
+            <div key={m.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:border-slate-300 shadow-card transition-colors group relative">
               <div className="flex items-start gap-3 mb-3">
                 <div className={`flex-shrink-0 ${getIconColor(m.mime_type, m.original_name)}`}>
                   {getFileIcon(m.mime_type, m.original_name)}
@@ -222,11 +291,11 @@ export default function MaterialLibrary() {
               </div>
 
               <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${MATERIAL_CATEGORY_COLORS[m.category]}`}>
+                <span className={`badge border ${MATERIAL_CATEGORY_COLORS[m.category]}`}>
                   {MATERIAL_CATEGORY_LABELS[m.category]}
                 </span>
                 {m.product_name && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[120px]">
+                  <span className="badge bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[120px]">
                     {m.product_name}
                   </span>
                 )}
@@ -253,7 +322,7 @@ export default function MaterialLibrary() {
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleDownload(m)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-brand-700 hover:bg-brand-50 rounded-lg transition-colors"
                     title="下载"
                   >
                     <Download className="w-4 h-4" />
@@ -273,22 +342,27 @@ export default function MaterialLibrary() {
       )}
 
       {showUpload && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowUpload(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-lg font-semibold text-slate-800">上传资料</h2>
-              <button onClick={() => setShowUpload(false)} className="p-1 hover:bg-slate-100 rounded-lg">
-                <X className="w-5 h-5 text-slate-400" />
+        <Modal
+          isOpen={showUpload}
+          onClose={() => setShowUpload(false)}
+          title="上传资料"
+          size="lg"
+          footer={
+            <>
+              <button onClick={() => setShowUpload(false)} className="btn-secondary flex-1">取消</button>
+              <button onClick={handleUpload} disabled={!selectedFile || uploading} className="btn-primary flex-1">
+                {uploading ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />上传中...</> : <><Upload className="w-4 h-4" />上传</>}
               </button>
-            </div>
-
-            <div className="p-5 space-y-4">
+            </>
+          }
+        >
+            <div className="space-y-4">
               <div
                 onDrop={handleDrop}
                 onDragOver={e => e.preventDefault()}
                 onClick={() => fileInputRef.current?.click()}
                 className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                  selectedFile ? 'border-indigo-300 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
+                  selectedFile ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50'
                 }`}
               >
                 <input ref={fileInputRef} type="file" onChange={handleFileSelect} className="hidden" />
@@ -340,7 +414,7 @@ export default function MaterialLibrary() {
                   <select
                     value={uploadProductId || ''}
                     onChange={e => setUploadProductId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    className="select w-full"
                   >
                     <option value="">不关联</option>
                     {products.map(p => (
@@ -361,7 +435,7 @@ export default function MaterialLibrary() {
                       onClick={() => toggleTag(tag)}
                       className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
                         selectedTags.includes(tag)
-                          ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                          ? 'bg-brand-50 text-brand-700 border-brand-200'
                           : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                       }`}
                     >
@@ -376,11 +450,11 @@ export default function MaterialLibrary() {
                     onChange={e => setCustomTag(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addCustomTag())}
                     placeholder="自定义标签"
-                    className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="input flex-1 py-1.5"
                   />
                   <button
                     onClick={addCustomTag}
-                    className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200"
+                    className="btn-secondary btn-sm"
                   >
                     添加
                   </button>
@@ -388,7 +462,7 @@ export default function MaterialLibrary() {
                 {selectedTags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {selectedTags.map((tag, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-xs">
+                      <span key={i} className="badge bg-brand-50 text-brand-700">
                         {tag}
                         <button onClick={() => toggleTag(tag)} className="hover:text-indigo-800">
                           <X className="w-3 h-3" />
@@ -406,56 +480,28 @@ export default function MaterialLibrary() {
                   onChange={e => setUploadDesc(e.target.value)}
                   placeholder="简要描述资料内容..."
                   rows={2}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+                  className="input resize-none"
                 />
               </div>
             </div>
-
-            <div className="flex gap-3 p-5 border-t border-slate-100">
-              <button
-                onClick={() => setShowUpload(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleUpload}
-                disabled={!selectedFile || uploading}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {uploading ? (
-                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />上传中...</>
-                ) : (
-                  <><Upload className="w-4 h-4" />上传</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
-      {deleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDeleteConfirm(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">确认删除</h3>
-            <p className="text-slate-500 text-sm mb-5">删除后资料文件将被移除，无法恢复。</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        title="确认删除资料"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setDeleteConfirm(null)} className="btn-secondary flex-1">取消</button>
+            <button onClick={() => deleteConfirm !== null && handleDelete(deleteConfirm)} className="btn-danger flex-1 bg-red-600 text-white hover:bg-red-700">删除</button>
+          </>
+        }
+      >
+        <p className="text-slate-600 text-sm">删除后资料文件将被移除，无法恢复。</p>
+      </Modal>
+      </div>
     </div>
   );
 }

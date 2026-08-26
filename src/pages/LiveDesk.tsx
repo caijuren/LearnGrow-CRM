@@ -84,59 +84,199 @@ export default function LiveDesk() {
     'from-amber-400 to-orange-500',
     'from-orange-400 to-red-500',
     'from-yellow-400 to-amber-500',
-    'from-rose-400 to-orange-500',
-    'from-red-400 to-rose-500',
+    'from-brand-400 to-orange-500',
+    'from-red-400 to-brand-500',
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50/50 to-orange-50/30 p-4 md:p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-600 via-orange-500 to-red-500 bg-clip-text text-transparent flex items-center justify-center gap-2">
-            <Mic2 className="w-8 h-8 text-orange-500" />
+    <div className="page-shell page-enter">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h1
+            className="flex items-center gap-2"
+            style={{
+              fontSize: '1.375rem',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3,
+            }}
+          >
+            <span
+              className="flex items-center justify-center"
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgb(249 115 22 / 0.1)',
+                color: 'rgb(234 88 12)',
+              }}
+            >
+              <Mic2 size={15} strokeWidth={1.8} />
+            </span>
             直播工作台
           </h1>
-          <p className="text-base text-slate-500 mt-2">直播时快速搜人，看完就记得</p>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--color-text-tertiary)',
+              marginTop: '4px',
+              marginLeft: '36px',
+            }}
+          >
+            直播时快速搜人，看完就记得
+          </p>
         </div>
 
+        {/* 搜索框 */}
         <div className="relative mb-6">
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl blur-lg opacity-30" />
-          <div className="relative">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-amber-500" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              className="w-full pl-14 pr-5 py-4 text-lg md:text-xl rounded-2xl border-2 border-amber-200 bg-white shadow-lg shadow-amber-100/50 focus:border-amber-400 focus:ring-4 focus:ring-amber-100 outline-none transition-all"
-              placeholder="输入微信名/抖音名/备注，快速找到客户"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-              >
-                <X className="w-4 h-4 text-slate-500" />
-              </button>
-            )}
-          </div>
+          <Search
+            size={16}
+            strokeWidth={1.8}
+            style={{
+              position: 'absolute',
+              left: '1rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--color-text-tertiary)',
+              zIndex: 1,
+            }}
+          />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="输入微信名/抖音名/备注，快速找到客户"
+            className="w-full"
+            style={{
+              paddingLeft: '2.75rem',
+              paddingRight: searchQuery ? '3rem' : '1rem',
+              paddingTop: '0.75rem',
+              paddingBottom: '0.75rem',
+              fontSize: '0.9375rem',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-bg-surface)',
+              color: 'var(--color-text-primary)',
+              outline: 'none',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = 'var(--color-primary)';
+              e.currentTarget.style.boxShadow = '0 0 0 3px var(--color-primary-soft)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--color-border-default)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); searchInputRef.current?.focus(); }}
+              className="absolute flex items-center justify-center transition-colors"
+              style={{
+                right: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--color-text-tertiary)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)';
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = 'var(--color-text-tertiary)';
+              }}
+            >
+              <X size={14} strokeWidth={1.8} />
+            </button>
+          )}
         </div>
 
         {!searchQuery ? (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center mx-auto mb-5 border-2 border-amber-200/50">
-              <Search className="w-12 h-12 text-amber-400" />
+          <div
+            className="py-16 flex flex-col items-center justify-center"
+            style={{
+              backgroundColor: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            <div
+              className="flex items-center justify-center mb-4"
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgb(249 115 22 / 0.08)',
+                color: 'rgb(245 158 11)',
+              }}
+            >
+              <Search size={24} strokeWidth={1.8} />
             </div>
-            <p className="text-lg font-semibold text-slate-600 mb-2">输入客户信息开始搜索</p>
-            <p className="text-sm text-slate-400">支持微信名、抖音名、备注模糊搜索</p>
+            <p
+              style={{
+                fontSize: '0.9375rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                marginBottom: '4px',
+              }}
+            >
+              输入客户信息开始搜索
+            </p>
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              支持微信名、抖音名、备注模糊搜索
+            </p>
           </div>
         ) : liveSearchResults.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center mx-auto mb-5 border-2 border-slate-200/50">
-              <Search className="w-12 h-12 text-slate-300" />
+          <div
+            className="py-16 flex flex-col items-center justify-center"
+            style={{
+              backgroundColor: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-default)',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
+            <div
+              className="flex items-center justify-center mb-4"
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-bg-subtle)',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              <Search size={24} strokeWidth={1.8} />
             </div>
-            <p className="text-lg font-semibold text-slate-500 mb-2">没找到匹配的客户</p>
-            <p className="text-sm text-slate-400">换个关键词试试</p>
+            <p
+              style={{
+                fontSize: '0.9375rem',
+                fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                marginBottom: '4px',
+              }}
+            >
+              没找到匹配的客户
+            </p>
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              换个关键词试试
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -146,10 +286,10 @@ export default function LiveDesk() {
               return (
                 <div
                   key={customer.id}
-                  className={`bg-white rounded-2xl shadow-md border-2 overflow-hidden transition-all ${
+                    className={`bg-white rounded-lg shadow-card border overflow-hidden transition-all ${
                     isVip
-                      ? 'border-amber-300 bg-gradient-to-br from-amber-50/30 to-white'
-                      : 'border-slate-100'
+                      ? 'border-amber-300 bg-amber-50/30'
+                      : 'border-slate-200'
                   }`}
                 >
                   <div className="p-5">

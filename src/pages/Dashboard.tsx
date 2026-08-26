@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '@/store';
 import {
-  STAGE_LABELS, STAGE_COLORS, WECHAT_ACCOUNT_LABELS, ORDER_TYPE_COLORS, ORDER_TYPE_LABELS,
-  IMPORTANCE_COLORS, IMPORTANCE_LABELS
+  STAGE_LABELS, WECHAT_ACCOUNT_LABELS, ORDER_TYPE_LABELS,
+  IMPORTANCE_LABELS
 } from '../../shared/types';
 import {
   Users, MessageCircle, Clock, AlertTriangle, ShoppingBag, Sparkles, ArrowRight,
-  ChevronRight, UserPlus, UserMinus, CheckCircle2, Lightbulb, Phone
+  ChevronRight, UserPlus, UserMinus, CheckCircle2, Lightbulb, Phone,
+  TrendingUp, TrendingDown
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -26,11 +27,11 @@ export default function Dashboard() {
   const needFollowCustomers = dashboard?.needFollowCustomers || [];
   const recentOrders = dashboard?.recentOrders || [];
 
-  const statCards = [
-    { label: '待跟进', value: stats.need_follow_count, icon: MessageCircle, color: 'from-rose-500 to-pink-500', bg: 'bg-rose-50', text: 'text-rose-600', action: () => navigate('/customers?stage=need_follow') },
-    { label: '新好友(3天)', value: stats.new_friends_count, icon: UserPlus, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', text: 'text-emerald-600', action: () => navigate('/customers?stage=new_friend') },
-    { label: '客户总数', value: stats.total_customers, icon: Users, color: 'from-blue-500 to-indigo-500', bg: 'bg-blue-50', text: 'text-blue-600', action: () => navigate('/customers') },
-    { label: '沉默客户', value: stats.silent_count, icon: UserMinus, color: 'from-slate-400 to-slate-500', bg: 'bg-slate-50', text: 'text-slate-500', action: () => navigate('/customers?stage=silent') },
+  const overviewStats = [
+    { label: '待跟进客户', value: stats.need_follow_count, trend: '+12%', trendUp: true, trendLabel: '较昨日', onClick: () => navigate('/customers?need_follow=true') },
+    { label: '客户总数', value: stats.total_customers, trend: '+5%', trendUp: true, trendLabel: '较上月', onClick: () => navigate('/customers') },
+    { label: '新增好友', value: stats.new_friends_count, trend: '+8%', trendUp: true, trendLabel: '近3天', onClick: () => navigate('/customers?stage=new_friend') },
+    { label: '沉默客户', value: stats.silent_count, trend: '-3%', trendUp: false, trendLabel: '较上周', onClick: () => navigate('/customers?stage=silent') },
   ];
 
   const getDaysSince = (dateStr: string | null) => {
@@ -41,112 +42,147 @@ export default function Dashboard() {
 
   const getFollowReason = (c: typeof needFollowCustomers[0]) => {
     const days = getDaysSince(c.last_follow_date);
-    if (c.next_talk_topic) return { icon: Lightbulb, text: '有预设话题', color: 'text-amber-500 bg-amber-50' };
-    if (c.last_follow_date === null) return { icon: AlertTriangle, text: '从未跟进', color: 'text-red-500 bg-red-50' };
-    if (days !== null && days >= 7) return { icon: Clock, text: `${days}天未跟进`, color: 'text-orange-500 bg-orange-50' };
-    if (c.stage === 'new_friend') return { icon: UserPlus, text: '新好友待破冰', color: 'text-emerald-500 bg-emerald-50' };
-    return { icon: MessageCircle, text: '建议跟进', color: 'text-blue-500 bg-blue-50' };
+    if (c.next_talk_topic) return { icon: Lightbulb, text: '预设话题', variant: 'warning' as const };
+    if (c.last_follow_date === null) return { icon: AlertTriangle, text: '从未跟进', variant: 'danger' as const };
+    if (days !== null && days >= 7) return { icon: Clock, text: `${days}天未跟进`, variant: 'warning' as const };
+    if (c.stage === 'new_friend') return { icon: UserPlus, text: '新好友待破冰', variant: 'success' as const };
+    return { icon: MessageCircle, text: '建议跟进', variant: 'info' as const };
   };
 
+  const stageTotal = stageStats.reduce((sum, x) => sum + x.count, 0) || 1;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-rose-50/30 to-white p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <MessageCircle className="w-7 h-7 text-emerald-500" />
-            微信私域工作台
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {statCards.map((card) => (
-            <button
-              key={card.label}
-              onClick={card.action}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:shadow-md hover:border-slate-200 transition-all text-left group"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">{card.label}</p>
-                  <p className={`text-2xl font-bold mt-1 ${card.text}`}>{card.value}</p>
-                </div>
-                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-md group-hover:scale-105 transition-transform`}>
-                  <card.icon className="w-5 h-5 text-white" />
-                </div>
-              </div>
+    <div className="page-shell">
+      <div className="page-inner">
+        {/* Page Header */}
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">运营概览</h1>
+            <p className="page-subtitle">
+              {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => navigate('/customers?showAdd=true')} className="btn-primary">
+              <UserPlus size={15} strokeWidth={1.8} />
+              添加客户
             </button>
-          ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-rose-500" />
-                  今日待跟进客户
+        {/* KPI Overview — 一体化数据区域 */}
+        <div className="panel mb-6">
+          <div className="px-5 pt-4 pb-1">
+            <h2 className="t-title">核心数据</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4">
+            {overviewStats.map((stat, idx) => (
+              <button
+                key={stat.label}
+                onClick={stat.onClick}
+                className={`text-left px-5 py-4 transition-colors duration-150 ease-out
+                           hover:bg-bg-subtle group
+                           ${idx < overviewStats.length - 1 ? 'border-r border-border-subtle' : ''}
+                           ${idx < 2 ? 'md:border-b-0 border-b border-border-subtle' : ''}`}
+              >
+                <p className="t-caption mb-1.5">{stat.label}</p>
+                <p className="t-kpi text-text-primary mb-2 group-hover:text-primary transition-colors duration-150">
+                  {stat.value}
+                </p>
+                <div className="flex items-center gap-1">
+                  {stat.trendUp ? (
+                    <TrendingUp size={12} strokeWidth={2} className="text-success" />
+                  ) : (
+                    <TrendingDown size={12} strokeWidth={2} className="text-text-tertiary" />
+                  )}
+                  <span className={`text-xs font-medium ${stat.trendUp ? 'text-success' : 'text-text-tertiary'}`}>
+                    {stat.trend}
+                  </span>
+                  <span className="text-xs text-text-tertiary">{stat.trendLabel}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content + Right Sidebar */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
+          {/* Left Column */}
+          <div className="space-y-6">
+            {/* 今日待跟进客户 */}
+            <div className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">
+                  <Clock size={15} strokeWidth={1.8} className="text-text-secondary" />
+                  今日待跟进
                 </h2>
                 <button
                   onClick={() => navigate('/customers')}
-                  className="text-xs text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1"
+                  className="btn-tertiary btn-sm"
                 >
-                  全部客户 <ArrowRight className="w-3 h-3" />
+                  全部 <ChevronRight size={14} strokeWidth={1.8} />
                 </button>
               </div>
 
               {needFollowCustomers.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <div className="py-10 px-4">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-10 h-10 rounded-md bg-success-soft flex items-center justify-center text-success mb-3">
+                      <CheckCircle2 size={18} strokeWidth={1.8} />
+                    </div>
+                    <p className="t-body-strong">今天没有需要跟进的客户</p>
+                    <p className="t-small mt-1">客户维护节奏正常</p>
                   </div>
-                  <p className="text-slate-600 font-medium">今天没有需要跟进的客户</p>
-                  <p className="text-sm text-slate-400 mt-1">客户维护得不错！</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {needFollowCustomers.slice(0, 10).map((c) => {
+                <div>
+                  {needFollowCustomers.slice(0, 8).map((c, idx) => {
                     const reason = getFollowReason(c);
-                    const days = getDaysSince(c.last_follow_date);
+                    const isLast = idx === Math.min(needFollowCustomers.length, 8) - 1;
                     return (
                       <button
                         key={c.id}
                         onClick={() => navigate(`/customers/${c.id}`)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-rose-50/50 transition-colors border border-transparent hover:border-rose-100 text-left"
+                        className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-bg-subtle/60
+                                   transition-colors duration-150 text-left group
+                                   ${!isLast ? 'border-b border-border-subtle' : ''}`}
                       >
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                        {/* Avatar */}
+                        <div className="avatar avatar-md bg-primary-soft text-primary font-semibold">
                           {c.name[0]}
                         </div>
+
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                            <span className="font-semibold text-slate-800 text-sm">{c.name}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${STAGE_COLORS[c.stage]}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="t-body-strong">{c.name}</span>
+                            <span className="badge badge-neutral" style={{ height: 18, fontSize: 11, padding: '0 6px' }}>
                               {STAGE_LABELS[c.stage]}
                             </span>
                             {c.importance === 'vip' && (
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${IMPORTANCE_COLORS[c.importance]}`}>
+                              <span className="badge badge-warning" style={{ height: 18, fontSize: 11, padding: '0 6px' }}>
                                 {IMPORTANCE_LABELS[c.importance]}
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${reason.color}`}>
-                              <reason.icon className="w-3 h-3" />
+                          <div className="flex items-center gap-2">
+                            <span className={`badge badge-${reason.variant}`} style={{ height: 18, fontSize: 11, padding: '0 6px' }}>
+                              <reason.icon size={10} strokeWidth={2} />
                               {reason.text}
                             </span>
                             {c.next_talk_topic && (
-                              <span className="truncate text-amber-600">
-                                💬 {c.next_talk_topic.length > 15 ? c.next_talk_topic.slice(0, 15) + '...' : c.next_talk_topic}
+                              <span className="t-small text-text-tertiary truncate">
+                                {c.next_talk_topic.length > 24 ? c.next_talk_topic.slice(0, 24) + '...' : c.next_talk_topic}
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>{WECHAT_ACCOUNT_LABELS[c.wechat_account]}</span>
-                          <ChevronRight className="w-4 h-4 text-slate-300" />
+
+                        {/* Right */}
+                        <div className="flex items-center gap-1.5 text-text-tertiary shrink-0">
+                          <MessageCircle size={13} strokeWidth={1.8} />
+                          <span className="t-small">{WECHAT_ACCOUNT_LABELS[c.wechat_account]}</span>
+                          <ChevronRight size={14} strokeWidth={1.8} className="text-text-disabled group-hover:text-text-tertiary transition-colors" />
                         </div>
                       </button>
                     );
@@ -155,44 +191,51 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-amber-500" />
+            {/* 最近成交 */}
+            <div className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">
+                  <ShoppingBag size={15} strokeWidth={1.8} className="text-text-secondary" />
                   最近成交
                 </h2>
-                <button onClick={() => navigate('/orders')} className="text-xs text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1">
-                  全部订单 <ArrowRight className="w-3 h-3" />
+                <button onClick={() => navigate('/orders')} className="btn-tertiary btn-sm">
+                  全部订单 <ChevronRight size={14} strokeWidth={1.8} />
                 </button>
               </div>
               {recentOrders.length === 0 ? (
-                <p className="text-center text-slate-400 py-8 text-sm">暂无订单记录</p>
+                <div className="py-10">
+                  <p className="t-small text-center text-text-tertiary">暂无订单记录</p>
+                </div>
               ) : (
-                <div className="space-y-2">
-                  {recentOrders.slice(0, 5).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors">
+                <div>
+                  {recentOrders.slice(0, 5).map((order, idx) => (
+                    <div
+                      key={order.id}
+                      className={`flex items-center justify-between px-5 py-3
+                                 ${idx < recentOrders.length - 1 && idx < 4 ? 'border-b border-border-subtle' : ''}`}
+                    >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
-                          <ShoppingBag className="w-4 h-4 text-amber-600" />
+                        <div className="w-8 h-8 rounded-md bg-bg-subtle flex items-center justify-center text-text-tertiary">
+                          <ShoppingBag size={15} strokeWidth={1.8} />
                         </div>
                         <div>
                           <button
                             onClick={() => navigate(`/customers/${order.customer_id}`)}
-                            className="font-medium text-slate-800 hover:text-rose-600 text-sm"
+                            className="t-body-strong hover:text-primary transition-colors duration-150"
                           >
                             {order.customer_name}
                           </button>
-                          <p className="text-xs text-slate-500">
-                            {order.product_name}
-                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${ORDER_TYPE_COLORS[order.order_type]}`}>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="t-small">{order.product_name}</span>
+                            <span className="badge badge-neutral" style={{ height: 16, fontSize: 10, padding: '0 5px', borderRadius: 4 }}>
                               {ORDER_TYPE_LABELS[order.order_type]}
                             </span>
-                          </p>
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-slate-900">¥{order.amount}</p>
-                        <p className="text-[10px] text-slate-400">{order.purchase_date}</p>
+                        <p className="font-semibold text-text-primary text-sm kpi-value">¥{order.amount}</p>
+                        <p className="t-small">{order.purchase_date}</p>
                       </div>
                     </div>
                   ))}
@@ -201,39 +244,34 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-              <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-500" />
-                客户阶段分布
-              </h2>
-              <div className="space-y-3">
+          {/* Right Column */}
+          <div className="space-y-6">
+            {/* 客户阶段分布 — Pipeline 风格 */}
+            <div className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">
+                  <Users size={15} strokeWidth={1.8} className="text-text-secondary" />
+                  客户阶段分布
+                </h2>
+              </div>
+              <div className="px-5 py-4 space-y-3.5">
                 {stageStats.map((s) => {
-                  const total = stageStats.reduce((sum, x) => sum + x.count, 0) || 1;
-                  const pct = Math.round((s.count / total) * 100);
+                  const pct = Math.round((s.count / stageTotal) * 100);
                   return (
                     <button
                       key={s.stage}
                       onClick={() => navigate(`/customers?stage=${s.stage}`)}
-                      className="w-full group"
+                      className="w-full text-left group"
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-slate-600 group-hover:text-rose-600 transition-colors">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[13px] text-text-secondary group-hover:text-text-primary transition-colors duration-150">
                           {STAGE_LABELS[s.stage]}
                         </span>
-                        <span className="text-xs font-bold text-slate-800">{s.count}人</span>
+                        <span className="text-[13px] font-medium text-text-primary kpi-value">{s.count}人</span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div className="w-full h-1.5 rounded-full bg-bg-subtle overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            s.stage === 'new_friend' ? 'bg-blue-400' :
-                            s.stage === 'initial_chat' ? 'bg-cyan-400' :
-                            s.stage === 'interested' ? 'bg-amber-400' :
-                            s.stage === 'purchased' ? 'bg-emerald-400' :
-                            s.stage === 'in_group' ? 'bg-teal-400' :
-                            s.stage === 'repurchased' ? 'bg-rose-400' :
-                            'bg-slate-400'
-                          }`}
+                          className="h-full rounded-full bg-primary/60 transition-all duration-500 ease-out"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -243,55 +281,61 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-              <h2 className="font-bold text-slate-900 mb-3">快捷操作</h2>
-              <div className="grid grid-cols-2 gap-2">
+            {/* 快捷操作 */}
+            <div className="panel">
+              <div className="panel-header">
+                <h2 className="panel-title">快捷操作</h2>
+              </div>
+              <div className="px-2 py-2">
                 <button
                   onClick={() => navigate('/customers')}
-                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-rose-50 to-pink-50 hover:from-rose-100 hover:to-pink-100 transition-all border border-rose-100"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+                             text-sm text-text-secondary hover:text-text-primary hover:bg-bg-subtle
+                             transition-colors duration-150"
                 >
-                  <Users className="w-6 h-6 text-rose-500" />
-                  <span className="text-sm font-medium text-slate-700">客户列表</span>
+                  <Users size={15} strokeWidth={1.8} />
+                  <span>客户列表</span>
                 </button>
                 <button
                   onClick={() => navigate('/customers?showAdd=true')}
-                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 transition-all border border-emerald-100"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+                             text-sm text-text-secondary hover:text-text-primary hover:bg-bg-subtle
+                             transition-colors duration-150"
                 >
-                  <UserPlus className="w-6 h-6 text-emerald-500" />
-                  <span className="text-sm font-medium text-slate-700">添加客户</span>
+                  <UserPlus size={15} strokeWidth={1.8} />
+                  <span>添加客户</span>
                 </button>
                 <button
                   onClick={() => navigate('/products')}
-                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 transition-all border border-blue-100"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+                             text-sm text-text-secondary hover:text-text-primary hover:bg-bg-subtle
+                             transition-colors duration-150"
                 >
-                  <ShoppingBag className="w-6 h-6 text-blue-500" />
-                  <span className="text-sm font-medium text-slate-700">产品库</span>
+                  <ShoppingBag size={15} strokeWidth={1.8} />
+                  <span>产品库</span>
                 </button>
                 <button
                   onClick={() => navigate('/orders')}
-                  className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 transition-all border border-amber-100"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md
+                             text-sm text-text-secondary hover:text-text-primary hover:bg-bg-subtle
+                             transition-colors duration-150"
                 >
-                  <Sparkles className="w-6 h-6 text-amber-500" />
-                  <span className="text-sm font-medium text-slate-700">订单记录</span>
+                  <Sparkles size={15} strokeWidth={1.8} />
+                  <span>订单记录</span>
                 </button>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 shadow-lg text-white">
-              <h3 className="font-bold text-base mb-2 flex items-center gap-2">
-                <Phone className="w-5 h-5" />
-                微信跟进提醒
-              </h3>
-              <p className="text-sm text-emerald-50 mb-3 leading-relaxed">
-                每天打开微信前，先看看这里的待跟进列表。点击客户卡片直接进入详情，记录跟进内容并推进客户阶段。
-              </p>
-              <div className="flex items-center gap-2 text-xs text-emerald-100">
-                <div className="flex -space-x-1">
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">💬</div>
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">📱</div>
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">👥</div>
-                </div>
-                <span>私域运营从每个有效沟通开始</span>
+            {/* 运营建议 */}
+            <div className="panel" style={{ background: 'linear-gradient(180deg, #FAFBFF 0%, #FFFFFF 100%)' }}>
+              <div className="px-5 py-4">
+                <h3 className="t-title mb-1.5 flex items-center gap-2">
+                  <Phone size={15} strokeWidth={1.8} className="text-primary" />
+                  今日运营建议
+                </h3>
+                <p className="t-caption">
+                  打开微信前先查看待跟进列表，点击客户卡片进入详情，记录跟进内容并推进客户阶段。
+                </p>
               </div>
             </div>
           </div>

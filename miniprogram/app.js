@@ -1,6 +1,8 @@
+const config = require('./config');
+
 App({
   globalData: {
-    baseUrl: 'http://124.220.103.120:3456',
+    baseUrl: config.apiBaseUrl,
     userInfo: null,
     token: null
   },

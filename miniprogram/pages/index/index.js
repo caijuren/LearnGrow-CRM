@@ -3,10 +3,19 @@ const app = getApp();
 
 Page({
   data: {
-    events: [],
+    upcomingEvents: [],
+    ongoingEvents: [],
+    expiredEvents: [],
+    todaySummary: {
+      pending: 0,
+      completed: 0,
+      joined: 0,
+      nextEvent: null
+    },
     userInfo: null,
     loading: true,
-    isLoggedIn: false
+    isLoggedIn: false,
+    baseUrl: app.globalData.baseUrl
   },
 
   onLoad() {
@@ -28,7 +37,24 @@ Page({
     this.setData({ loading: true });
     try {
       const events = await api.getEvents();
-      this.setData({ events });
+      const upcomingEvents = events.filter(e => e.event_status === 'upcoming');
+      const ongoingEvents = events.filter(e => e.event_status === 'ongoing');
+      const expiredEvents = events.filter(e => e.event_status === 'expired');
+
+      const joinedEvents = ongoingEvents.filter(e => e.is_joined);
+      const pendingEvents = joinedEvents.filter(e => !e.today_checked);
+      const completedEvents = joinedEvents.filter(e => e.today_checked);
+      this.setData({
+        upcomingEvents,
+        ongoingEvents,
+        expiredEvents,
+        todaySummary: {
+          pending: pendingEvents.length,
+          completed: completedEvents.length,
+          joined: joinedEvents.length,
+          nextEvent: pendingEvents[0] || joinedEvents[0] || null
+        }
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -54,6 +80,16 @@ Page({
     wx.navigateTo({ url: `/pages/event-detail/event-detail?id=${id}&autoCheckin=1` });
   },
 
+  goToTodayTask() {
+    if (!app.requireLogin()) return;
+    const nextEvent = this.data.todaySummary.nextEvent;
+    if (!nextEvent) {
+      wx.showToast({ title: '暂无待打卡活动', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: `/pages/event-detail/event-detail?id=${nextEvent.id}&autoCheckin=${nextEvent.today_checked ? 0 : 1}` });
+  },
+
   goToDetail(e) {
     const { id } = e.currentTarget.dataset;
     wx.navigateTo({ url: `/pages/event-detail/event-detail?id=${id}` });
@@ -65,11 +101,11 @@ Page({
   },
 
   goToMyCheckins() {
-    wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
+    wx.reLaunch({ url: '/pages/my-checkins/my-checkins' });
   },
 
   goToProfile() {
-    wx.navigateTo({ url: '/pages/profile/profile' });
+    wx.reLaunch({ url: '/pages/profile/profile' });
   },
 
   goToLogin() {
