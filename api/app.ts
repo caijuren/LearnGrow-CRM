@@ -1515,6 +1515,7 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
   const isProduction = process.env.NODE_ENV === 'production';
   
   if (!WX_APPID || !WX_SECRET) {
+    request.log.error('微信登录配置缺失：WX_APPID 或 WX_SECRET 未设置');
     if (isProduction) return reply.code(500).send({ success: false, error: '微信登录配置缺失' });
     openid = `dev_${code || randomUUID()}`;
   } else if (!code) {
@@ -1525,7 +1526,9 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
     try {
       const res = await fetch(`https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_SECRET}&js_code=${code}&grant_type=authorization_code`);
       data = await res.json();
+      request.log.info({ wxCode: code.substring(0, 8) + '...', wxResponse: data }, '微信 jscode2session 响应');
     } catch (e) {
+      request.log.error({ err: e }, '调用微信 jscode2session 失败');
       if (isProduction) return reply.code(502).send({ success: false, error: '微信登录服务暂不可用' });
     }
 
@@ -1534,6 +1537,7 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
     } else if (data.openid) {
       openid = data.openid;
     } else if (isProduction) {
+      request.log.error({ wxErrcode: data.errcode, wxErrmsg: data.errmsg }, '微信 jscode2session 返回错误');
       return reply.code(401).send({ success: false, error: data.errmsg || '微信登录失败' });
     } else {
       openid = `dev_${code}`;

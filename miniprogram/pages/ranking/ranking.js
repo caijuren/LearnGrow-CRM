@@ -35,7 +35,7 @@ Page({
       }
       this.setData({ ranking, myRank });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '排行榜加载失败', icon: 'none' });
     }
   }
 });

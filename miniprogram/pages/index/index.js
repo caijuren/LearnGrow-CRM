@@ -44,6 +44,14 @@ Page({
       const joinedEvents = ongoingEvents.filter(e => e.is_joined);
       const pendingEvents = joinedEvents.filter(e => !e.today_checked);
       const completedEvents = joinedEvents.filter(e => e.today_checked);
+
+      const enrichEvent = (e) => ({
+        ...e,
+        progressPercent: e.total_days > 0 ? Math.round((e.my_checkin_days / e.total_days) * 100) : 0
+      });
+      upcomingEvents.forEach((e, i) => upcomingEvents[i] = enrichEvent(e));
+      ongoingEvents.forEach((e, i) => ongoingEvents[i] = enrichEvent(e));
+      expiredEvents.forEach((e, i) => expiredEvents[i] = enrichEvent(e));
       this.setData({
         upcomingEvents,
         ongoingEvents,
@@ -56,7 +64,7 @@ Page({
         }
       });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '活动加载失败', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }
@@ -70,7 +78,7 @@ Page({
       wx.showToast({ title: '加入成功', icon: 'success' });
       this.loadEvents();
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '加入失败，请重试', icon: 'none' });
     }
   },
 

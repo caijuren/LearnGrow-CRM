@@ -26,7 +26,7 @@ Page({
       const checkins = await api.getMyCheckins();
       this.setData({ checkins });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '打卡记录加载失败', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }

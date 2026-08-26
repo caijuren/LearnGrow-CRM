@@ -96,8 +96,8 @@ Page({
         setTimeout(() => this.goHome(), 800);
       }
     } catch (e) {
-      console.error(e);
-      wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
+      const message = (e && e.message) || '登录失败，请稍后重试';
+      wx.showToast({ title: message, icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }
@@ -125,7 +125,6 @@ Page({
         setupAvatarFile: tempFilePath
       });
     } catch (err) {
-      console.error(err);
       wx.showToast({ title: '头像上传失败', icon: 'none' });
     } finally {
       this.setData({ saving: false });
@@ -168,7 +167,6 @@ Page({
         setTimeout(() => this.goHome(), 800);
       }
     } catch (e) {
-      console.error(e);
       wx.showToast({ title: '保存失败，请重试', icon: 'none' });
     } finally {
       this.setData({ saving: false });
@@ -196,7 +194,6 @@ Page({
       wx.showToast({ title: '设置完成', icon: 'success' });
       setTimeout(() => this.goHome(), 800);
     } catch (e) {
-      console.error(e);
       wx.showToast({ title: '保存失败，请重试', icon: 'none' });
     } finally {
       this.setData({ saving: false });

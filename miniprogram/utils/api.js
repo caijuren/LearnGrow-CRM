@@ -28,19 +28,23 @@ function request(options) {
         if (res.data && res.data.success) {
           resolve(res.data.data);
         } else {
-          wx.showToast({
-            title: res.data?.error || '请求失败',
-            icon: 'none',
-            duration: 2000
-          });
+          if (options.showError !== false) {
+            wx.showToast({
+              title: res.data?.error || '请求失败',
+              icon: 'none',
+              duration: 2000
+            });
+          }
           reject(new Error(res.data?.error || '请求失败'));
         }
       },
       fail: (err) => {
-        wx.showToast({
-          title: '网络错误',
-          icon: 'none'
-        });
+        if (options.showError !== false) {
+          wx.showToast({
+            title: '网络错误',
+            icon: 'none'
+          });
+        }
         reject(err);
       }
     });
@@ -95,7 +99,8 @@ function login(data) {
   return request({
     url: '/api/wx/login',
     method: 'POST',
-    data
+    data,
+    showError: false
   });
 }
 

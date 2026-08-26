@@ -103,12 +103,16 @@ Page({
       try {
         badges = await api.getEventBadges(this.data.eventId) || [];
         achievedBadges = badges.filter(b => b.achieved).length;
-      } catch (e) { console.log('徽章加载失败', e); }
+      } catch (e) {
+        // 徽章加载失败不阻断主流程
+      }
 
       let materials = [];
       try {
         materials = await api.getEventMaterials(this.data.eventId) || [];
-      } catch (e) { console.log('资料加载失败', e); }
+      } catch (e) {
+        // 资料加载失败不阻断主流程
+      }
 
       let feed = [];
       try {
@@ -116,13 +120,17 @@ Page({
           ...item,
           formattedDate: this.formatFeedDate(item.created_at || item.checkin_date)
         }));
-      } catch (e) { console.log('动态加载失败', e); }
+      } catch (e) {
+        // 动态加载失败不阻断主流程
+      }
 
       let reminder = this.data.reminder;
       if (app.checkLogin() && isJoined) {
         try {
           reminder = await api.getEventReminder(this.data.eventId) || reminder;
-        } catch (e) { console.log('提醒设置加载失败', e); }
+        } catch (e) {
+          // 提醒设置加载失败不阻断主流程
+        }
       }
 
       this.setData({
@@ -139,7 +147,7 @@ Page({
         reminder
       });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '活动详情加载失败', icon: 'none' });
     }
   },
 
@@ -212,7 +220,7 @@ Page({
       wx.showToast({ title: '加入成功', icon: 'success' });
       this.loadData();
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '加入失败，请重试', icon: 'none' });
     }
   },
 
@@ -240,7 +248,7 @@ Page({
       // 补充完孩子名后继续打卡
       this.submitCheckin();
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '保存失败，请重试', icon: 'none' });
       this.setData({ savingChildName: false });
     }
   },
@@ -314,7 +322,7 @@ Page({
       this.setData({ reminder: { ...next, ...saved } });
       wx.showToast({ title: next.is_enabled ? '提醒已设置' : '提醒已关闭', icon: 'success' });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '提醒设置失败', icon: 'none' });
       this.loadData();
     } finally {
       this.setData({ savingReminder: false });
@@ -344,7 +352,7 @@ Page({
         } : item)
       });
     } catch (err) {
-      console.error(err);
+      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
       this.loadData();
     }
   },
@@ -412,7 +420,7 @@ Page({
           });
         } catch (e) {
           wx.hideLoading();
-          console.error(e);
+          wx.showToast({ title: '上传失败，请重试', icon: 'none' });
         }
       }
     });
@@ -486,7 +494,7 @@ Page({
           toastTitle = '已提交，等待老师审核';
         }
         if (result.new_badges && result.new_badges.length > 0) {
-          toastTitle = `🎉 获得${result.new_badges[0].name}徽章！`;
+          toastTitle = `获得${result.new_badges[0].name}徽章！`;
         }
       }
 
@@ -501,7 +509,7 @@ Page({
         setTimeout(() => this.showSharePrompt(), 600);
       }
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '提交失败，请重试', icon: 'none' });
     } finally {
       this.setData({ submitting: false });
     }

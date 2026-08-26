@@ -1,6 +1,6 @@
 <view class="login-container">
   <view class="login-header">
-    <view class="logo">📚</view>
+    <view class="logo">源</view>
     <view class="title">源来是糖</view>
     <view class="subtitle">每天坚持，养成好习惯</view>
   </view>
@@ -17,12 +17,12 @@
     </view>
 
     <button class="btn-wechat {{agreed ? '' : 'btn-disabled'}}" bindtap="handleWxLogin" loading="{{loading}}">
-      <text class="wx-icon">💬</text>
-      <text>微信一键登录</text>
+      <text class="wx-icon">微信</text>
+      <text class="btn-text">一键登录</text>
     </button>
 
     <button class="btn-skip" bindtap="goBack">
-      先逛逛，看看活动
+      暂不登录，先逛逛
     </button>
   </view>
 
@@ -32,34 +32,43 @@
       <view class="nickname-title">完善一下资料</view>
       <view class="nickname-desc">选择头像并设置昵称</view>
 
-      <button
-        class="avatar-picker"
-        open-type="chooseAvatar"
-        bind:chooseavatar="onChooseAvatar"
-      >
-        <image
-          wx:if="{{setupAvatarUrl}}"
-          class="avatar-picker-img"
-          src="{{setupAvatarUrl}}"
-          mode="aspectFill"
-        />
-        <view wx:else class="avatar-placeholder">
-          <text class="avatar-placeholder-icon">+</text>
-          <text class="avatar-placeholder-text">选择头像</text>
-        </view>
-      </button>
+      <view class="profile-form">
+        <button
+          class="avatar-picker"
+          open-type="chooseAvatar"
+          bind:chooseavatar="onChooseAvatar"
+        >
+          <image
+            wx:if="{{setupAvatarUrl}}"
+            class="avatar-picker-img"
+            src="{{setupAvatarUrl}}"
+            mode="aspectFill"
+          />
+          <view wx:else class="avatar-placeholder">
+            <text class="avatar-placeholder-icon">◉</text>
+            <text class="avatar-placeholder-text">点击选择微信头像</text>
+          </view>
+          <view wx:if="{{setupAvatarUrl}}" class="avatar-edit-badge">
+            <text class="avatar-edit-icon">✎</text>
+          </view>
+        </button>
 
-      <input
-        type="nickname"
-        class="nickname-input"
-        placeholder-class="input-placeholder"
-        placeholder="输入你的昵称"
-        value="{{setupNickname}}"
-        bindinput="onNicknameInput"
-        bindblur="onNicknameInput"
-        bindnicknamereview="onNicknameReview"
-        maxlength="20"
-      />
+        <view class="form-group">
+          <view class="form-label">昵称</view>
+          <input
+            type="nickname"
+            class="nickname-input"
+            placeholder-class="input-placeholder"
+            placeholder="点击输入或选择微信昵称"
+            value="{{setupNickname}}"
+            bindinput="onNicknameInput"
+            bindblur="onNicknameInput"
+            bindnicknamereview="onNicknameReview"
+            maxlength="20"
+          />
+        </view>
+      </view>
+
       <view class="nickname-actions">
         <button class="btn-save" bindtap="saveNickname" loading="{{saving}}">保存</button>
       </view>
@@ -71,15 +80,20 @@
     <view class="nickname-modal">
       <view class="nickname-title">孩子怎么称呼？</view>
       <view class="nickname-desc">打卡记录会显示孩子的名字</view>
-      <input
-        class="nickname-input"
-        placeholder-class="input-placeholder"
-        placeholder="如：糖糖、小明"
-        value="{{setupChildName}}"
-        bindinput="onChildNameInput"
-        bindblur="onChildNameInput"
-        maxlength="20"
-      />
+
+      <view class="form-group">
+        <view class="form-label">孩子昵称</view>
+        <input
+          class="nickname-input"
+          placeholder-class="input-placeholder"
+          placeholder="如：糖糖、小明"
+          value="{{setupChildName}}"
+          bindinput="onChildNameInput"
+          bindblur="onChildNameInput"
+          maxlength="20"
+        />
+      </view>
+
       <view class="nickname-actions">
         <button class="btn-save" bindtap="saveChildName" loading="{{saving}}">保存，开始打卡</button>
       </view>

@@ -16,7 +16,8 @@ Page({
     editAvatarPath: '',
     saving: false,
     isLoggedIn: false,
-    baseUrl: app.globalData.baseUrl
+    baseUrl: app.globalData.baseUrl,
+    appVersion: app.globalData.appVersion
   },
 
   onLoad() {
@@ -49,7 +50,9 @@ Page({
       let myBadges = [];
       try {
         myBadges = await api.getMyBadges() || [];
-      } catch (e) { console.log('徽章加载失败', e); }
+      } catch (e) {
+        // 徽章加载失败不阻断主流程
+      }
 
       this.setData({
         myCheckins,
@@ -59,7 +62,7 @@ Page({
         joinedEvents: myCheckins.length
       });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '数据加载失败', icon: 'none' });
     }
   },
 
@@ -99,7 +102,6 @@ Page({
         editAvatarPath: uploadRes.url
       });
     } catch (err) {
-      console.error(err);
       wx.showToast({ title: '头像上传失败', icon: 'none' });
     } finally {
       this.setData({ saving: false });
@@ -138,7 +140,7 @@ Page({
 
       wx.showToast({ title: '保存成功', icon: 'success' });
     } catch (e) {
-      console.error(e);
+      wx.showToast({ title: '保存失败，请重试', icon: 'none' });
     } finally {
       this.setData({ saving: false });
     }

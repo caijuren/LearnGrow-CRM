@@ -1,7 +1,7 @@
 <view class="container">
   <view class="header flex-between items-center mb-4">
     <view>
-      <view class="greeting text-xl font-bold">你好，{{userInfo.nickname || '游客家长'}} 👋</view>
+      <view class="greeting text-xl font-bold">你好，{{userInfo.nickname || '游客家长'}}</view>
       <view class="text-secondary mt-1">{{isLoggedIn ? '今天也要坚持打卡哦' : '登录后可参与打卡活动'}}</view>
     </view>
     <view class="avatar" bindtap="{{isLoggedIn ? 'goToProfile' : 'goToLogin'}}">
@@ -12,10 +12,10 @@
 
   <view wx:if="{{!isLoggedIn}}" class="login-banner mb-4" bindtap="goToLogin">
     <view class="login-banner-text">
-      <text class="font-bold">立即登录</text>
-      <text class="text-secondary ml-2" style="font-size: 24rpx;">解锁完整打卡功能</text>
+      <text class="login-banner-title">立即登录</text>
+      <text class="login-banner-desc">登录后即可加入活动并打卡</text>
     </view>
-    <text class="login-banner-arrow">›</text>
+    <text class="login-banner-arrow">→</text>
   </view>
 
   <view wx:if="{{isLoggedIn}}" class="today-panel">
@@ -26,8 +26,8 @@
           {{todaySummary.pending > 0 ? '还有' + todaySummary.pending + '个待打卡' : '今日已全部完成'}}
         </view>
         <view wx:else class="today-title">还没有加入活动</view>
-        <view wx:if="{{todaySummary.nextEvent}}" class="today-subtitle">{{todaySummary.nextEvent.name}}</view>
-        <view wx:else class="today-subtitle">加入活动后，这里会显示今天的打卡任务</view>
+        <view wx:if="{{todaySummary.nextEvent}}" class="today-subtitle truncate">{{todaySummary.nextEvent.name}}</view>
+        <view wx:else class="today-subtitle truncate">加入活动后，这里会显示今天的打卡任务</view>
       </view>
       <view class="today-ring {{todaySummary.pending === 0 && todaySummary.joined > 0 ? 'done' : ''}}">
         <text class="ring-completed">{{todaySummary.completed}}</text><text class="ring-total">/{{todaySummary.joined}}</text>
@@ -66,7 +66,7 @@
     </view>
 
     <view wx:if="{{item.required_text}}" class="required-text mt-3">
-      <text class="text-muted" style="font-size: 24rpx;">打卡要求：{{item.required_text}}</text>
+      <text class="text-muted meta-hint">打卡要求：{{item.required_text}}</text>
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
@@ -90,7 +90,7 @@
       <view class="event-title text-lg font-bold">{{item.name}}</view>
       <view wx:if="{{isLoggedIn && item.today_checked}}" class="status-pill done">已完成</view>
       <view wx:elif="{{isLoggedIn && item.is_joined}}" class="status-pill pending">待打卡</view>
-      <view wx:else class="badge badge-rose">{{isLoggedIn ? '未加入' : '浏览中'}}</view>
+      <view wx:else class="badge badge-muted">{{isLoggedIn ? '未加入' : '浏览中'}}</view>
     </view>
 
     <view class="event-meta flex gap-3 mt-2">
@@ -108,17 +108,17 @@
         <text>{{item.my_checkin_days}}/{{item.total_days}}天</text>
       </view>
       <view class="progress-bar">
-        <view class="progress-fill" style="width: {{item.my_checkin_days / item.total_days * 100}}%"></view>
+        <view class="progress-fill" style="width: {{item.progressPercent}}%"></view>
       </view>
       <view class="progress-footer">
         <text wx:if="{{item.my_current_streak >= 2}}" class="streak-text">连续{{item.my_current_streak}}天</text>
         <text wx:else class="text-muted">加油坚持哦～</text>
-        <text wx:if="{{item.days_left >= 0}}" class="text-muted">还剩{{item.days_left}}天</text>
+        <text wx:if="{{item.days_left >= 0}}" class="days-left">还剩{{item.days_left}}天</text>
       </view>
     </view>
 
     <view wx:if="{{item.required_text}}" class="required-text mt-3">
-      <text class="text-muted" style="font-size: 24rpx;">打卡要求：{{item.required_text}}</text>
+      <text class="text-muted meta-hint">打卡要求：{{item.required_text}}</text>
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
@@ -164,7 +164,7 @@
         <text>{{item.my_checkin_days}}/{{item.total_days}}天</text>
       </view>
       <view class="progress-bar">
-        <view class="progress-fill" style="width: {{item.my_checkin_days / item.total_days * 100}}%"></view>
+        <view class="progress-fill" style="width: {{item.progressPercent}}%"></view>
       </view>
       <view wx:if="{{item.my_current_streak >= 2}}" class="progress-footer">
         <text class="streak-text">最高连续{{item.my_current_streak}}天</text>
@@ -172,7 +172,7 @@
     </view>
 
     <view wx:if="{{item.required_text}}" class="required-text mt-3">
-      <text class="text-muted" style="font-size: 24rpx;">打卡要求：{{item.required_text}}</text>
+      <text class="text-muted meta-hint">打卡要求：{{item.required_text}}</text>
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
@@ -186,22 +186,22 @@
   </view>
 
   <view wx:if="{{upcomingEvents.length === 0 && ongoingEvents.length === 0 && expiredEvents.length === 0 && !loading}}" class="empty">
-    <view class="empty-icon">📅</view>
-    <view>暂无活动</view>
-    <view class="text-muted mt-2" style="font-size: 26rpx;">请等待老师创建新活动</view>
+    <view class="empty-icon">○</view>
+    <view class="empty-title">暂无活动</view>
+    <view class="empty-desc">暂时没有进行中的活动，稍后再来看看吧～</view>
   </view>
 
   <view class="bottom-nav">
     <view class="nav-item active">
-      <text class="nav-icon">🏠</text>
+      <text class="nav-icon">⌂</text>
       <text class="nav-text">活动</text>
     </view>
     <view class="nav-item" bindtap="goToMyCheckins">
-      <text class="nav-icon">📋</text>
+      <text class="nav-icon">☰</text>
       <text class="nav-text">我的打卡</text>
     </view>
     <view class="nav-item" bindtap="goToProfile">
-      <text class="nav-icon">👤</text>
+      <text class="nav-icon">◉</text>
       <text class="nav-text">我的</text>
     </view>
   </view>

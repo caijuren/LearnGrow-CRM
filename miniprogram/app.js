@@ -3,6 +3,7 @@ const config = require('./config');
 App({
   globalData: {
     baseUrl: config.apiBaseUrl,
+    appVersion: config.appVersion,
     userInfo: null,
     token: null
   },

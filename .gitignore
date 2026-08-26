@@ -42,3 +42,5 @@ miniprogram-avatar.png
 *.sln
 *.sw?
 .vite
+# Uploaded user files
+uploads/
