@@ -444,6 +444,7 @@ export interface CheckinEvent {
   group_name?: string;
   start_date: string;
   end_date: string;
+  signup_deadline?: string | null;
   required_text: string | null;
   reward_rules: string | null;
   allow_makeup?: number | boolean;
@@ -468,6 +469,7 @@ export interface CheckinParticipant {
   wx_user_id: number | null;
   nickname: string;
   child_name: string | null;
+  avatar_url?: string | null;
   joined_at: string;
   checkin_days?: number;
   current_streak?: number;
@@ -561,19 +563,52 @@ export interface WxUser {
   avatar_url: string | null;
   child_name: string | null;
   customer_id: number | null;
+  points: number;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export interface WxUserWithPoints extends WxUser {
+  customer_name?: string | null;
+}
+
+export type PointsType = 'checkin' | 'order' | 'adjust';
+
+export interface PointsLedgerItem {
+  id: number;
+  wx_user_id: number;
+  amount: number;
+  type: PointsType;
+  ref_type: 'none' | 'checkin_record' | 'order';
+  ref_id: number | null;
+  note: string | null;
+  operator_id: number | null;
+  created_at: string;
+}
+
+export interface PointsConfig {
+  points_checkin: number;
+  points_order_rate: number;
+}
+
+export const POINTS_TYPE_LABELS: Record<PointsType, string> = {
+  checkin: '打卡',
+  order: '订单',
+  adjust: '手动调整',
+};
 
 export interface WxCheckinEvent {
   id: number;
   name: string;
   start_date: string;
   end_date: string;
+  signup_deadline: string | null;
   required_text: string | null;
   reward_rules: string | null;
   status: CheckinEventStatus;
+  event_status: 'upcoming' | 'ongoing' | 'expired';
+  can_signup: boolean;
   participant_count: number;
   total_days: number;
   days_left: number;

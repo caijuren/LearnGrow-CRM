@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft, Users, Calendar, CheckCircle2, Circle, Award,
-  Plus, UserPlus, Check, X, Search, ChevronLeft, ChevronRight,
+  Plus, UserPlus, Check, Search, ChevronLeft, ChevronRight,
   Trash2, Flame, Trophy, Target, FileText, Gift, BookOpen,
-  Download, Eye, ThumbsUp, ThumbsDown, Edit2, Upload,
+  Download, Eye, ThumbsUp, ThumbsDown, Edit2,
 } from 'lucide-react';
 import { useStore } from '@/store';
-import { CHECKIN_STATUS_LABELS, CHECKIN_STATUS_COLORS } from '../../shared/types';
+import Loading from '@/components/ui/Loading';
+import { CHECKIN_STATUS_LABELS } from '../../shared/types';
 import {
   fetchCheckinRecords, reviewCheckinRecord,
   fetchEventBadges, createEventBadge, updateEventBadge, deleteEventBadge,
@@ -38,22 +41,10 @@ const RECORD_STATUS_LABELS: Record<string, string> = {
   rejected: '已拒绝',
 };
 
-const RECORD_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-700 border-amber-200',
-  approved: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  rejected: 'bg-red-100 text-red-700 border-red-200',
-};
-
 const REWARD_STATUS_LABELS: Record<string, string> = {
   pending: '待发放',
   distributed: '已发放',
   not_qualified: '未达标',
-};
-
-const REWARD_STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-700 border-amber-200',
-  distributed: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  not_qualified: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 
 function formatDate(dateStr: string): string {
@@ -69,6 +60,17 @@ function getDayOfWeek(dateStr: string): string {
 function isToday(dateStr: string): boolean {
   return dateStr === new Date().toISOString().split('T')[0];
 }
+
+
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04, delayChildren: 0.02 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } },
+};
 
 export default function CheckinDetail() {
   const { id } = useParams<{ id: string }>();
@@ -118,46 +120,7 @@ export default function CheckinDetail() {
   const [showRewardModal, setShowRewardModal] = useState<any>(null);
   const [rewardNote, setRewardNote] = useState('');
 
-  useEffect(() => {
-    if (eventId) loadCheckinEvent(eventId);
-  }, [eventId]);
-
-  useEffect(() => {
-    if (selectedCheckinEvent && !selectedCheckinEvent.calendar.some((c: any) => c.date === selectedDate)) {
-      const today = new Date().toISOString().split('T')[0];
-      if (selectedCheckinEvent.calendar.some((c: any) => c.date === today)) {
-        setSelectedDate(today);
-      } else if (selectedCheckinEvent.calendar.length > 0) {
-        setSelectedDate(selectedCheckinEvent.calendar[selectedCheckinEvent.calendar.length - 1].date);
-      }
-    }
-  }, [selectedCheckinEvent]);
-
-  useEffect(() => {
-    if (activeTab === 'review' && eventId) {
-      loadReviewRecords();
-    }
-  }, [activeTab, reviewStatus, reviewRecordType, reviewPage, eventId]);
-
-  useEffect(() => {
-    if (activeTab === 'badges' && eventId) {
-      loadBadges();
-    }
-  }, [activeTab, eventId]);
-
-  useEffect(() => {
-    if (activeTab === 'materials' && eventId) {
-      loadMaterials();
-    }
-  }, [activeTab, eventId]);
-
-  useEffect(() => {
-    if (activeTab === 'rewards' && eventId) {
-      loadRewards();
-    }
-  }, [activeTab, rewardStatus, rewardSearch, eventId]);
-
-  const loadReviewRecords = async () => {
+  const loadReviewRecords = useCallback(async () => {
     setLoadingReview(true);
     try {
       const data = await fetchCheckinRecords(eventId, { status: reviewStatus, record_type: reviewRecordType, page: reviewPage, limit: 20 });
@@ -168,34 +131,74 @@ export default function CheckinDetail() {
     } finally {
       setLoadingReview(false);
     }
-  };
+  }, [eventId, reviewStatus, reviewRecordType, reviewPage]);
 
-  const loadBadges = async () => {
+  const loadBadges = useCallback(async () => {
     try {
       const data = await fetchEventBadges(eventId);
       setBadges(data);
     } catch (e: any) {
       console.error(e);
     }
-  };
+  }, [eventId]);
 
-  const loadMaterials = async () => {
+  const loadMaterials = useCallback(async () => {
     try {
       const data = await fetchEventMaterials(eventId);
       setMaterials(data);
     } catch (e: any) {
       console.error(e);
     }
-  };
+  }, [eventId]);
 
-  const loadRewards = async () => {
+  const loadRewards = useCallback(async () => {
     try {
       const data = await fetchEventRewards(eventId, { status: rewardStatus || undefined, search: rewardSearch || undefined });
       setRewards(data);
     } catch (e: any) {
       console.error(e);
     }
-  };
+  }, [eventId, rewardStatus, rewardSearch]);
+
+  useEffect(() => {
+    if (eventId) loadCheckinEvent(eventId);
+  }, [eventId, loadCheckinEvent]);
+
+  useEffect(() => {
+    if (selectedCheckinEvent && !selectedCheckinEvent.calendar.some((c: any) => c.date === selectedDate)) {
+      const today = new Date().toISOString().split('T')[0];
+      if (selectedCheckinEvent.calendar.some((c: any) => c.date === today)) {
+        setSelectedDate(today);
+      } else if (selectedCheckinEvent.calendar.length > 0) {
+        setSelectedDate(selectedCheckinEvent.calendar[selectedCheckinEvent.calendar.length - 1].date);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCheckinEvent]);
+
+  useEffect(() => {
+    if (activeTab === 'review' && eventId) {
+      loadReviewRecords();
+    }
+  }, [activeTab, reviewStatus, reviewRecordType, reviewPage, eventId, loadReviewRecords]);
+
+  useEffect(() => {
+    if (activeTab === 'badges' && eventId) {
+      loadBadges();
+    }
+  }, [activeTab, eventId, loadBadges]);
+
+  useEffect(() => {
+    if (activeTab === 'materials' && eventId) {
+      loadMaterials();
+    }
+  }, [activeTab, eventId, loadMaterials]);
+
+  useEffect(() => {
+    if (activeTab === 'rewards' && eventId) {
+      loadRewards();
+    }
+  }, [activeTab, rewardStatus, rewardSearch, eventId, loadRewards]);
 
   const handleReview = async () => {
     if (!showReviewModal) return;
@@ -278,7 +281,7 @@ export default function CheckinDetail() {
   if (!selectedCheckinEvent) {
     return (
       <div className="p-6 flex items-center justify-center h-full">
-        <div className="text-slate-400">加载中...</div>
+        <Loading text="" size="sm" />
       </div>
     );
   }
@@ -404,37 +407,39 @@ export default function CheckinDetail() {
   };
 
   return (
-    <div className="page-shell">
+    <motion.div
+      className="page-shell"
+      variants={container}
+      initial="hidden"
+      animate="show"
+    >
       <div className="max-w-6xl mx-auto">
         {/* Page Header */}
-        <div className="mb-6">
+        <motion.div variants={fadeUp} className="mb-6">
           <button
             onClick={() => navigate('/checkin')}
-            className="inline-flex items-center gap-1.5 text-sm mb-3"
-            style={{ color: 'var(--color-text-secondary)' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
+            className="inline-flex items-center gap-1.5 text-sm mb-3 text-text-secondary hover:text-text-primary transition-colors"
           >
             <ArrowLeft size={15} strokeWidth={1.8} />
             返回活动列表
           </button>
 
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="t-display mb-2">{event.name}</h1>
+              <h1 className="text-[28px] font-bold text-text-primary tracking-tight mb-2">{event.name}</h1>
               <div className="flex flex-wrap items-center gap-4">
                 {event.group_name && (
                   <span className="t-caption flex items-center gap-1.5">
-                    <Users size={13} strokeWidth={1.8} />
+                    <Users size={13} strokeWidth={1.8} style={{ color: '#8B5CF6' }} />
                     {event.group_name}
                   </span>
                 )}
                 <span className="t-caption flex items-center gap-1.5">
-                  <Calendar size={13} strokeWidth={1.8} />
+                  <Calendar size={13} strokeWidth={1.8} className="text-primary" />
                   {formatDate(event.start_date)} — {formatDate(event.end_date)}
                 </span>
                 <span className={`badge ${
-                  event.status === 'active' ? 'badge-success' :
+                  event.status === 'active' ? 'badge-primary' :
                   event.status === 'ended' ? 'badge-neutral' : 'badge-warning'
                 }`}>
                   {CHECKIN_STATUS_LABELS[event.status]}
@@ -443,35 +448,36 @@ export default function CheckinDetail() {
             </div>
             <a
               href={getExportUrl(eventId)}
-              className="btn-secondary"
+              className="btn btn-primary shrink-0"
               download
             >
-              <Download size={15} strokeWidth={1.8} />
+              <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                <Download size={13} strokeWidth={2.5} />
+              </span>
               导出数据
             </a>
           </div>
-        </div>
+        </motion.div>
 
         {/* KPI Overview */}
-        <div className="panel mb-6">
+        <motion.div variants={fadeUp} className="clean-card mb-6 overflow-hidden">
           <div className="grid grid-cols-2 md:grid-cols-4">
             {[
-              { label: '参与人数', value: event.participant_count, icon: Users },
-              { label: '活动天数', value: event.total_days, icon: Calendar },
-              { label: '今日打卡', value: todayCount, icon: CheckCircle2 },
-              { label: '平均打卡率', value: `${avgCheckinRate}%`, icon: Target },
+              { label: '参与人数', value: event.participant_count, icon: Users, iconBg: '#EEF0FF', iconColor: '#5B5CE2' },
+              { label: '活动天数', value: event.total_days, icon: Calendar, iconBg: '#EFF6FF', iconColor: '#2563EB' },
+              { label: '今日打卡', value: todayCount, icon: CheckCircle2, iconBg: '#ECFDF3', iconColor: '#22C55E' },
+              { label: '平均打卡率', value: `${avgCheckinRate}%`, icon: Target, iconBg: '#FFFBEB', iconColor: '#F59E0B' },
             ].map((stat, idx) => (
               <div
                 key={stat.label}
-                className={`px-5 py-4
+                className={`px-5 py-5
                            ${idx < 3 ? 'md:border-r border-border-subtle' : ''}
                            ${idx < 2 ? 'border-b md:border-b-0 border-border-subtle' : ''}`}
-                style={{ borderColor: 'var(--color-border-subtle)' }}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center"
-                       style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
-                    <stat.icon size={14} strokeWidth={1.8} />
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                       style={{ backgroundColor: stat.iconBg, color: stat.iconColor }}>
+                    <stat.icon size={16} strokeWidth={1.8} />
                   </div>
                   <span className="t-caption">{stat.label}</span>
                 </div>
@@ -479,29 +485,29 @@ export default function CheckinDetail() {
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Reward Rules */}
         {event.reward_rules && (
-          <div className="panel mb-6" style={{ background: 'linear-gradient(180deg, #FFFCF5 0%, #FFFFFF 100%)' }}>
-            <div className="px-5 py-4 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-                   style={{ backgroundColor: 'var(--color-warning-soft)', color: 'var(--color-warning)' }}>
-                <Trophy size={16} strokeWidth={1.8} />
+          <motion.div variants={fadeUp} className="clean-card overflow-hidden mb-6 relative">
+            <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[20px]" style={{ background: 'linear-gradient(90deg, #F59E0B 0%, #FCD34D 100%)' }} />
+            <div className="px-5 py-5 pt-[22px] flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFFBEB', color: '#F59E0B' }}>
+                <Trophy size={18} strokeWidth={1.8} />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="t-body-strong mb-1">奖励规则</h3>
-                <p className="t-caption whitespace-pre-wrap" style={{ color: 'var(--color-text-secondary)' }}>
+                <p className="t-caption whitespace-pre-wrap text-text-secondary">
                   {event.reward_rules}
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Tabs */}
-        <div className="mb-6">
-          <div className="tab-list">
+        <motion.div variants={fadeUp} className="mb-6">
+          <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -509,7 +515,11 @@ export default function CheckinDetail() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`tab-item ${isActive ? 'active' : ''}`}
+                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-bg-surface text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
                 >
                   <Icon size={14} strokeWidth={1.8} />
                   {tab.label}
@@ -517,17 +527,19 @@ export default function CheckinDetail() {
               );
             })}
           </div>
-        </div>
+        </motion.div>
 
       {activeTab === 'checkin' && (
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6">
+        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6">
           {/* Left: Calendar + Leaderboard */}
           <div className="space-y-6">
             {/* Calendar */}
-            <div className="panel">
-              <div className="px-5 py-3.5 flex items-center justify-between border-b"
-                   style={{ borderColor: 'var(--color-border-subtle)' }}>
-                <h3 className="panel-title">打卡日历</h3>
+            <div className="clean-card overflow-hidden">
+              <div className="px-5 py-3.5 flex items-center justify-between border-b border-border-subtle">
+                <h3 className="panel-title">
+                  <Calendar size={15} strokeWidth={1.8} className="text-primary" />
+                  打卡日历
+                </h3>
                 <div className="flex items-center gap-0.5">
                   <button onClick={prevMonth} className="btn-icon-sm">
                     <ChevronLeft size={15} strokeWidth={1.8} />
@@ -553,35 +565,12 @@ export default function CheckinDetail() {
                         <button
                           onClick={() => day.isEventDay && setSelectedDate(day.date)}
                           disabled={!day.isEventDay}
-                          className={`w-full h-full rounded-md flex flex-col items-center justify-center transition-all duration-150
-                                     ${day.isEventDay ? 'cursor-pointer' : 'cursor-default'}`}
-                          style={{
-                            backgroundColor: day.isSelected
-                              ? 'var(--color-primary-soft)'
-                              : day.isEventDay && day.count && day.count > 0
-                              ? 'var(--color-success-soft)'
-                              : 'transparent',
-                            color: day.isSelected
-                              ? 'var(--color-primary)'
-                              : day.isEventDay && day.count && day.count > 0
-                              ? 'var(--color-success)'
-                              : day.isEventDay
-                              ? 'var(--color-text-secondary)'
-                              : 'var(--color-text-disabled)',
-                            fontWeight: day.isSelected ? 600 : 500,
-                          }}
-                          onMouseEnter={(e) => {
-                            if (day.isEventDay && !day.isSelected) {
-                              e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (day.isEventDay && !day.isSelected) {
-                              e.currentTarget.style.backgroundColor = day.count && day.count > 0
-                                ? 'var(--color-success-soft)'
-                                : 'transparent';
-                            }
-                          }}
+                          className={`w-full h-full rounded-lg flex flex-col items-center justify-center transition-all duration-150
+                            ${!day.isEventDay ? 'cursor-default text-text-disabled' : 'cursor-pointer'}
+                            ${day.isSelected && day.isEventDay ? 'bg-primary-soft text-primary font-semibold' : ''}
+                            ${!day.isSelected && day.isEventDay && day.count && day.count > 0 ? 'bg-success-soft text-success hover:bg-bg-hover' : ''}
+                            ${!day.isSelected && day.isEventDay && (!day.count || day.count === 0) ? 'text-text-secondary hover:bg-bg-hover' : ''}
+                          `}
                         >
                           <span className="text-xs leading-none">{new Date(day.date).getDate()}</span>
                           {day.isEventDay && day.count && day.count > 0 && (
@@ -596,11 +585,11 @@ export default function CheckinDetail() {
                 </div>
                 <div className="flex items-center gap-4 mt-3 t-small">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--color-success-soft)' }} />
+                    <div className="w-2.5 h-2.5 rounded-sm bg-success-soft" />
                     <span>已打卡</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'var(--color-primary-soft)' }} />
+                    <div className="w-2.5 h-2.5 rounded-sm bg-primary-soft" />
                     <span>选中</span>
                   </div>
                 </div>
@@ -609,38 +598,39 @@ export default function CheckinDetail() {
 
             {/* Leaderboard */}
             {topParticipants.length > 0 && (
-              <div className="panel">
-                <div className="px-5 py-3.5 flex items-center justify-between border-b"
-                     style={{ borderColor: 'var(--color-border-subtle)' }}>
+              <div className="clean-card overflow-hidden">
+                <div className="px-5 py-3.5 flex items-center justify-between border-b border-border-subtle">
                   <h3 className="panel-title">
-                    <Trophy size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                    <Trophy size={15} strokeWidth={1.8} style={{ color: '#F59E0B' }} />
                     打卡排行
                   </h3>
                 </div>
                 <div className="py-1">
                   {topParticipants.map((p: any, idx: number) => {
-                    const medals = ['🥇', '🥈', '🥉', '4', '5'];
-                    const medalColors = [
-                      'var(--color-warning)',
-                      'var(--color-text-tertiary)',
-                      '#C97B50',
-                      'var(--color-text-tertiary)',
-                      'var(--color-text-tertiary)',
+                    const medalStyles = [
+                      { bg: '#FFFBEB', color: '#F59E0B' },
+                      { bg: '#F2F4F7', color: '#667085' },
+                      { bg: '#FFF7ED', color: '#C97B50' },
+                      { bg: 'transparent', color: 'var(--color-text-tertiary)' },
+                      { bg: 'transparent', color: 'var(--color-text-tertiary)' },
                     ];
+                    const style = medalStyles[idx] || medalStyles[3];
                     return (
                       <div key={p.participant.id}
-                           className="flex items-center gap-3 px-5 py-2.5 hover:bg-bg-subtle/60 transition-colors duration-150"
-                           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(248 249 252 / 0.6)'}
-                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                           className="flex items-center gap-3 px-5 py-2.5 hover:bg-bg-hover transition-colors duration-150"
                       >
-                        <span className="w-5 text-center font-semibold text-sm"
-                              style={{ color: medalColors[idx], fontFamily: 'Manrope, sans-serif' }}>
-                          {idx < 3 ? medals[idx] : idx + 1}
+                        <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0"
+                              style={{ backgroundColor: style.bg, color: style.color }}>
+                          {idx + 1}
                         </span>
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                             style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-secondary)' }}>
-                          {p.participant.nickname[0] || '?'}
-                        </div>
+                        {p.participant.avatar_url ? (
+                          <img src={p.participant.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
+                               style={{ backgroundColor: '#EEF0FF', color: '#5B5CE2' }}>
+                            {p.participant.nickname[0] || '?'}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="t-body-strong truncate">
                             {p.participant.nickname}
@@ -650,11 +640,11 @@ export default function CheckinDetail() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm kpi-value" style={{ color: 'var(--color-text-primary)' }}>
+                          <span className="font-semibold text-sm kpi-value text-text-primary">
                             {p.checkin_days}天
                           </span>
                           {p.current_streak > 1 && (
-                            <span className="flex items-center gap-0.5" style={{ color: 'var(--color-warning)' }}>
+                            <span className="flex items-center gap-0.5 text-warning">
                               <Flame size={12} strokeWidth={2} />
                               <span className="text-xs font-medium">{p.current_streak}</span>
                             </span>
@@ -669,46 +659,46 @@ export default function CheckinDetail() {
           </div>
 
           {/* Right: Participant List */}
-          <div className="panel">
+          <div className="clean-card overflow-hidden">
             {/* Header */}
-            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--color-border-subtle)' }}>
+            <div className="px-5 py-4 border-b border-border-subtle">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="panel-title">
-                    <Calendar size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                    <Calendar size={15} strokeWidth={1.8} className="text-primary" />
                     {formatDate(selectedDate)} 周{getDayOfWeek(selectedDate)}
                     {isToday(selectedDate) && (
-                      <span className="badge badge-primary" style={{ marginLeft: '0.5rem' }}>今天</span>
+                      <span className="badge badge-primary ml-2">今天</span>
                     )}
                   </h3>
-                  <p className="t-caption mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="t-caption mt-0.5 text-text-tertiary">
                     点击人员可快速标记打卡
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {batchMode ? (
                     <>
-                      <button onClick={selectAllUnchecked} className="btn-secondary">
+                      <button onClick={selectAllUnchecked} className="btn btn-secondary">
                         全选未打卡
                       </button>
                       <button
                         onClick={handleBatchCheckin}
                         disabled={selectedParticipants.size === 0}
-                        className="btn-primary"
+                        className="btn btn-primary"
                       >
                         <Check size={14} strokeWidth={1.8} />
                         批量打卡 ({selectedParticipants.size})
                       </button>
-                      <button onClick={() => { setBatchMode(false); setSelectedParticipants(new Set()); }} className="btn-secondary">
+                      <button onClick={() => { setBatchMode(false); setSelectedParticipants(new Set()); }} className="btn btn-secondary">
                         取消
                       </button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => setBatchMode(true)} className="btn-secondary">
+                      <button onClick={() => setBatchMode(true)} className="btn btn-secondary">
                         批量操作
                       </button>
-                      <button onClick={() => setShowAddParticipant(true)} className="btn-primary">
+                      <button onClick={() => setShowAddParticipant(true)} className="btn btn-primary">
                         <UserPlus size={14} strokeWidth={1.8} />
                         添加人员
                       </button>
@@ -719,16 +709,9 @@ export default function CheckinDetail() {
             </div>
 
             {/* Search */}
-            <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--color-border-subtle)' }}>
+            <div className="px-5 py-3 border-b border-border-subtle">
               <div className="relative">
-                <Search size={15} strokeWidth={1.8}
-                        style={{
-                          position: 'absolute',
-                          left: '0.75rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          color: 'var(--color-text-tertiary)',
-                        }} />
+                <Search size={15} strokeWidth={1.8} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -740,44 +723,34 @@ export default function CheckinDetail() {
             </div>
 
             {/* List */}
-            <div className="max-h-[600px] overflow-y-auto">
+            <div className="max-h-[600px] overflow-y-auto scrollbar-thin">
               {filteredParticipants.length === 0 ? (
                 <div className="px-5 py-16 text-center">
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                       style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EEF0FF', color: '#5B5CE2' }}>
                     <Users size={22} strokeWidth={1.5} />
                   </div>
-                  <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <p className="t-caption text-text-tertiary">
                     暂无参与者，点击上方添加
                   </p>
                 </div>
               ) : (
-                <div className="divide-y" style={{ borderColor: 'var(--color-border-subtle)' }}>
+                <div className="divide-y divide-border-subtle">
                   {filteredParticipants.map((p: any) => {
                     const isChecked = !!getParticipantCheckedOnDate(p.participant.id, selectedDate);
                     const record = getParticipantRecordOnDate(p.participant.id, selectedDate);
                     return (
                       <div
                         key={p.participant.id}
-                        className={`flex items-center gap-3 px-5 py-3 transition-colors duration-150 group
-                                   ${isChecked ? 'bg-success-soft/30' : ''}`}
-                        style={{ backgroundColor: isChecked ? 'rgb(225 244 232 / 0.3)' : undefined }}
-                        onMouseEnter={(e) => {
-                          if (!isChecked) e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isChecked) e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
+                        className={`flex items-center gap-3 px-5 py-3 transition-colors duration-150 group hover:bg-bg-hover ${isChecked ? 'bg-success-soft/30' : ''}`}
                       >
                         {batchMode && (
                           <button
                             onClick={() => toggleSelectParticipant(p.participant.id)}
-                            className="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all"
-                            style={{
-                              backgroundColor: selectedParticipants.has(p.participant.id) ? 'var(--color-primary)' : 'transparent',
-                              borderColor: selectedParticipants.has(p.participant.id) ? 'var(--color-primary)' : 'var(--color-border-default)',
-                              color: 'white',
-                            }}
+                            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                              selectedParticipants.has(p.participant.id)
+                                ? 'bg-primary border-primary text-white'
+                                : 'bg-transparent border-border-default'
+                            }`}
                           >
                             {selectedParticipants.has(p.participant.id) && <Check size={12} strokeWidth={2.5} />}
                           </button>
@@ -786,23 +759,26 @@ export default function CheckinDetail() {
                           onClick={() => !batchMode && handleToggleCheckin(p.participant.id)}
                           className="flex-1 flex items-center gap-3 text-left min-w-0"
                         >
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm"
-                               style={{
-                                 backgroundColor: isChecked ? 'var(--color-success-soft)' : 'var(--color-bg-subtle)',
-                                 color: isChecked ? 'var(--color-success)' : 'var(--color-text-tertiary)',
-                               }}>
-                            {isChecked
-                              ? <CheckCircle2 size={18} strokeWidth={2} />
-                              : (p.participant.nickname[0] || '?')}
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
+                            isChecked ? 'ring-2 ring-success ring-offset-1 ring-offset-surface' : ''
+                          }`}>
+                            {p.participant.avatar_url ? (
+                              <img src={p.participant.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className={`w-full h-full flex items-center justify-center font-semibold text-sm ${
+                                isChecked ? 'bg-success-soft text-success' : 'bg-primary-soft text-primary'
+                              }`}>
+                                {p.participant.nickname[0] || '?'}
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="t-body-strong"
-                                    style={{ color: isChecked ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+                              <span className={`t-body-strong ${isChecked ? 'text-success' : 'text-text-primary'}`}>
                                 {p.participant.nickname}
                               </span>
                               {record?.display_name && (
-                                <span className="badge badge-success" style={{ fontWeight: 500 }}>
+                                <span className="badge badge-success">
                                   {record.display_name}
                                 </span>
                               )}
@@ -812,32 +788,29 @@ export default function CheckinDetail() {
                             </div>
                             <div className="flex items-center gap-3 mt-0.5">
                               <span className="t-small">
-                                累计 <span className="font-medium" style={{ color: isChecked ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>{p.checkin_days}</span> 天
+                                累计 <span className={`font-medium ${isChecked ? 'text-success' : 'text-text-secondary'}`}>{p.checkin_days}</span> 天
                               </span>
                               {p.current_streak >= 2 && (
-                                <span className="flex items-center gap-0.5 t-small" style={{ color: 'var(--color-warning)' }}>
+                                <span className="flex items-center gap-0.5 t-small text-warning">
                                   <Flame size={11} strokeWidth={2} />
                                   连续{p.current_streak}天
                                 </span>
                               )}
                               {p.max_streak > p.current_streak && p.max_streak >= 3 && (
-                                <span className="t-small" style={{ color: 'var(--color-text-tertiary)' }}>
+                                <span className="t-small text-text-tertiary">
                                   最长{p.max_streak}天
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="shrink-0" style={{ color: isChecked ? 'var(--color-success)' : 'var(--color-text-disabled)' }}>
+                          <div className={`shrink-0 ${isChecked ? 'text-success' : 'text-text-disabled'}`}>
                             {isChecked ? <CheckCircle2 size={20} strokeWidth={1.8} /> : <Circle size={20} strokeWidth={1.5} />}
                           </div>
                         </button>
                         {!batchMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleRemoveParticipant(p.participant.id); }}
-                            className="opacity-0 group-hover:opacity-100 btn-icon-sm transition-opacity"
-                            style={{ color: 'var(--color-text-tertiary)' }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                            className="opacity-0 group-hover:opacity-100 btn-icon-sm transition-opacity text-text-tertiary hover:text-danger"
                           >
                             <Trash2 size={14} strokeWidth={1.8} />
                           </button>
@@ -849,34 +822,29 @@ export default function CheckinDetail() {
               )}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {activeTab === 'review' && (
-        <div className="panel">
-          <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-               style={{ borderColor: 'var(--color-border-subtle)' }}>
+        <motion.div variants={fadeUp} className="clean-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1">
+              <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
                 {['pending', 'approved', 'rejected', ''].map(s => (
                   <button
                     key={s || 'all'}
                     onClick={() => { setReviewStatus(s); setReviewPage(1); }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       reviewStatus === s
-                        ? 'bg-primary text-white'
-                        : 'text-secondary hover:bg-bg-subtle'
+                        ? 'bg-bg-surface text-primary shadow-sm'
+                        : 'text-text-secondary hover:text-text-primary'
                     }`}
-                    style={{
-                      backgroundColor: reviewStatus === s ? 'var(--color-primary)' : 'transparent',
-                      color: reviewStatus === s ? 'white' : 'var(--color-text-secondary)',
-                    }}
                   >
                     {s ? RECORD_STATUS_LABELS[s] : '全部'}
                   </button>
                 ))}
               </div>
-              <div className="h-5 w-px" style={{ backgroundColor: 'var(--color-border-subtle)' }} />
+              <div className="h-5 w-px bg-border-subtle" />
               {[
                 { value: '', label: '全部类型' },
                 { value: 'makeup', label: '补卡' },
@@ -885,40 +853,42 @@ export default function CheckinDetail() {
                 <button
                   key={t.value || 'all-type'}
                   onClick={() => { setReviewRecordType(t.value); setReviewPage(1); }}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: reviewRecordType === t.value ? 'var(--color-bg-elevated)' : 'transparent',
-                    color: reviewRecordType === t.value ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                    fontWeight: reviewRecordType === t.value ? 600 : 500,
-                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    reviewRecordType === t.value
+                      ? 'bg-bg-surface text-text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
-            <div className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>共 {reviewTotal} 条记录</div>
+            <div className="t-caption text-text-tertiary">共 {reviewTotal} 条记录</div>
           </div>
 
-          <div className="divide-y" style={{ borderColor: 'var(--color-border-subtle)' }}>
+          <div className="divide-y divide-border-subtle">
             {loadingReview ? (
-              <div className="px-5 py-12 text-center t-caption" style={{ color: 'var(--color-text-tertiary)' }}>加载中...</div>
+              <div className="px-5 py-12 flex justify-center">
+                <Loading text="" size="sm" />
+              </div>
             ) : reviewRecords.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                     style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
                   <FileText size={22} strokeWidth={1.5} />
                 </div>
-                <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>暂无打卡记录</p>
+                <p className="t-caption text-text-tertiary">暂无打卡记录</p>
               </div>
             ) : (
               reviewRecords.map((r: any) => (
-                <div key={r.id} className="px-5 py-4 flex items-start gap-4 hover:bg-bg-subtle/60 transition-colors duration-150"
-                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgb(248 249 252 / 0.6)'}
-                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0"
-                       style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-secondary)' }}>
-                    {r.nickname?.[0] || '?'}
+                <div key={r.id} className="px-5 py-4 flex items-start gap-4 hover:bg-bg-hover transition-colors duration-150 group">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                    {r.avatar_url ? (
+                      <img src={r.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center font-semibold text-sm bg-primary-soft text-primary">
+                        {r.nickname?.[0] || '?'}
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -932,19 +902,17 @@ export default function CheckinDetail() {
                       </span>
                       {r.is_makeup && <span className="badge badge-warning">补卡</span>}
                     </div>
-                    <div className="t-caption mb-2" style={{ color: 'var(--color-text-tertiary)' }}>{r.checkin_date}</div>
-                    {r.note && <p className="t-body mb-2" style={{ color: 'var(--color-text-secondary)' }}>{r.note}</p>}
+                    <div className="t-caption mb-2 text-text-tertiary">{r.checkin_date}</div>
+                    {r.note && <p className="t-body mb-2 text-text-secondary">{r.note}</p>}
                     {r.image_url && (
                       <img
                         src={r.image_url}
                         alt="打卡图片"
-                        className="w-24 h-24 object-cover rounded-md"
-                        style={{ border: '1px solid var(--color-border-subtle)' }}
+                        className="w-24 h-24 object-cover rounded-lg border border-border-subtle"
                       />
                     )}
                     {r.review_note && (
-                      <div className="mt-2 t-caption rounded-md p-2"
-                           style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-secondary)' }}>
+                      <div className="mt-2 t-caption rounded-lg p-2 bg-bg-subtle text-text-secondary">
                         审核备注：{r.review_note}
                       </div>
                     )}
@@ -953,16 +921,14 @@ export default function CheckinDetail() {
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => { setShowReviewModal({ record: r, action: 'approve' }); setReviewNote(''); }}
-                        className="btn-icon-sm"
-                        style={{ color: 'var(--color-success)' }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-success hover:bg-success-soft transition-colors"
                         title="通过"
                       >
                         <ThumbsUp size={15} strokeWidth={1.8} />
                       </button>
                       <button
                         onClick={() => { setShowReviewModal({ record: r, action: 'reject' }); setReviewNote(''); }}
-                        className="btn-icon-sm"
-                        style={{ color: 'var(--color-danger)' }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"
                         title="拒绝"
                       >
                         <ThumbsDown size={15} strokeWidth={1.8} />
@@ -975,34 +941,32 @@ export default function CheckinDetail() {
           </div>
 
           {reviewTotal > 20 && (
-            <div className="px-5 py-3 border-t flex items-center justify-center gap-2"
-                 style={{ borderColor: 'var(--color-border-subtle)' }}>
+            <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-center gap-2">
               <button
                 onClick={() => setReviewPage(p => Math.max(1, p - 1))}
                 disabled={reviewPage === 1}
-                className="btn-secondary"
+                className="btn btn-secondary disabled:opacity-50"
               >
                 上一页
               </button>
-              <span className="t-small" style={{ color: 'var(--color-text-tertiary)' }}>第 {reviewPage} 页</span>
+              <span className="t-small text-text-tertiary">第 {reviewPage} 页</span>
               <button
                 onClick={() => setReviewPage(p => p + 1)}
                 disabled={reviewPage * 20 >= reviewTotal}
-                className="btn-secondary"
+                className="btn btn-secondary disabled:opacity-50"
               >
                 下一页
               </button>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {activeTab === 'badges' && (
-        <div className="panel">
-          <div className="px-5 py-4 border-b flex items-center justify-between"
-               style={{ borderColor: 'var(--color-border-subtle)' }}>
+        <motion.div variants={fadeUp} className="clean-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
             <h3 className="panel-title">
-              <Award size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+              <Award size={15} strokeWidth={1.8} style={{ color: '#F59E0B' }} />
               徽章管理
             </h3>
             <button
@@ -1011,9 +975,11 @@ export default function CheckinDetail() {
                 setBadgeForm({ name: '', description: '', icon: '🏅', type: 'streak', target_days: 7 });
                 setShowBadgeForm(true);
               }}
-              className="btn-primary"
+              className="btn btn-primary"
             >
-              <Plus size={14} strokeWidth={1.8} />
+              <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                <Plus size={13} strokeWidth={2.5} />
+              </span>
               添加徽章
             </button>
           </div>
@@ -1021,11 +987,10 @@ export default function CheckinDetail() {
           <div className="px-5 py-5">
             {badges.length === 0 ? (
               <div className="py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                     style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFFBEB', color: '#F59E0B' }}>
                   <Award size={22} strokeWidth={1.5} />
                 </div>
-                <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                <p className="t-caption text-text-tertiary">
                   还没有徽章，点击右上角添加第一个吧
                 </p>
               </div>
@@ -1033,22 +998,12 @@ export default function CheckinDetail() {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {badges.map((b: any) => (
                   <div key={b.id}
-                       className="rounded-xl p-4 group transition-all duration-150"
-                       style={{
-                         border: '1px solid var(--color-border-subtle)',
-                         backgroundColor: 'var(--color-bg-elevated)',
-                       }}
-                       onMouseEnter={(e) => {
-                         e.currentTarget.style.borderColor = 'var(--color-border-default)';
-                         e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
-                       }}
-                       onMouseLeave={(e) => {
-                         e.currentTarget.style.borderColor = 'var(--color-border-subtle)';
-                         e.currentTarget.style.boxShadow = 'none';
-                       }}
+                       className="rounded-xl p-4 group transition-all duration-150 bg-bg-surface border border-border-subtle hover:border-border-default hover:shadow-sm"
                   >
                     <div className="flex items-start justify-between mb-3">
-                      <div className="text-3xl">{b.icon || '🏅'}</div>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: '#FFFBEB' }}>
+                        {b.icon || '🏅'}
+                      </div>
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => {
@@ -1056,48 +1011,41 @@ export default function CheckinDetail() {
                             setBadgeForm({ name: b.name, description: b.description || '', icon: b.icon || '🏅', type: b.type, target_days: b.target_days });
                             setShowBadgeForm(true);
                           }}
-                          className="btn-icon-sm"
-                          style={{ color: 'var(--color-text-tertiary)' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-primary hover:bg-primary-soft transition-colors"
                         >
                           <Edit2 size={13} strokeWidth={1.8} />
                         </button>
                         <button
                           onClick={() => handleDeleteBadge(b.id)}
-                          className="btn-icon-sm"
-                          style={{ color: 'var(--color-text-tertiary)' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-danger hover:bg-danger-soft transition-colors"
                         >
                           <Trash2 size={13} strokeWidth={1.8} />
                         </button>
                       </div>
                     </div>
                     <div className="t-body-strong mb-1">{b.name}</div>
-                    <div className="t-caption mb-2 line-clamp-2" style={{ color: 'var(--color-text-tertiary)' }}>
+                    <div className="t-caption mb-2 line-clamp-2 text-text-tertiary">
                       {b.description || '暂无描述'}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="badge badge-warning">
                         {BADGE_TYPES.find(t => t.value === b.type)?.label}
                       </span>
-                      <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>{b.target_days}天</span>
+                      <span className="t-caption text-text-tertiary">{b.target_days}天</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {activeTab === 'materials' && (
-        <div className="panel">
-          <div className="px-5 py-4 border-b flex items-center justify-between"
-               style={{ borderColor: 'var(--color-border-subtle)' }}>
+        <motion.div variants={fadeUp} className="clean-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
             <h3 className="panel-title">
-              <BookOpen size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+              <BookOpen size={15} strokeWidth={1.8} style={{ color: '#2563EB' }} />
               资料管理
             </h3>
             <button
@@ -1106,36 +1054,32 @@ export default function CheckinDetail() {
                 setMaterialForm({ title: '', description: '', file_url: '', file_type: 'pdf', sort_order: 0, is_active: true });
                 setShowMaterialForm(true);
               }}
-              className="btn-primary"
+              className="btn btn-primary"
             >
-              <Plus size={14} strokeWidth={1.8} />
+              <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                <Plus size={13} strokeWidth={2.5} />
+              </span>
               添加资料
             </button>
           </div>
 
-          <div className="divide-y" style={{ borderColor: 'var(--color-border-subtle)' }}>
+          <div className="divide-y divide-border-subtle">
             {materials.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                     style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
                   <BookOpen size={22} strokeWidth={1.5} />
                 </div>
-                <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                <p className="t-caption text-text-tertiary">
                   还没有资料，点击右上角添加第一个吧
                 </p>
               </div>
             ) : (
               materials.map((m: any) => (
                 <div key={m.id}
-                     className="px-5 py-4 flex items-start gap-4 group transition-colors duration-150"
-                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)'}
-                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                     className="px-5 py-4 flex items-start gap-4 group transition-colors duration-150 hover:bg-bg-hover"
                 >
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                       style={{ backgroundColor: 'var(--color-primary-soft)' }}>
-                    <span className="text-lg">
-                      {m.file_type === 'pdf' ? '📄' : m.file_type === 'video' ? '🎬' : m.file_type === 'audio' ? '🎵' : '📎'}
-                    </span>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-lg bg-primary-soft">
+                    {m.file_type === 'pdf' ? '📄' : m.file_type === 'video' ? '🎬' : m.file_type === 'audio' ? '🎵' : '📎'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="t-body-strong mb-1 flex items-center gap-2">
@@ -1144,11 +1088,10 @@ export default function CheckinDetail() {
                         <span className="badge badge-neutral">已下架</span>
                       )}
                     </div>
-                    {m.description && <p className="t-caption mb-1" style={{ color: 'var(--color-text-secondary)' }}>{m.description}</p>}
+                    {m.description && <p className="t-caption mb-1 text-text-secondary">{m.description}</p>}
                     {m.file_url && (
                       <a href={m.file_url} target="_blank" rel="noreferrer"
-                         className="t-small truncate block"
-                         style={{ color: 'var(--color-primary)' }}>
+                         className="t-small truncate block text-primary hover:underline">
                         {m.file_url}
                       </a>
                     )}
@@ -1160,19 +1103,13 @@ export default function CheckinDetail() {
                         setMaterialForm({ title: m.title, description: m.description || '', file_url: m.file_url || '', file_type: m.file_type || 'pdf', sort_order: m.sort_order || 0, is_active: !!m.is_active });
                         setShowMaterialForm(true);
                       }}
-                      className="btn-icon-sm"
-                      style={{ color: 'var(--color-text-tertiary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-primary hover:bg-primary-soft transition-colors"
                     >
                       <Edit2 size={14} strokeWidth={1.8} />
                     </button>
                     <button
                       onClick={() => handleDeleteMaterial(m.id)}
-                      className="btn-icon-sm"
-                      style={{ color: 'var(--color-text-tertiary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-danger hover:bg-danger-soft transition-colors"
                     >
                       <Trash2 size={14} strokeWidth={1.8} />
                     </button>
@@ -1181,66 +1118,56 @@ export default function CheckinDetail() {
               ))
             )}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {activeTab === 'rewards' && (
-        <div className="panel">
-          <div className="px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-               style={{ borderColor: 'var(--color-border-subtle)' }}>
-            <div className="flex items-center gap-1">
-              {['', 'pending', 'distributed', 'not_qualified'].map(s => (
+        <motion.div variants={fadeUp} className="clean-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
+              {[
+                { value: '', label: '全部' },
+                { value: 'pending', label: '待发放' },
+                { value: 'distributed', label: '已发放' },
+                { value: 'not_qualified', label: '未达标' },
+              ].map(t => (
                 <button
-                  key={s || 'all'}
-                  onClick={() => setRewardStatus(s)}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: rewardStatus === s ? 'var(--color-primary)' : 'transparent',
-                    color: rewardStatus === s ? 'white' : 'var(--color-text-secondary)',
-                  }}
+                  key={t.value || 'all'}
+                  onClick={() => setRewardStatus(t.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    rewardStatus === t.value
+                      ? 'bg-bg-surface text-primary shadow-sm'
+                      : 'text-text-secondary hover:text-text-primary'
+                  }`}
                 >
-                  {s ? REWARD_STATUS_LABELS[s] : '全部'}
+                  {t.label}
                 </button>
               ))}
             </div>
             <div className="relative">
-              <Search size={14} strokeWidth={1.8}
-                      style={{
-                        position: 'absolute',
-                        left: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: 'var(--color-text-tertiary)',
-                      }} />
+              <Search size={14} strokeWidth={1.8} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type="text"
                 value={rewardSearch}
                 onChange={e => setRewardSearch(e.target.value)}
-                placeholder="搜索..."
-                className="input pl-9 w-48"
-                style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem', fontSize: '0.8125rem' }}
+                placeholder="搜索参与者..."
+                className="input pl-9 w-48 h-9 text-[13px]"
               />
             </div>
           </div>
 
-          <div className="divide-y" style={{ borderColor: 'var(--color-border-subtle)' }}>
+          <div className="divide-y divide-border-subtle">
             {rewards.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                     style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center bg-bg-subtle text-text-tertiary">
                   <Gift size={22} strokeWidth={1.5} />
                 </div>
-                <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>暂无数据</p>
+                <p className="t-caption text-text-tertiary">暂无数据</p>
               </div>
             ) : (
               rewards.map((p: any) => (
-                <div key={p.id}
-                     className="px-5 py-4 flex items-center gap-4 transition-colors duration-150"
-                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)'}
-                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0"
-                       style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-secondary)' }}>
+                <div key={p.id} className="px-5 py-4 flex items-center gap-4 transition-colors duration-150 hover:bg-bg-hover group">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 bg-bg-subtle text-text-secondary">
                     {p.nickname?.[0] || '?'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1248,12 +1175,12 @@ export default function CheckinDetail() {
                       <span className="t-body-strong">{p.nickname}</span>
                       {p.child_name && <span className="t-small">({p.child_name})</span>}
                     </div>
-                    <div className="flex items-center gap-4 t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
-                      <span>打卡 <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>{p.checkin_days}</span> 天</span>
+                    <div className="flex items-center gap-4 t-caption text-text-tertiary">
+                      <span>打卡 <span className="font-medium text-text-secondary">{p.checkin_days}</span> 天</span>
                       <span>加入 {p.joined_at?.split(' ')[0] || ''}</span>
                     </div>
                     {p.reward_note && (
-                      <div className="t-caption mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                      <div className="t-caption mt-1 text-text-tertiary">
                         奖励备注：{p.reward_note}
                       </div>
                     )}
@@ -1268,8 +1195,7 @@ export default function CheckinDetail() {
                     {(p.reward_status === 'pending' || !p.reward_status) && (
                       <button
                         onClick={() => { setShowRewardModal(p); setRewardNote(''); }}
-                        className="btn-primary"
-                        style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}
+                        className="btn btn-primary btn-sm"
                       >
                         <Gift size={13} strokeWidth={1.8} />
                         发放
@@ -1280,7 +1206,7 @@ export default function CheckinDetail() {
               ))
             )}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {showAddParticipant && (
@@ -1290,8 +1216,8 @@ export default function CheckinDetail() {
           title="添加参与者"
           footer={
             <>
-              <button onClick={() => { setShowAddParticipant(false); setNewParticipantName(''); setNewParticipantChild(''); }} className="btn-secondary">取消</button>
-              <button onClick={handleAddParticipant} disabled={!newParticipantName.trim()} className="btn-primary"><Plus className="w-4 h-4" />添加</button>
+              <button onClick={() => { setShowAddParticipant(false); setNewParticipantName(''); setNewParticipantChild(''); }} className="btn btn-secondary">取消</button>
+              <button onClick={handleAddParticipant} disabled={!newParticipantName.trim()} className="btn btn-primary"><Plus className="w-4 h-4" />添加</button>
             </>
           }
         >
@@ -1328,8 +1254,8 @@ export default function CheckinDetail() {
           title={showReviewModal.action === 'approve' ? '通过审核' : '拒绝审核'}
           footer={
             <>
-              <button onClick={() => setShowReviewModal(null)} className="btn-secondary">取消</button>
-              <button onClick={handleReview} className={showReviewModal.action === 'approve' ? 'btn-primary' : 'btn-danger-solid'}>
+              <button onClick={() => setShowReviewModal(null)} className="btn btn-secondary">取消</button>
+              <button onClick={handleReview} className={showReviewModal.action === 'approve' ? 'btn btn-primary' : 'btn btn-danger-solid'}>
                 {showReviewModal.action === 'approve' ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
                 {showReviewModal.action === 'approve' ? '通过' : '拒绝'}
               </button>
@@ -1357,8 +1283,8 @@ export default function CheckinDetail() {
           title={editingBadge ? '编辑徽章' : '添加徽章'}
           footer={
             <>
-              <button onClick={() => { setShowBadgeForm(false); setEditingBadge(null); }} className="btn-secondary">取消</button>
-              <button onClick={handleSaveBadge} disabled={!badgeForm.name || !badgeForm.target_days} className="btn-primary"><Check className="w-4 h-4" />保存</button>
+              <button onClick={() => { setShowBadgeForm(false); setEditingBadge(null); }} className="btn btn-secondary">取消</button>
+              <button onClick={handleSaveBadge} disabled={!badgeForm.name || !badgeForm.target_days} className="btn btn-primary"><Check className="w-4 h-4" />保存</button>
             </>
           }
         >
@@ -1366,8 +1292,7 @@ export default function CheckinDetail() {
               <div>
                 <label className="form-label">徽章图标</label>
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl w-14 h-14 rounded-lg flex items-center justify-center"
-                       style={{ backgroundColor: 'var(--color-warning-soft)', border: '1px solid var(--color-border-subtle)' }}>
+                  <div className="text-3xl w-14 h-14 rounded-lg flex items-center justify-center bg-warning-soft border border-border-subtle">
                     {badgeForm.icon}
                   </div>
                   <input
@@ -1433,8 +1358,8 @@ export default function CheckinDetail() {
           title={editingMaterial ? '编辑资料' : '添加资料'}
           footer={
             <>
-              <button onClick={() => { setShowMaterialForm(false); setEditingMaterial(null); }} className="btn-secondary">取消</button>
-              <button onClick={handleSaveMaterial} disabled={!materialForm.title} className="btn-primary"><Check className="w-4 h-4" />保存</button>
+              <button onClick={() => { setShowMaterialForm(false); setEditingMaterial(null); }} className="btn btn-secondary">取消</button>
+              <button onClick={handleSaveMaterial} disabled={!materialForm.title} className="btn btn-primary"><Check className="w-4 h-4" />保存</button>
             </>
           }
         >
@@ -1480,7 +1405,7 @@ export default function CheckinDetail() {
                   placeholder="https://..."
                   className="input"
                 />
-                <p className="text-xs text-slate-400 mt-1">先把文件上传到服务器或云存储，然后把链接填在这里</p>
+                <p className="text-xs text-text-tertiary mt-1">先把文件上传到服务器或云存储，然后把链接填在这里</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1515,15 +1440,15 @@ export default function CheckinDetail() {
           title="发放奖励"
           footer={
             <>
-              <button onClick={() => setShowRewardModal(null)} className="btn-secondary">取消</button>
-              <button onClick={handleDistributeReward} className="btn-primary"><Gift className="w-4 h-4" />确认发放</button>
+              <button onClick={() => setShowRewardModal(null)} className="btn btn-secondary">取消</button>
+              <button onClick={handleDistributeReward} className="btn btn-primary"><Gift className="w-4 h-4" />确认发放</button>
             </>
           }
         >
             <div className="space-y-4">
-              <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--color-bg-subtle)' }}>
+              <div className="rounded-lg p-3 bg-bg-subtle">
                 <div className="t-body-strong mb-1">{showRewardModal.nickname}</div>
-                <div className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>累计打卡 {showRewardModal.checkin_days} 天</div>
+                <div className="t-caption text-text-tertiary">累计打卡 {showRewardModal.checkin_days} 天</div>
               </div>
               <div>
                 <label className="form-label">奖励备注（选填）</label>
@@ -1538,6 +1463,6 @@ export default function CheckinDetail() {
         </Modal>
       )}
       </div>
-    </div>
+    </motion.div>
   );
 }

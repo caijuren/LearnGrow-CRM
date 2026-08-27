@@ -17,6 +17,12 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 
+# Backups
+backups/
+.restore-tmp/
+data-before-restore-*/
+uploads-before-restore-*/
+
 # Local config
 .trae/
 .workbuddy/

@@ -22,7 +22,7 @@
     </navigator>
   </view>
 
-  <view wx:for="{{checkins}}" wx:key="event.id" class="checkin-card card" bindtap="goToDetail" data-id="{{item.event.id}}">
+  <view wx:for="{{checkins}}" wx:key="id" class="checkin-card card" bindtap="goToDetail" data-id="{{item.event.id}}">
     <view class="flex-between items-start mb-3">
       <view class="flex-1">
         <view class="text-lg font-bold">{{item.event.name}}</view>

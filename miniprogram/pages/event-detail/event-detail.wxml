@@ -4,7 +4,7 @@
     <view class="hero-meta mt-2">{{event.start_date}} ~ {{event.end_date}}</view>
     <view class="hero-badges flex gap-2 mt-3">
       <view class="hero-badge">{{event.participant_count}}人参与</view>
-      <view wx:if="{{isLoggedIn && isJoined}}" class="hero-badge">已加入</view>
+      <view wx:if="{{isLoggedIn && isJoined}}" class="hero-badge">已报名</view>
     </view>
   </view>
 
@@ -13,7 +13,7 @@
     <text class="status-banner-icon">!</text>
     <view class="status-banner-content">
       <view class="status-banner-title">活动即将开始</view>
-      <view class="status-banner-desc">{{event.start_date}} 起可参与打卡，敬请期待</view>
+      <view class="status-banner-desc">{{event.signup_deadline}} 前可报名，{{event.start_date}} 起开始打卡</view>
     </view>
   </view>
   <view wx:elif="{{event.event_status === 'expired'}}" class="status-banner expired">
@@ -22,6 +22,15 @@
       <view class="status-banner-title">活动已结束</view>
       <view class="status-banner-desc">本次活动已于 {{event.end_date}} 结束，感谢参与</view>
     </view>
+  </view>
+
+  <view class="share-card" bindtap="openShareModal">
+    <view class="share-card-icon">⇗</view>
+    <view class="share-card-text">
+      <view class="share-card-title">分享活动</view>
+      <view class="share-card-desc">复制链接发给好友，点击即可打开活动</view>
+    </view>
+    <text class="share-card-arrow">→</text>
   </view>
 
   <view wx:if="{{event.required_text}}" class="card">
@@ -81,7 +90,7 @@
     <view class="login-prompt-inner">
       <view class="login-prompt-icon">登录</view>
       <view class="font-bold text-lg mb-2">登录后参与打卡</view>
-      <view class="text-secondary login-prompt-desc">登录后即可加入活动、每日打卡</view>
+      <view class="text-secondary login-prompt-desc">登录后即可报名活动、每日打卡</view>
       <button class="btn-primary" bindtap="goToLogin">立即登录</button>
     </view>
   </view>
@@ -178,10 +187,15 @@
     </view>
   </view>
 
-  <view wx:if="{{isLoggedIn && !isJoined && event.event_status === 'ongoing'}}" class="card join-prompt-card">
-    <view class="join-prompt-title font-bold text-lg mb-2">加入打卡活动</view>
-    <view class="text-secondary join-prompt-desc mb-4">加入后即可开始每日打卡</view>
-    <button class="btn-primary" bindtap="handleJoin">立即加入活动</button>
+  <view wx:if="{{isLoggedIn && !isJoined && event.can_signup}}" class="card join-prompt-card">
+    <view class="join-prompt-title font-bold text-lg mb-2">报名参加活动</view>
+    <view class="text-secondary join-prompt-desc mb-4">报名后即可在 {{event.start_date}} 开始打卡</view>
+    <button class="btn-primary" bindtap="handleJoin">立即报名</button>
+  </view>
+
+  <view wx:elif="{{isLoggedIn && !isJoined && event.event_status !== 'upcoming'}}" class="card join-prompt-card">
+    <view class="join-prompt-title font-bold text-lg mb-2">报名已截止</view>
+    <view class="text-secondary join-prompt-desc mb-4">本次活动仅限已报名用户打卡</view>
   </view>
 
   <view wx:if="{{isLoggedIn && isJoined}}" class="card">
@@ -314,6 +328,22 @@
         <button class="success-btn success-btn-share" open-type="share">邀请好友一起打卡</button>
       </view>
       <view class="success-close" bindtap="closeSuccessActions">暂不分享</view>
+    </view>
+  </view>
+
+  <!-- 分享活动链接弹窗 -->
+  <view wx:if="{{showShareModal}}" class="modal-mask" bindtap="closeShareModal">
+    <view class="modal-content share-content" catchtap="preventClose">
+      <view class="modal-title">分享活动</view>
+      <view class="modal-desc">复制链接后粘贴到微信聊天发送，好友点击即可直接打开活动页，无需搜索小程序。</view>
+      <view wx:if="{{shareLink}}" class="share-link-box">
+        <text class="share-link-text">{{shareLink}}</text>
+      </view>
+      <view wx:if="{{shareExpireText}}" class="share-expire-tip">{{shareExpireText}}</view>
+      <view class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" bindtap="closeShareModal">取消</button>
+        <button class="modal-btn modal-btn-primary" bindtap="copyShareLink">复制链接</button>
+      </view>
     </view>
   </view>
 </view>

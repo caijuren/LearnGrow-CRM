@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Shield, Users, Check, AlertTriangle, Lock, ArrowLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, Shield, Users, Check, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useStore } from '@/store';
 import Modal from '@/components/Modal';
 
@@ -9,10 +9,6 @@ const ROLE_LABELS: Record<string, string> = {
   assistant: '助理',
 };
 
-const ROLE_COLORS: Record<string, { bg: string; text: string; avatar: string }> = {
-  admin: { bg: 'bg-violet-100', text: 'text-violet-700', avatar: 'from-violet-500 to-purple-600' },
-  assistant: { bg: 'bg-sky-100', text: 'text-sky-700', avatar: 'from-sky-500 to-blue-600' },
-};
 
 interface UserItem {
   id: number;
@@ -24,7 +20,7 @@ interface UserItem {
 
 export default function UserManagement() {
   const navigate = useNavigate();
-  const { currentUser, users, loading, loadUsers, addUser, editUser, removeUser } = useStore();
+  const { currentUser, users, loadUsers, addUser, editUser, removeUser } = useStore();
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -34,7 +30,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const openAdd = () => {
     setSelectedUser(null);

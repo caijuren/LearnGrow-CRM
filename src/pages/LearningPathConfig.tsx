@@ -6,6 +6,7 @@ import {
 import { useStore } from '@/store';
 import * as api from '@/lib/api';
 import Modal from '@/components/Modal';
+import Loading from '@/components/ui/Loading';
 import type { LearningPath, Product } from '../../shared/types';
 
 const SUBJECT_OPTIONS = [
@@ -69,7 +70,7 @@ export default function LearningPathConfig() {
   useEffect(() => {
     loadLearningPaths();
     api.fetchAllProducts().then(setProducts).catch(() => {});
-  }, []);
+  }, [loadLearningPaths]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -157,7 +158,7 @@ export default function LearningPathConfig() {
 
     setSaving(true);
     try {
-      const payload: any = {
+      const payload: Parameters<typeof addLearningPath>[0] = {
         name: form.name,
         subject: form.subject,
         description: form.description || null,
@@ -243,8 +244,7 @@ export default function LearningPathConfig() {
             <div className="flex-1 overflow-y-auto p-2">
               {loading && learningPaths.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16">
-                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-                  <p className="text-sm text-slate-400 mt-2">加载中...</p>
+                  <Loading />
                 </div>
               ) : learningPaths.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-4 text-center">

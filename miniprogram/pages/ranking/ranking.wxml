@@ -6,7 +6,8 @@
 
   <view wx:if="{{myRank}}" class="my-rank-card">
     <view class="my-rank-main">
-      <view class="my-rank-avatar">{{myRank.nickname[0]}}</view>
+      <image wx:if="{{myRank.avatar_url}}" class="my-rank-avatar" src="{{baseUrl}}{{myRank.avatar_url}}" mode="aspectFill" />
+      <view wx:else class="my-rank-avatar">{{myRank.nickname[0]}}</view>
       <view class="my-rank-body">
         <view class="my-rank-label">我的排名</view>
         <view class="my-rank-title">第 {{myRank.rank}} 名</view>
@@ -26,7 +27,8 @@
   <view wx:if="{{ranking.length >= 3}}" class="podium">
     <view class="podium-item second">
       <view class="podium-rank rank-2">2</view>
-      <view class="podium-avatar">{{ranking[1].nickname[0]}}</view>
+      <image wx:if="{{ranking[1].avatar_url}}" class="podium-avatar" src="{{baseUrl}}{{ranking[1].avatar_url}}" mode="aspectFill" />
+      <view wx:else class="podium-avatar">{{ranking[1].nickname[0]}}</view>
       <view class="podium-name">{{ranking[1].nickname}}</view>
       <view class="podium-days">{{ranking[1].checkin_days}} 天</view>
     </view>
@@ -34,13 +36,15 @@
       <view class="podium-crown">
         <text class="crown-icon">◆</text>
       </view>
-      <view class="podium-avatar gold">{{ranking[0].nickname[0]}}</view>
+      <image wx:if="{{ranking[0].avatar_url}}" class="podium-avatar gold" src="{{baseUrl}}{{ranking[0].avatar_url}}" mode="aspectFill" />
+      <view wx:else class="podium-avatar gold">{{ranking[0].nickname[0]}}</view>
       <view class="podium-name">{{ranking[0].nickname}}</view>
       <view class="podium-days">{{ranking[0].checkin_days}} 天</view>
     </view>
     <view class="podium-item third">
       <view class="podium-rank rank-3">3</view>
-      <view class="podium-avatar bronze">{{ranking[2].nickname[0]}}</view>
+      <image wx:if="{{ranking[2].avatar_url}}" class="podium-avatar bronze" src="{{baseUrl}}{{ranking[2].avatar_url}}" mode="aspectFill" />
+      <view wx:else class="podium-avatar bronze">{{ranking[2].nickname[0]}}</view>
       <view class="podium-name">{{ranking[2].nickname}}</view>
       <view class="podium-days">{{ranking[2].checkin_days}} 天</view>
     </view>
@@ -55,7 +59,8 @@
     </view>
     <view wx:for="{{ranking}}" wx:key="rank" class="ranking-item {{item.is_me ? 'is-me' : ''}}">
       <view class="rank-num {{item.rank <= 3 ? 'rank-top-' + item.rank : ''}}">{{item.rank}}</view>
-      <view class="user-avatar">{{item.nickname[0]}}</view>
+      <image wx:if="{{item.avatar_url}}" class="user-avatar" src="{{baseUrl}}{{item.avatar_url}}" mode="aspectFill" />
+      <view wx:else class="user-avatar">{{item.nickname[0]}}</view>
       <view class="user-info">
         <view class="user-name">
           {{item.nickname}}

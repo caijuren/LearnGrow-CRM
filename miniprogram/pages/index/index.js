@@ -72,13 +72,13 @@ Page({
 
   async handleJoin(e) {
     if (!app.requireLogin()) return;
-    const { id, name } = e.currentTarget.dataset;
+    const { id } = e.currentTarget.dataset;
     try {
       await api.joinEvent(id);
-      wx.showToast({ title: '加入成功', icon: 'success' });
+      wx.showToast({ title: '报名成功', icon: 'success' });
       this.loadEvents();
     } catch (e) {
-      wx.showToast({ title: '加入失败，请重试', icon: 'none' });
+      // api.js 已展示具体错误信息
     }
   },
 

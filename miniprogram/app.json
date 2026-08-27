@@ -6,6 +6,7 @@
     "pages/my-checkins/my-checkins",
     "pages/ranking/ranking",
     "pages/profile/profile",
+    "pages/points/points",
     "pages/privacy/privacy"
   ],
   "window": {

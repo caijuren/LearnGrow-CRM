@@ -9,7 +9,7 @@ const envVersion = typeof __wxConfig !== 'undefined' ? __wxConfig.envVersion : '
 const apiBaseUrl = API_BASE_URLS[envVersion] || API_BASE_URLS.release;
 
 // 小程序本地版本号，独立于后端版本，用于“我的”页展示；升级小程序时同步更新
-const APP_VERSION = '3.3.0';
+const APP_VERSION = '3.5.0';
 
 if (envVersion !== 'develop' && !apiBaseUrl.startsWith('https://')) {
   throw new Error('正式版和体验版必须使用 HTTPS API 域名');

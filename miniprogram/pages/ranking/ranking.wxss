@@ -5,7 +5,7 @@
 .ranking-header {
   background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
   margin: -32rpx -28rpx 0;
-  padding: 80rpx 40rpx 150rpx;
+  padding: 180rpx 40rpx 150rpx;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -87,6 +87,10 @@
   font-weight: 600;
   flex-shrink: 0;
   box-shadow: 0 6rpx 20rpx var(--primary-glow);
+}
+
+image.my-rank-avatar {
+  display: block;
 }
 
 .my-rank-body {
@@ -234,6 +238,10 @@
   box-shadow: 0 6rpx 20rpx rgba(249, 115, 22, 0.25);
 }
 
+image.podium-avatar {
+  display: block;
+}
+
 .podium-name {
   font-size: 24rpx;
   font-weight: 600;
@@ -352,6 +360,10 @@
   font-weight: 600;
   flex-shrink: 0;
   box-shadow: 0 4rpx 12rpx var(--primary-glow);
+}
+
+image.user-avatar {
+  display: block;
 }
 
 .user-info {

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/store';
-import { MATERIAL_CATEGORY_LABELS, MATERIAL_CATEGORY_COLORS, MATERIAL_COMMON_TAGS, type MaterialCategory } from '../../shared/types';
+import { MATERIAL_CATEGORY_LABELS, MATERIAL_CATEGORY_COLORS, MATERIAL_COMMON_TAGS, type MaterialCategory, type Material } from '../../shared/types';
 import {
   FolderOpen, Upload, Search, FileText, FileImage, FileVideo, File, Download, Trash2,
-  X, Tag, Folder, Plus, Filter, FileArchive
+  X, Tag, Plus, FileArchive
 } from 'lucide-react';
 import Modal from '@/components/Modal';
+import Loading from '@/components/ui/Loading';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B';
@@ -42,7 +43,7 @@ const CATEGORIES: { key: string; label: string }[] = [
 
 export default function MaterialLibrary() {
   const {
-    materials, materialCategory, materialSearch, loading,
+    materials, materialCategory, loading,
     loadMaterials, uploadMaterial, removeMaterial, recordMaterialDownload,
     setMaterialCategory, setMaterialSearch, products, loadProducts
   } = useStore();
@@ -63,7 +64,7 @@ export default function MaterialLibrary() {
   useEffect(() => {
     loadMaterials();
     loadProducts({ limit: 200 });
-  }, []);
+  }, [loadMaterials, loadProducts]);
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -72,7 +73,7 @@ export default function MaterialLibrary() {
       loadMaterials({ search: searchInput });
     }, 300);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
-  }, [searchInput]);
+  }, [searchInput, loadMaterials, setMaterialSearch]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,7 +119,7 @@ export default function MaterialLibrary() {
     }
   };
 
-  const handleDownload = async (m: any) => {
+  const handleDownload = async (m: Material) => {
     await recordMaterialDownload(m.id);
     window.open(`/api${m.url}`, '_blank');
   };
@@ -127,15 +128,6 @@ export default function MaterialLibrary() {
     await removeMaterial(id);
     setDeleteConfirm(null);
   };
-
-  const categoryCounts = CATEGORIES.reduce((acc, cat) => {
-    if (cat.key === 'all') {
-      acc[cat.key] = materials.length;
-    } else {
-      acc[cat.key] = materials.filter(m => m.category === cat.key).length;
-    }
-    return acc;
-  }, {} as Record<string, number>);
 
   return (
     <div className="page-shell">
@@ -239,11 +231,8 @@ export default function MaterialLibrary() {
       </div>
 
       {loading && materials.length === 0 ? (
-        <div
-          className="text-center py-16"
-          style={{ color: 'var(--color-text-tertiary)', fontSize: '0.8125rem' }}
-        >
-          加载中...
+        <div className="panel py-16">
+          <Loading />
         </div>
       ) : materials.length === 0 ? (
         <div

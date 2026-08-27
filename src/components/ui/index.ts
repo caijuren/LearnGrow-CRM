@@ -28,3 +28,5 @@ export type { StatusVariant } from './Status';
 
 export { Avatar } from './Avatar';
 export type { AvatarSize } from './Avatar';
+
+export { Loading } from './Loading';

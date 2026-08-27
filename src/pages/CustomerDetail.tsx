@@ -4,27 +4,20 @@ import {
   ArrowLeft, Edit2, Trash2, X, Phone, MessageCircle,
   FileText, ShoppingBag, Lightbulb, Copy, Check, Clock,
   Tag, Radio, Users, Calendar, Loader2, ChevronRight,
-  Star, ShoppingCart, User, Plus, Baby, AlertTriangle,
+  ShoppingCart, User, Plus, Baby, AlertTriangle,
 } from 'lucide-react';
 import { useStore } from '@/store';
+import Loading from '@/components/ui/Loading';
 import {
-  SOURCE_LABELS, IMPORTANCE_LABELS, IMPORTANCE_COLORS, COMMON_TAGS,
-  ORDER_TYPE_LABELS, ORDER_TYPE_COLORS, FOLLOW_UP_METHOD_LABELS, FOLLOW_UP_RESULT_LABELS,
-  STAGE_LABELS, STAGE_COLORS, WECHAT_ACCOUNT_LABELS,
+  SOURCE_LABELS, IMPORTANCE_LABELS, COMMON_TAGS,
+  ORDER_TYPE_LABELS, FOLLOW_UP_METHOD_LABELS, FOLLOW_UP_RESULT_LABELS,
+  STAGE_LABELS, WECHAT_ACCOUNT_LABELS,
   GRADES, GENDERS, SUBJECTS,
   type Importance, type CustomerSource, type FollowUpMethod, type FollowUpResult,
   type OrderType, type Child, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
 import SharedModal from '@/components/Modal';
-
-const AVATAR_COLORS = [
-  'bg-brand-500',
-  'bg-sky-500',
-  'bg-emerald-500',
-  'bg-violet-500',
-  'bg-slate-500',
-];
 
 const METHOD_ICONS: Record<FollowUpMethod, typeof MessageCircle> = {
   wechat: MessageCircle,
@@ -34,12 +27,7 @@ const METHOD_ICONS: Record<FollowUpMethod, typeof MessageCircle> = {
   moments: Users,
 };
 
-const SUGGESTION_COLORS = [
-  { bg: 'bg-brand-50', border: 'border-brand-200', icon: 'bg-brand-100 text-brand-600', badge: 'bg-brand-100 text-brand-700' },
-  { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bg-amber-100 text-amber-600', badge: 'bg-amber-100 text-amber-700' },
-  { bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'bg-emerald-100 text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
-  { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bg-blue-100 text-blue-600', badge: 'bg-blue-100 text-blue-700' },
-];
+
 
 interface FollowUpForm {
   method: FollowUpMethod | '';
@@ -168,7 +156,7 @@ export default function CustomerDetail() {
       loadProducts({ limit: 100 });
     }
     return () => clearSelectedCustomer();
-  }, [id]);
+  }, [id, loadCustomer, loadProducts, clearSelectedCustomer]);
 
   useEffect(() => {
     if (customer) {
@@ -191,29 +179,30 @@ export default function CustomerDetail() {
     }
   }, [customer]);
 
+  const customerOrderCount = customer?.order_count ?? 0;
   useEffect(() => {
     if (orderForm.product_id && allProducts.length > 0) {
       const product = allProducts.find(p => p.id === Number(orderForm.product_id));
       if (product) {
         setOrderForm(f => ({ ...f, amount: String(product.price) }));
-        if (!orderForm.order_type && customer) {
-          const orderType: OrderType = customer.order_count === 0 ? 'first' : 'repurchase';
+        if (!orderForm.order_type) {
+          const orderType: OrderType = customerOrderCount === 0 ? 'first' : 'repurchase';
           setOrderForm(f => ({ ...f, order_type: orderType }));
         }
       }
     }
-  }, [orderForm.product_id, allProducts, customer?.order_count, orderForm.order_type]);
+  }, [orderForm.product_id, allProducts, customerOrderCount, orderForm.order_type]);
 
   useEffect(() => {
     loadTextbookRegions();
-  }, []);
+  }, [loadTextbookRegions]);
 
   useEffect(() => {
     if (childForm.region) {
       loadTextbooks({ region: childForm.region });
       setChildForm(f => ({ ...f, textbook_version: '' }));
     }
-  }, [childForm.region]);
+  }, [childForm.region, loadTextbooks]);
 
   const copyScript = async (text: string, index: number) => {
     try {
@@ -401,11 +390,8 @@ export default function CustomerDetail() {
 
   if (loading && !customer) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-500 mt-3">加载中...</p>
-        </div>
+      <div className="min-h-screen bg-bg-page flex items-center justify-center">
+        <Loading />
       </div>
     );
   }
@@ -416,18 +402,18 @@ export default function CustomerDetail() {
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => navigate('/customers')}
-            className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md flex items-center justify-center mb-6 transition-all"
+            className="w-10 h-10 rounded-xl bg-bg-surface shadow-sm hover:shadow-md flex items-center justify-center mb-6 transition-all"
           >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
           </button>
           <Empty
-            icon={<User className="w-10 h-10 text-brand-300" />}
+            icon={<User className="w-10 h-10 text-primary/30" />}
             title="客户不存在"
             description="该客户可能已被删除"
             action={
               <button
                 onClick={() => navigate('/customers')}
-                className="bg-brand-600 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
+                className="btn btn-primary"
               >
                 返回客户列表
               </button>
@@ -438,7 +424,6 @@ export default function CustomerDetail() {
     );
   }
 
-  const avatarColor = AVATAR_COLORS[customer.id % AVATAR_COLORS.length];
   const sortedFollowUps = [...(customer.follow_ups || [])].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
@@ -451,23 +436,18 @@ export default function CustomerDetail() {
       <div className="max-w-5xl mx-auto">
         {/* 面包屑导航 */}
         <div className="flex items-center gap-1.5 mb-4 t-caption">
-          <button onClick={() => navigate('/customers')}
-                  style={{ color: 'var(--color-text-secondary)' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-secondary)'}
-                  className="transition-colors">
+          <button onClick={() => navigate('/customers')} className="hover:text-primary transition-colors">
             客户管理
           </button>
-          <ChevronRight size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
-          <span className="t-body-strong" style={{ color: 'var(--color-text-primary)' }}>客户详情</span>
+          <ChevronRight size={13} strokeWidth={1.8} className="text-text-tertiary" />
+          <span className="t-body-strong text-text-primary">客户详情</span>
         </div>
 
         {/* 客户信息卡 */}
         <div className="panel mb-4">
           <div className="px-5 py-4">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-                   style={{ backgroundColor: 'var(--color-primary-soft)', color: 'var(--color-primary)' }}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary-soft text-primary">
                 <span className="text-lg font-semibold">{customer.name[0]}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -487,79 +467,77 @@ export default function CustomerDetail() {
                     {IMPORTANCE_LABELS[customer.importance]}
                   </span>
                 </div>
-                <div className="flex items-center gap-4 flex-wrap t-small" style={{ color: 'var(--color-text-secondary)' }}>
+                <div className="flex items-center gap-4 flex-wrap t-small text-text-secondary">
                   {customer.wechat_id && (
                     <span className="flex items-center gap-1.5">
-                      <MessageCircle size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
-                      <span style={{ color: 'var(--color-text-primary)' }}>{customer.wechat_id}</span>
-                      {customer.wechat_remark && <span style={{ color: 'var(--color-text-tertiary)' }}>({customer.wechat_remark})</span>}
+                      <MessageCircle size={13} strokeWidth={1.8} className="text-text-tertiary" />
+                      <span className="text-text-primary">{customer.wechat_id}</span>
+                      {customer.wechat_remark && <span className="text-text-tertiary">({customer.wechat_remark})</span>}
                     </span>
                   )}
                   {customer.phone && (
                     <span className="flex items-center gap-1.5">
-                      <Phone size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
-                      <span style={{ color: 'var(--color-text-primary)' }}>{customer.phone}</span>
+                      <Phone size={13} strokeWidth={1.8} className="text-text-tertiary" />
+                      <span className="text-text-primary">{customer.phone}</span>
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">
-                    <Users size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                    <Users size={13} strokeWidth={1.8} className="text-text-tertiary" />
                     {WECHAT_ACCOUNT_LABELS[customer.wechat_account]}
                   </span>
                   {customer.source && (
                     <span className="flex items-center gap-1.5">
-                      <Tag size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      <Tag size={13} strokeWidth={1.8} className="text-text-tertiary" />
                       {SOURCE_LABELS[customer.source]}
                     </span>
                   )}
                   {customer.wechat_add_date && (
                     <span className="flex items-center gap-1.5">
-                      <Calendar size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                      <Calendar size={13} strokeWidth={1.8} className="text-text-tertiary" />
                       {customer.wechat_add_date} 添加
                     </span>
                   )}
                 </div>
               </div>
               {/* 关键指标 */}
-              <div className="hidden sm:flex items-center gap-6 shrink-0 pl-5"
-                   style={{ borderLeft: '1px solid var(--color-border-subtle)' }}>
+              <div className="hidden sm:flex items-center gap-6 shrink-0 pl-5 border-l border-border-subtle">
                 <div className="text-center">
                   <div className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</div>
-                  <div className="t-caption mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>累计消费</div>
+                  <div className="t-caption mt-0.5 text-text-tertiary">累计消费</div>
                 </div>
                 <div className="text-center">
                   <div className="t-kpi">{customer.order_count || 0}</div>
-                  <div className="t-caption mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>订单数</div>
+                  <div className="t-caption mt-0.5 text-text-tertiary">订单数</div>
                 </div>
               </div>
             </div>
 
             {/* 标签 & 备注 */}
             {(customer.tags?.length > 0 || customer.remark || customer.next_talk_topic) && (
-              <div className="mt-4 pt-4 space-y-2.5"
-                   style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+              <div className="mt-4 pt-4 space-y-2.5 border-t border-border-subtle">
                 {customer.next_talk_topic && (
                   <div className="flex items-start gap-2">
-                    <Lightbulb size={14} strokeWidth={1.8} style={{ color: 'var(--color-warning)', marginTop: '2px' }} className="shrink-0" />
+                    <Lightbulb size={14} strokeWidth={1.8} className="shrink-0 text-warning mt-0.5" />
                     <div className="t-small">
                       <span className="t-body-strong">下次跟进话题：</span>
-                      <span style={{ color: 'var(--color-text-secondary)' }}>{customer.next_talk_topic}</span>
+                      <span className="text-text-secondary">{customer.next_talk_topic}</span>
                     </div>
                   </div>
                 )}
                 {customer.tags && customer.tags.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <Tag size={14} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="shrink-0" />
+                    <Tag size={14} strokeWidth={1.8} className="shrink-0 text-text-tertiary mt-0.5" />
                     <div className="flex flex-wrap gap-1.5">
                       {customer.tags.map(tag => (
-                        <span key={tag} className="chip chip-outline">{tag}</span>
+                        <span key={tag} className="chip chip-neutral">{tag}</span>
                       ))}
                     </div>
                   </div>
                 )}
                 {customer.remark && (
                   <div className="flex items-start gap-2">
-                    <FileText size={14} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)', marginTop: '2px' }} className="shrink-0" />
-                    <p className="t-small flex-1" style={{ color: 'var(--color-text-secondary)' }}>{customer.remark}</p>
+                    <FileText size={14} strokeWidth={1.8} className="shrink-0 text-text-tertiary mt-0.5" />
+                    <p className="t-small flex-1 text-text-secondary">{customer.remark}</p>
                   </div>
                 )}
               </div>
@@ -567,18 +545,17 @@ export default function CustomerDetail() {
           </div>
 
           {/* 操作栏 */}
-          <div className="px-5 py-3 border-t flex items-center justify-between"
-               style={{ borderColor: 'var(--color-border-subtle)', backgroundColor: 'var(--color-bg-subtle)' }}>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setShowFollowUp(true)} className="btn-primary btn-sm">
+          <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-between bg-bg-subtle">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowFollowUp(true)} className="btn btn-primary btn-sm">
                 <FileText size={14} strokeWidth={1.8} />
                 记录跟进
               </button>
-              <button onClick={() => setShowOrder(true)} className="btn-secondary btn-sm">
+              <button onClick={() => setShowOrder(true)} className="btn btn-secondary btn-sm">
                 <ShoppingBag size={14} strokeWidth={1.8} />
                 记录订单
               </button>
-              <button onClick={() => setShowEdit(true)} className="btn-ghost btn-sm">
+              <button onClick={() => setShowEdit(true)} className="btn btn-tertiary btn-sm">
                 <Edit2 size={14} strokeWidth={1.8} />
                 编辑资料
               </button>
@@ -587,7 +564,7 @@ export default function CustomerDetail() {
                   setEditForm(f => ({ ...f, stage: customer.stage }));
                   setShowEdit(true);
                 }}
-                className="btn-ghost btn-sm"
+                className="btn btn-tertiary btn-sm"
               >
                 <ChevronRight size={14} strokeWidth={1.8} />
                 推进阶段
@@ -595,10 +572,7 @@ export default function CustomerDetail() {
             </div>
             <button
               onClick={() => setShowDelete(true)}
-              className="btn-ghost btn-sm"
-              style={{ color: 'var(--color-danger)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-danger-soft)')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
+              className="btn btn-danger-text btn-sm"
             >
               <Trash2 size={14} strokeWidth={1.8} />
               删除
@@ -609,25 +583,24 @@ export default function CustomerDetail() {
         {/* 移动端关键指标 */}
         <div className="sm:hidden grid grid-cols-2 gap-3 mb-4">
           <div className="panel py-3 px-4 text-center">
-            <p className="t-caption mb-1" style={{ color: 'var(--color-text-tertiary)' }}>累计消费</p>
+            <p className="t-caption mb-1 text-text-tertiary">累计消费</p>
             <p className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</p>
           </div>
           <div className="panel py-3 px-4 text-center">
-            <p className="t-caption mb-1" style={{ color: 'var(--color-text-tertiary)' }}>订单数</p>
+            <p className="t-caption mb-1 text-text-tertiary">订单数</p>
             <p className="t-kpi">{customer.order_count || 0}</p>
           </div>
         </div>
 
-        <div className="panel mb-4">
-          <div className="px-5 py-4 border-b flex items-center justify-between"
-               style={{ borderColor: 'var(--color-border-subtle)' }}>
+        <div className="panel mb-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
             <h3 className="panel-title">
-              <Baby size={15} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+              <Baby size={15} strokeWidth={1.8} className="text-text-tertiary" />
               孩子
             </h3>
             <button
               onClick={openAddChild}
-              className="btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm"
             >
               <Plus size={13} strokeWidth={1.8} />
               添加孩子
@@ -641,21 +614,12 @@ export default function CustomerDetail() {
                 return (
                   <div
                     key={child.id}
-                    className="flex items-center gap-3 p-3 rounded-xl transition-colors cursor-pointer group"
-                    style={{ backgroundColor: 'var(--color-bg-subtle)' }}
+                    className="clean-card-mini flex items-center gap-3 p-3 cursor-pointer group"
                     onClick={() => navigate(`/customers/${customer.id}/children/${child.id}`)}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-subtle)'}
                   >
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative"
-                         style={{ backgroundColor: 'var(--color-primary-soft)' }}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative bg-primary-soft">
                       <span className="text-xl">{childEmoji}</span>
-                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold"
-                            style={{
-                              backgroundColor: 'var(--color-bg-surface)',
-                              color: 'var(--color-text-secondary)',
-                              border: '1px solid var(--color-border-subtle)',
-                            }}>
+                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-bg-surface text-text-secondary border border-border-subtle">
                         {child.nickname[0]}
                       </span>
                     </div>
@@ -666,24 +630,21 @@ export default function CustomerDetail() {
                           {child.grade}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap t-caption text-text-tertiary">
                         {child.region && <span>{child.region}</span>}
                         {child.textbook_version && <span>· {child.textbook_version}</span>}
                       </div>
                       {child.weak_subjects && child.weak_subjects.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {child.weak_subjects.map(subject => (
-                            <span key={subject} className="chip chip-outline">{subject}</span>
+                            <span key={subject} className="chip chip-neutral">{subject}</span>
                           ))}
                         </div>
                       )}
                     </div>
                     <button
                       onClick={e => { e.stopPropagation(); openEditChild(child); }}
-                      className="w-8 h-8 rounded-md flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
-                      style={{ color: 'var(--color-text-tertiary)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-primary)'}
-                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                      className="w-8 h-8 rounded-md flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm text-text-tertiary hover:text-primary"
                     >
                       <Edit2 size={14} strokeWidth={1.8} />
                     </button>
@@ -693,11 +654,10 @@ export default function CustomerDetail() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center"
-                   style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
+              <div className="w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center bg-bg-subtle text-text-tertiary">
                 <Baby size={20} strokeWidth={1.5} />
               </div>
-              <p className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>还没添加孩子信息</p>
+              <p className="t-caption text-text-tertiary">还没添加孩子信息</p>
             </div>
           )}
           </div>
@@ -706,24 +666,24 @@ export default function CustomerDetail() {
         {customer.suggestions && customer.suggestions.length > 0 && (
           <div className="mb-4">
             <h3 className="panel-title mb-3 flex items-center gap-2">
-              <Lightbulb size={15} strokeWidth={1.8} style={{ color: 'var(--color-warning)' }} />
+              <Lightbulb size={15} strokeWidth={1.8} className="text-warning" />
               可以推什么
             </h3>
             <div className="space-y-3">
               {customer.suggestions.map((suggestion, index) => {
-                const bgColors = [
-                  { bg: 'rgb(91 92 226 / 0.06)', border: 'rgb(91 92 226 / 0.15)', icon: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
-                  { bg: 'rgb(232 178 78 / 0.1)', border: 'rgb(232 178 78 / 0.25)', icon: 'var(--color-warning-soft)', iconColor: 'var(--color-warning-text)' },
-                  { bg: 'rgb(41 167 102 / 0.08)', border: 'rgb(41 167 102 / 0.2)', icon: 'var(--color-success-soft)', iconColor: 'var(--color-success)' },
-                  { bg: 'rgb(59 130 246 / 0.08)', border: 'rgb(59 130 246 / 0.2)', icon: 'rgb(59 130 246 / 0.12)', iconColor: 'rgb(37 99 235)' },
+                const accents = [
+                  { gradient: 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)', iconBg: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
+                  { gradient: 'linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%)', iconBg: 'var(--color-warning-soft)', iconColor: 'var(--color-warning)' },
+                  { gradient: 'linear-gradient(90deg, #22C55E 0%, #86EFAC 100%)', iconBg: 'var(--color-success-soft)', iconColor: 'var(--color-success)' },
+                  { gradient: 'linear-gradient(90deg, #3B82F6 0%, #93C5FD 100%)', iconBg: 'rgb(59 130 246 / 0.12)', iconColor: 'rgb(37 99 235)' },
                 ];
-                const color = bgColors[index % bgColors.length];
+                const accent = accents[index % accents.length];
                 return (
-                  <div key={index} className="panel p-4"
-                       style={{ backgroundColor: color.bg, borderColor: color.border }}>
+                  <div key={index} className="clean-card relative overflow-hidden p-4 pt-[22px]">
+                    <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[20px]" style={{ background: accent.gradient }} />
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-                           style={{ backgroundColor: color.icon, color: color.iconColor }}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                           style={{ backgroundColor: accent.iconBg, color: accent.iconColor }}>
                         <Lightbulb size={15} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -733,19 +693,17 @@ export default function CustomerDetail() {
                             <span className="badge badge-primary">{suggestion.product.name}</span>
                           )}
                         </div>
-                        <p className="t-caption mb-2" style={{ color: 'var(--color-text-secondary)' }}>{suggestion.reason}</p>
-                        <div className="rounded-lg p-3 relative group"
-                             style={{ backgroundColor: 'var(--color-bg-surface)' }}>
-                          <p className="t-small leading-relaxed pr-8" style={{ color: 'var(--color-text-primary)' }}>{suggestion.script}</p>
+                        <p className="t-caption mb-2 text-text-secondary">{suggestion.reason}</p>
+                        <div className="rounded-xl p-3 relative group bg-bg-subtle">
+                          <p className="t-small leading-relaxed pr-8 text-text-primary">{suggestion.script}</p>
                           <button
                             onClick={() => copyScript(suggestion.script, index)}
-                            className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center transition-all btn-icon-sm"
-                            style={{ backgroundColor: 'var(--color-bg-subtle)' }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center transition-all btn-icon-sm bg-bg-subtle"
                           >
                             {copiedIndex === index ? (
-                              <Check size={13} strokeWidth={2} style={{ color: 'var(--color-success)' }} />
+                              <Check size={13} strokeWidth={2} className="text-success" />
                             ) : (
-                              <Copy size={13} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
+                              <Copy size={13} strokeWidth={1.8} className="text-text-tertiary" />
                             )}
                           </button>
                         </div>
@@ -759,25 +717,33 @@ export default function CustomerDetail() {
         )}
 
         <div className="panel overflow-hidden">
-          <div className="tab-list" style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+          <div className="px-5 py-3 border-b border-border-subtle flex items-center gap-1">
             <button
               onClick={() => { setActiveTab('orders'); setSearchParams({ tab: 'orders' }); }}
-              className={`tab-item ${activeTab === 'orders' ? 'active' : ''}`}
+              className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'orders'
+                  ? 'bg-bg-surface text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
             >
               <ShoppingCart size={14} strokeWidth={1.8} />
               订单记录
               {sortedOrders.length > 0 && (
-                <span className="tab-count">{sortedOrders.length}</span>
+                <span className="ml-0.5 text-xs opacity-80">{sortedOrders.length}</span>
               )}
             </button>
             <button
               onClick={() => { setActiveTab('followups'); setSearchParams({ tab: 'followups' }); }}
-              className={`tab-item ${activeTab === 'followups' ? 'active' : ''}`}
+              className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === 'followups'
+                  ? 'bg-bg-surface text-primary shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
             >
               <MessageCircle size={14} strokeWidth={1.8} />
               跟进记录
               {sortedFollowUps.length > 0 && (
-                <span className="tab-count">{sortedFollowUps.length}</span>
+                <span className="ml-0.5 text-xs opacity-80">{sortedFollowUps.length}</span>
               )}
             </button>
           </div>
@@ -785,13 +751,12 @@ export default function CustomerDetail() {
           <div className="px-5 py-4">
             {activeTab === 'orders' ? (
               sortedOrders.length > 0 ? (
-                <div className="divide-y -mx-5 -mt-4" style={{ borderColor: 'var(--color-border-subtle)' }}>
+                <div className="divide-y -mx-5 -mt-4 border-border-subtle">
                   {sortedOrders.map(order => (
                     <div key={order.id} className="px-5 py-3 flex items-center justify-between transition-colors group">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-                             style={{ backgroundColor: 'var(--color-bg-subtle)', color: 'var(--color-text-tertiary)' }}>
-                          <ShoppingBag size={14} strokeWidth={1.8} />
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-primary-soft text-primary">
+                          <ShoppingBag size={15} strokeWidth={1.8} />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -803,10 +768,10 @@ export default function CustomerDetail() {
                               {ORDER_TYPE_LABELS[order.order_type]}
                             </span>
                             {order.child_name && (
-                              <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>· {order.child_name}</span>
+                              <span className="t-caption text-text-tertiary">· {order.child_name}</span>
                             )}
                           </div>
-                          <div className="t-caption mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                          <div className="t-caption mt-0.5 flex items-center gap-1 text-text-tertiary">
                             <Calendar size={11} strokeWidth={1.8} />
                             {formatDate(order.purchase_date)}
                           </div>
@@ -816,10 +781,7 @@ export default function CustomerDetail() {
                         <span className="t-kpi-sm">¥{order.amount?.toLocaleString()}</span>
                         <button
                           onClick={() => setDeleteConfirm({ type: 'order', id: order.id })}
-                          className="p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
-                          style={{ color: 'var(--color-text-tertiary)' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                          className="p-1.5 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm text-text-tertiary hover:text-danger"
                           title="删除订单"
                         >
                           <Trash2 size={13} strokeWidth={1.8} />
@@ -830,7 +792,7 @@ export default function CustomerDetail() {
                 </div>
               ) : (
                 <Empty
-                  icon={<ShoppingCart size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
+                  icon={<ShoppingCart size={22} strokeWidth={1.5} className="text-text-tertiary" />}
                   title="暂无订单记录"
                   description="点击上方「记录订单」添加第一笔订单"
                 />
@@ -838,38 +800,38 @@ export default function CustomerDetail() {
             ) : (
               sortedFollowUps.length > 0 ? (
                 <div className="relative pl-6 -mx-5 -mt-4">
-                  <div className="absolute left-[22px] top-4 bottom-4 w-px" style={{ backgroundColor: 'var(--color-border-default)' }} />
-                  {sortedFollowUps.map((followUp, index) => {
+                  <div className="absolute left-[22px] top-4 bottom-4 w-px bg-border-default" />
+                  {sortedFollowUps.map((followUp) => {
                     const Icon = METHOD_ICONS[followUp.method];
                     const isLive = followUp.is_live_note || followUp.method === 'live';
                     return (
                       <div key={followUp.id} className="relative pl-8 pr-4 py-3 last:pb-0 first:pt-4 group">
-                        <div className="absolute left-3 top-3.5 w-4 h-4 rounded-full border-2 z-10"
-                             style={{
-                               backgroundColor: isLive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
-                               borderColor: 'var(--color-bg-surface)',
-                               boxShadow: `0 0 0 1px ${isLive ? 'var(--color-primary)' : 'var(--color-border-default)'}`,
-                             }} />
+                        <div
+                        className="absolute left-3 top-3.5 w-4 h-4 rounded-full border-2 z-10 border-bg-surface"
+                        style={{
+                          backgroundColor: isLive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                          boxShadow: `0 0 0 1px ${isLive ? 'var(--color-primary)' : 'var(--color-border-default)'}`,
+                        }} />
                         <div className="relative">
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                            <span className="t-caption flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
-                              <Icon size={12} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
-                              {isLive && <Radio size={11} strokeWidth={1.8} style={{ color: 'var(--color-primary)' }} />}
+                            <span className="t-caption flex items-center gap-1 text-text-secondary">
+                              <Icon size={12} strokeWidth={1.8} className="text-text-tertiary" />
+                              {isLive && <Radio size={11} strokeWidth={1.8} className="text-primary" />}
                               {FOLLOW_UP_METHOD_LABELS[followUp.method]}
                             </span>
-                            <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>· {formatDate(followUp.date)}</span>
+                            <span className="t-caption text-text-tertiary">· {formatDate(followUp.date)}</span>
                             {followUp.result && (
                               <>
-                                <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>·</span>
-                                <span className="t-small font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                                <span className="t-caption text-text-tertiary">·</span>
+                                <span className="t-small font-medium text-text-secondary">
                                   {FOLLOW_UP_RESULT_LABELS[followUp.result]}
                                 </span>
                               </>
                             )}
                             {followUp.next_follow_date && (
                               <>
-                                <span className="t-caption" style={{ color: 'var(--color-text-tertiary)' }}>·</span>
-                                <span className="flex items-center gap-1 t-caption" style={{ color: 'var(--color-text-tertiary)' }}>
+                                <span className="t-caption text-text-tertiary">·</span>
+                                <span className="flex items-center gap-1 t-caption text-text-tertiary">
                                   <Clock size={11} strokeWidth={1.8} />
                                   下次: {formatDate(followUp.next_follow_date)}
                                 </span>
@@ -877,16 +839,13 @@ export default function CustomerDetail() {
                             )}
                             <button
                               onClick={() => setDeleteConfirm({ type: 'followup', id: followUp.id })}
-                              className="ml-auto p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm"
-                              style={{ color: 'var(--color-text-tertiary)' }}
-                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-danger)'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-tertiary)'}
+                              className="ml-auto p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100 btn-icon-sm text-text-tertiary hover:text-danger"
                               title="删除跟进"
                             >
                               <Trash2 size={13} strokeWidth={1.8} />
                             </button>
                           </div>
-                          <p className="t-small leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--color-text-primary)' }}>{followUp.content}</p>
+                          <p className="t-small leading-relaxed whitespace-pre-wrap text-text-primary">{followUp.content}</p>
                         </div>
                       </div>
                     );
@@ -894,7 +853,7 @@ export default function CustomerDetail() {
                 </div>
               ) : (
                 <Empty
-                  icon={<MessageCircle size={22} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
+                  icon={<MessageCircle size={22} strokeWidth={1.5} className="text-text-tertiary" />}
                   title="暂无跟进记录"
                   description="点击上方「记录跟进」开始记录沟通内容"
                 />
@@ -910,11 +869,11 @@ export default function CustomerDetail() {
           onClose={() => setShowFollowUp(false)}
           footer={
             <>
-              <button onClick={() => setShowFollowUp(false)} className="btn-secondary">取消</button>
+              <button onClick={() => setShowFollowUp(false)} className="btn btn-secondary">取消</button>
               <button
                 onClick={handleAddFollowUp}
                 disabled={!followUpForm.method || !followUpForm.content.trim() || submitting}
-                className="btn-primary"
+                className="btn btn-primary"
               >
                 {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 保存
@@ -933,15 +892,14 @@ export default function CustomerDetail() {
                     <button
                       key={method}
                       onClick={() => setFollowUpForm(f => ({ ...f, method }))}
-                      className="flex flex-col items-center gap-1 p-2 rounded-lg border transition-all"
-                      style={{
-                        borderColor: selected ? 'rgb(91 92 226 / 0.4)' : 'var(--color-border-default)',
-                        backgroundColor: selected ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
-                        color: selected ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
-                      }}
+                      className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-[11px] font-medium ${
+                        selected
+                          ? 'border-primary/40 bg-primary-soft text-primary'
+                          : 'border-border-default bg-bg-surface text-text-tertiary'
+                      }`}
                     >
                       <Icon size={18} strokeWidth={1.8} />
-                      <span style={{ fontSize: '0.6875rem', fontWeight: 500 }}>{label}</span>
+                      {label}
                     </button>
                   );
                 })}
@@ -950,8 +908,7 @@ export default function CustomerDetail() {
             <div>
               <label className="form-label">跟进内容 *</label>
               <textarea
-                className="input resize-none"
-                style={{ minHeight: '100px', paddingTop: '0.625rem', paddingBottom: '0.625rem' }}
+                className="textarea"
                 rows={4}
                 placeholder="记录沟通内容..."
                 value={followUpForm.content}
@@ -1007,11 +964,11 @@ export default function CustomerDetail() {
           onClose={() => setShowOrder(false)}
           footer={
             <>
-              <button onClick={() => setShowOrder(false)} className="btn-secondary">取消</button>
+              <button onClick={() => setShowOrder(false)} className="btn btn-secondary">取消</button>
               <button
                 onClick={handleAddOrder}
                 disabled={!orderForm.product_id || !orderForm.amount || submitting}
-                className="btn-primary"
+                className="btn btn-primary"
               >
                 {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 保存
@@ -1092,11 +1049,11 @@ export default function CustomerDetail() {
           onClose={() => setShowEdit(false)}
           footer={
             <>
-              <button onClick={() => setShowEdit(false)} className="btn-secondary">取消</button>
+              <button onClick={() => setShowEdit(false)} className="btn btn-secondary">取消</button>
               <button
                 onClick={handleEdit}
                 disabled={!editForm.name.trim() || submitting}
-                className="btn-primary"
+                className="btn btn-primary"
               >
                 {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 保存
@@ -1106,13 +1063,10 @@ export default function CustomerDetail() {
         >
           <div className="space-y-4">
             {/* 微信私域 */}
-            <div
-              className="p-3 rounded-lg border"
-              style={{ backgroundColor: 'rgb(16 185 129 / 0.04)', borderColor: 'rgb(16 185 129 / 0.12)' }}
-            >
-              <div className="flex items-center gap-1.5 mb-3" style={{ color: 'rgb(5 150 105)' }}>
+            <div className="p-3 rounded-xl border border-success/15 bg-success-soft/30">
+              <div className="flex items-center gap-1.5 mb-3 text-success">
                 <Users size={14} strokeWidth={2} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>微信私域信息</span>
+                <span className="text-xs font-semibold">微信私域信息</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1158,13 +1112,10 @@ export default function CustomerDetail() {
             </div>
 
             {/* 客户阶段 */}
-            <div
-              className="p-3 rounded-lg border"
-              style={{ backgroundColor: 'var(--color-primary-soft)', borderColor: 'rgb(91 92 226 / 0.12)' }}
-            >
-              <div className="flex items-center gap-1.5 mb-3" style={{ color: 'var(--color-primary)' }}>
+            <div className="p-3 rounded-xl border border-primary/15 bg-primary-soft/40">
+              <div className="flex items-center gap-1.5 mb-3 text-primary">
                 <ChevronRight size={14} strokeWidth={2} />
-                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>客户阶段管理</span>
+                <span className="text-xs font-semibold">客户阶段管理</span>
               </div>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {Object.entries(STAGE_LABELS).map(([k, v]) => {
@@ -1174,13 +1125,11 @@ export default function CustomerDetail() {
                       key={k}
                       type="button"
                       onClick={() => setEditForm(f => ({ ...f, stage: k as CustomerStage }))}
-                      className="px-2 py-1.5 rounded-md text-xs font-medium border transition-all"
-                      style={{
-                        backgroundColor: active ? 'var(--color-bg-surface)' : 'transparent',
-                        borderColor: active ? 'rgb(91 92 226 / 0.4)' : 'transparent',
-                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                        boxShadow: active ? '0 1px 2px rgb(16 24 40 / 0.04)' : 'none',
-                      }}
+                      className={`px-2 py-1.5 rounded-md text-xs font-medium border transition-all ${
+                        active
+                          ? 'bg-bg-surface border-primary/40 text-primary shadow-sm'
+                          : 'bg-transparent border-transparent text-text-secondary'
+                      }`}
                     >
                       {v}
                     </button>
@@ -1188,8 +1137,8 @@ export default function CustomerDetail() {
                 })}
               </div>
               <div>
-                <label className="form-label flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
-                  <Lightbulb size={12} strokeWidth={1.8} style={{ color: 'rgb(245 158 11)' }} />
+                <label className="form-label flex items-center gap-1 text-text-secondary">
+                  <Lightbulb size={12} strokeWidth={1.8} className="text-warning" />
                   下次聊什么话题
                 </label>
                 <input
@@ -1278,12 +1227,7 @@ export default function CustomerDetail() {
                       key={tag}
                       type="button"
                       onClick={() => toggleEditTag(tag)}
-                      className="px-2.5 py-1 rounded-md text-xs font-medium border transition-all"
-                      style={{
-                        backgroundColor: active ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
-                        borderColor: active ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
-                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                      }}
+                      className={`chip ${active ? 'chip-primary' : 'chip-neutral'}`}
                     >
                       {tag}
                     </button>
@@ -1294,12 +1238,7 @@ export default function CustomerDetail() {
                     key={tag}
                     type="button"
                     onClick={() => toggleEditTag(tag)}
-                    className="px-2.5 py-1 rounded-md text-xs font-medium border flex items-center gap-1"
-                    style={{
-                      backgroundColor: 'rgb(236 72 153 / 0.06)',
-                      borderColor: 'rgb(236 72 153 / 0.2)',
-                      color: 'rgb(219 39 119)',
-                    }}
+                    className="chip chip-danger"
                   >
                     {tag}
                     <X size={10} strokeWidth={2} />
@@ -1308,8 +1247,7 @@ export default function CustomerDetail() {
               </div>
               <div className="flex gap-2">
                 <input
-                  className="input flex-1"
-                  style={{ fontSize: '0.75rem' }}
+                  className="input flex-1 text-xs"
                   placeholder="自定义标签"
                   value={customTag}
                   onChange={e => setCustomTag(e.target.value)}
@@ -1318,8 +1256,7 @@ export default function CustomerDetail() {
                 <button
                   type="button"
                   onClick={addEditCustomTag}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.75rem', paddingLeft: '0.75rem', paddingRight: '0.75rem' }}
+                  className="btn btn-secondary text-xs px-3"
                 >
                   添加
                 </button>
@@ -1330,8 +1267,7 @@ export default function CustomerDetail() {
             <div>
               <label className="form-label">备注</label>
               <textarea
-                className="input resize-none"
-                style={{ paddingTop: '0.625rem', paddingBottom: '0.625rem' }}
+                className="textarea"
                 rows={2}
                 value={editForm.remark}
                 onChange={e => setEditForm(f => ({ ...f, remark: e.target.value }))}
@@ -1356,16 +1292,13 @@ export default function CustomerDetail() {
           }
         >
           <div className="text-center py-2">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: 'rgb(239 68 68 / 0.08)' }}
-            >
-              <Trash2 size={24} strokeWidth={1.8} style={{ color: 'rgb(239 68 68)' }} />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 bg-danger-soft">
+              <Trash2 size={24} strokeWidth={1.8} className="text-danger" />
             </div>
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              即将删除客户 <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{customer.name}</span>
+            <p className="text-sm text-text-secondary">
+              即将删除客户 <span className="font-semibold text-text-primary">{customer.name}</span>
             </p>
-            <p className="text-xs mt-1" style={{ color: 'rgb(239 68 68)' }}>此操作不可撤销</p>
+            <p className="text-xs mt-1 text-danger">此操作不可撤销</p>
           </div>
         </Modal>
       )}
@@ -1405,13 +1338,10 @@ export default function CustomerDetail() {
           }
         >
           <div className="text-center py-2">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
-              style={{ backgroundColor: 'rgb(239 68 68 / 0.08)' }}
-            >
-              <AlertTriangle size={24} strokeWidth={1.8} style={{ color: 'rgb(239 68 68)' }} />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 bg-danger-soft">
+              <AlertTriangle size={24} strokeWidth={1.8} className="text-danger" />
             </div>
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>此操作不可撤销</p>
+            <p className="text-sm text-text-secondary">此操作不可撤销</p>
           </div>
         </Modal>
       )}
@@ -1425,14 +1355,14 @@ export default function CustomerDetail() {
               <button
                 onClick={() => { setShowAddChild(false); setChildForm(emptyChildForm); setEditingChild(null); }}
                 disabled={submitting}
-                className="btn-secondary"
+                className="btn btn-secondary"
               >
                 取消
               </button>
               <button
                 onClick={handleSaveChild}
                 disabled={!childForm.nickname.trim() || !childForm.grade || submitting}
-                className="btn-primary"
+                className="btn btn-primary"
               >
                 {submitting && <Loader2 size={14} strokeWidth={1.8} className="animate-spin" />}
                 保存
@@ -1460,18 +1390,13 @@ export default function CustomerDetail() {
                       key={g}
                       type="button"
                       onClick={() => setChildForm(f => ({ ...f, gender: g }))}
-                      className="flex items-center justify-center gap-1.5 p-2.5 rounded-lg border transition-all text-sm font-medium"
-                      style={{
-                        borderColor: active
-                          ? g === 'boy' ? 'rgb(56 189 248 / 0.5)' : 'rgb(244 114 182 / 0.5)'
-                          : 'var(--color-border-default)',
-                        backgroundColor: active
-                          ? g === 'boy' ? 'rgb(56 189 248 / 0.08)' : 'rgb(244 114 182 / 0.08)'
-                          : 'var(--color-bg-surface)',
-                        color: active
-                          ? g === 'boy' ? 'rgb(14 165 233)' : 'rgb(236 72 153)'
-                          : 'var(--color-text-tertiary)',
-                      }}
+                      className={`flex items-center justify-center gap-1.5 p-2.5 rounded-lg border transition-all text-sm font-medium ${
+                        active
+                          ? g === 'boy'
+                            ? 'border-sky-400/50 bg-sky-400/10 text-sky-500'
+                            : 'border-pink-400/50 bg-pink-400/10 text-pink-500'
+                          : 'border-border-default bg-bg-surface text-text-tertiary'
+                      }`}
                     >
                       <span className="text-lg">{g === 'boy' ? '👦' : '👧'}</span>
                       {GENDERS[g]}
@@ -1544,12 +1469,7 @@ export default function CustomerDetail() {
                       key={subject}
                       type="button"
                       onClick={() => toggleWeakSubject(subject)}
-                      className="px-3 py-1.5 rounded-md text-xs font-medium border transition-all"
-                      style={{
-                        backgroundColor: active ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
-                        borderColor: active ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
-                        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                      }}
+                      className={`chip ${active ? 'chip-primary' : 'chip-neutral'}`}
                     >
                       {subject}
                     </button>
@@ -1560,12 +1480,7 @@ export default function CustomerDetail() {
                     key={subject}
                     type="button"
                     onClick={() => toggleWeakSubject(subject)}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium border flex items-center gap-1"
-                    style={{
-                      backgroundColor: 'var(--color-primary-soft)',
-                      borderColor: 'rgb(91 92 226 / 0.3)',
-                      color: 'var(--color-primary)',
-                    }}
+                    className="chip chip-primary"
                   >
                     {subject}
                     <X size={10} strokeWidth={2} />
@@ -1574,8 +1489,7 @@ export default function CustomerDetail() {
               </div>
               <div className="flex gap-2">
                 <input
-                  className="input flex-1"
-                  style={{ fontSize: '0.75rem' }}
+                  className="input flex-1 text-xs"
                   placeholder="自定义科目"
                   value={childForm.custom_subject}
                   onChange={e => setChildForm(f => ({ ...f, custom_subject: e.target.value }))}
@@ -1584,8 +1498,7 @@ export default function CustomerDetail() {
                 <button
                   type="button"
                   onClick={addCustomSubject}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.75rem', paddingLeft: '0.75rem', paddingRight: '0.75rem' }}
+                  className="btn btn-secondary text-xs px-3"
                 >
                   添加
                 </button>
@@ -1594,8 +1507,7 @@ export default function CustomerDetail() {
             <div>
               <label className="form-label">备注</label>
               <textarea
-                className="input resize-none"
-                style={{ paddingTop: '0.625rem', paddingBottom: '0.625rem', minHeight: '80px' }}
+                className="textarea"
                 rows={3}
                 placeholder="其他备注信息（选填）"
                 value={childForm.notes}

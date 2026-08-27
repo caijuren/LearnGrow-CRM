@@ -102,6 +102,18 @@ page {
   background: rgba(244, 63, 122, 0.18);
 }
 
+.btn-disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  border-radius: 16rpx;
+  padding: 18rpx 32rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
 .btn-small {
   padding: 18rpx 32rpx;
   font-size: 26rpx;

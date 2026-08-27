@@ -9,6 +9,7 @@ Page({
     totalDays: 0,
     totalStreak: 0,
     joinedEvents: 0,
+    pointsBalance: 0,
     editing: false,
     editNickname: '',
     editChildName: '',
@@ -54,12 +55,21 @@ Page({
         // 徽章加载失败不阻断主流程
       }
 
+      let pointsBalance = 0;
+      try {
+        const p = await api.getMyPoints();
+        pointsBalance = p.balance || 0;
+      } catch (e) {
+        // 积分加载失败不阻断主流程
+      }
+
       this.setData({
         myCheckins,
         myBadges,
         totalDays,
         totalStreak: maxStreak,
-        joinedEvents: myCheckins.length
+        joinedEvents: myCheckins.length,
+        pointsBalance
       });
     } catch (e) {
       wx.showToast({ title: '数据加载失败', icon: 'none' });
@@ -157,6 +167,10 @@ Page({
 
   goToMyCheckins() {
     wx.reLaunch({ url: '/pages/my-checkins/my-checkins' });
+  },
+
+  goToPoints() {
+    wx.navigateTo({ url: '/pages/points/points' });
   },
 
   goToLogin() {

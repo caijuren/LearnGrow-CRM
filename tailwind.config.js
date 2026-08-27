@@ -59,6 +59,10 @@ export default {
           DEFAULT: 'var(--color-info)',
           soft: 'var(--color-info-soft)',
         },
+        cyan: {
+          DEFAULT: 'var(--color-cyan)',
+          soft: 'var(--color-cyan-soft)',
+        },
         // 保留旧 brand 命名，用于过渡兼容
         brand: {
           50: '#EEF0FF',

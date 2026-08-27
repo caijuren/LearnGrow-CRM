@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from 'react';
 import {
   Plus, Search, Users, MessageSquare, Edit2, Trash2, X, UserPlus,
@@ -423,7 +424,7 @@ export default function GroupManagement() {
     groups, loadGroups, addGroup, editGroup, removeGroup,
     selectedGroup, loadGroup, clearSelectedGroup,
     addGroupMember, batchAddGroupMembers, editGroupMember, removeGroupMember,
-    groupFilters, setGroupFilters, loading, error,
+    groupFilters, setGroupFilters,
   } = useStore();
 
   const [search, setSearch] = useState('');
@@ -441,13 +442,14 @@ export default function GroupManagement() {
 
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [loadGroups]);
 
   useEffect(() => {
     if (selectedGroup) {
       loadGroup(selectedGroup.id);
     }
-  }, [selectedGroup?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroup?.id, loadGroup]);
 
   const openAddGroup = () => {
     setGroupForm(emptyGroupForm);

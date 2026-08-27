@@ -22,6 +22,10 @@ Page({
     setupChildName: '',
     savingChildName: false,
     showSuccessActions: false,
+    showShareModal: false,
+    shareLink: '',
+    sharingLink: false,
+    shareExpireText: '',
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false,
     isJoined: false,
@@ -76,6 +80,16 @@ Page({
       let isJoined = false;
 
       if (app.checkLogin()) {
+        // 刷新用户信息，确保 child_name 等字段是最新的
+        try {
+          const latestUserInfo = await api.getUserInfo();
+          if (latestUserInfo) {
+            app.setLogin(app.globalData.token, latestUserInfo);
+          }
+        } catch (e) {
+          // 用户信息刷新失败不阻断主流程
+        }
+
         const myCheckins = await api.getMyCheckins();
         const myCheckin = myCheckins.find(c => c.event.id === this.data.eventId);
 
@@ -217,10 +231,10 @@ Page({
     if (!app.requireLogin()) return;
     try {
       await api.joinEvent(this.data.eventId);
-      wx.showToast({ title: '加入成功', icon: 'success' });
+      wx.showToast({ title: '报名成功', icon: 'success' });
       this.loadData();
     } catch (e) {
-      wx.showToast({ title: '加入失败，请重试', icon: 'none' });
+      // api.js 已展示具体错误信息
     }
   },
 
@@ -496,6 +510,11 @@ Page({
         if (result.new_badges && result.new_badges.length > 0) {
           toastTitle = `获得${result.new_badges[0].name}徽章！`;
         }
+        if (result.points_earned > 0 && !result.pending_review) {
+          toastTitle = this.data.makeupDate
+            ? `补卡成功 · 积分+${result.points_earned}`
+            : `第${result.checkin_number}次打卡成功 · 积分+${result.points_earned}`;
+        }
       }
 
       wx.showToast({ 
@@ -521,6 +540,39 @@ Page({
 
   closeSuccessActions() {
     this.setData({ showSuccessActions: false });
+  },
+
+  async openShareModal() {
+    if (this.data.sharingLink) return;
+    this.setData({ sharingLink: true });
+    try {
+      const { scheme, expire_at } = await api.getEventShareLink(this.data.eventId);
+      const expireText = expire_at ? expire_at.split(' ')[0].replace(/-/g, '.') : '';
+      this.setData({
+        shareLink: scheme,
+        shareExpireText: expireText ? `${expireText} 前有效` : '',
+        showShareModal: true
+      });
+    } catch (e) {
+      // api.js 已展示具体错误信息
+    } finally {
+      this.setData({ sharingLink: false });
+    }
+  },
+
+  closeShareModal() {
+    this.setData({ showShareModal: false });
+  },
+
+  copyShareLink() {
+    if (!this.data.shareLink) return;
+    wx.setClipboardData({
+      data: this.data.shareLink,
+      success: () => {
+        wx.showToast({ title: '链接已复制', icon: 'success' });
+        this.setData({ showShareModal: false });
+      }
+    });
   },
 
   onCreatePoster() {
@@ -700,7 +752,7 @@ Page({
     ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
+    ctx.arcTo(x, y + r, x + w, y, r);
     ctx.closePath();
     ctx.fill();
   },

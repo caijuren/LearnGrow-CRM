@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/store';
 import {
-  ORDER_TYPE_LABELS, ORDER_TYPE_COLORS,
+  ORDER_TYPE_LABELS,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Loading from '@/components/ui/Loading';
 import Modal from '@/components/Modal';
 
 export default function OrderList() {
@@ -25,7 +26,7 @@ export default function OrderList() {
 
   useEffect(() => {
     loadOrders({ page: 1, limit: 100 });
-  }, []);
+  }, [loadOrders]);
 
   const sortedOrders = [...orders].sort(
     (a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime()
@@ -85,16 +86,8 @@ export default function OrderList() {
         </div>
 
         {loading ? (
-          <div
-            className="flex flex-col items-center justify-center py-16"
-            style={{
-              backgroundColor: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
-            <Loader2 size={20} strokeWidth={1.8} className="animate-spin" style={{ color: 'var(--color-primary)', marginBottom: '8px' }} />
-            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-tertiary)' }}>加载中...</p>
+          <div className="panel py-16">
+            <Loading />
           </div>
         ) : sortedOrders.length > 0 ? (
           <div

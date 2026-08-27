@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, no-empty, @typescript-eslint/no-unused-vars */
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -5,6 +6,9 @@ import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import { z } from 'zod';
 import { adminOnly, authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
+import { AUTO_BACKUP_TIME, backupsDir, createBackup, isValidBackupName, listBackups } from './services/backup.js';
+import { getIntSetting, grantCheckinPoints, grantOrderPoints, grantPoints, revokeByRef } from './services/points.js';
+import { getEventShareLink } from './services/wx-share.js';
 import db from './db.js';
 import bcrypt from 'bcryptjs';
 import path from 'path';
@@ -446,6 +450,11 @@ app.register(async function (router) {
     const existingCount = (db.prepare('SELECT COUNT(*) as c FROM orders WHERE customer_id = ?').get(id) as any).c;
     const finalType = order_type || (existingCount === 0 ? 'first' : 'repurchase');
     const r = db.prepare("INSERT INTO orders (order_no, customer_id, child_id, product_id, amount, order_type, remark, shipping_note, purchase_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))").run(generateOrderNo(), id, child_id || null, product_id, finalAmount, finalType, remark || null, shipping_note || null);
+    const wxUser = db.prepare('SELECT id FROM wx_users WHERE customer_id = ?').get(id) as any;
+    if (wxUser) {
+      const earned = Math.floor(finalAmount * getIntSetting('points_order_rate'));
+      if (earned > 0) grantOrderPoints(wxUser.id, r.lastInsertRowid as number, earned);
+    }
     updateCustomerStats(id);
     updateProductSales(product_id);
     return reply.code(201).send(ok(db.prepare('SELECT * FROM orders WHERE id = ?').get(r.lastInsertRowid)));
@@ -537,7 +546,12 @@ app.register(async function (router) {
     const id = parseInt(request.params.id);
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM orders WHERE id = ?').run(id);
-    if (order) { updateCustomerStats(order.customer_id); updateProductSales(order.product_id); }
+    if (order) {
+      const wxUser = db.prepare('SELECT id FROM wx_users WHERE customer_id = ?').get(order.customer_id) as any;
+      if (wxUser) revokeByRef(wxUser.id, 'order', id);
+      updateCustomerStats(order.customer_id);
+      updateProductSales(order.product_id);
+    }
     return ok(null);
   });
 }, { prefix: '/api/orders' });
@@ -1141,7 +1155,13 @@ app.register(async function (router) {
       FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.id = ? AND e.is_deleted = 0`).get(id) as any;
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
-    const participantsRaw = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(id) as any[];
+    const participantsRaw = db.prepare(`
+      SELECT p.*, wu.avatar_url
+      FROM checkin_participants p
+      LEFT JOIN wx_users wu ON p.wx_user_id = wu.id
+      WHERE p.event_id = ?
+      ORDER BY p.joined_at ASC
+    `).all(id) as any[];
     const recordsRaw = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(id) as any[];
     
     const calendar: { date: string; count: number }[] = [];
@@ -1194,6 +1214,7 @@ app.register(async function (router) {
       group_id,
       start_date,
       end_date,
+      signup_deadline,
       required_text,
       reward_rules,
       allow_makeup = 0,
@@ -1207,16 +1228,17 @@ app.register(async function (router) {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
       INSERT INTO checkin_events (
-        name, group_id, start_date, end_date, required_text, reward_rules,
+        name, group_id, start_date, end_date, signup_deadline, required_text, reward_rules,
         allow_makeup, makeup_window_days, makeup_limit_per_user, makeup_requires_review, makeup_counts_for_streak,
         status, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       group_id || null,
       start_date,
       end_date,
+      signup_deadline || start_date,
       required_text || null,
       reward_rules || null,
       normalizeBoolean(allow_makeup),
@@ -1229,7 +1251,8 @@ app.register(async function (router) {
       now
     );
     
-    if (group_id) {
+    const autoImportMembers = normalizeBoolean(request.body.auto_import_members);
+    if (group_id && autoImportMembers) {
       const members = db.prepare('SELECT id, wechat_name, nickname, customer_id FROM wechat_group_members WHERE group_id = ?').all(group_id) as any[];
       const insertParticipant = db.prepare(`
         INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
@@ -1254,6 +1277,7 @@ app.register(async function (router) {
       group_id,
       start_date,
       end_date,
+      signup_deadline,
       required_text,
       reward_rules,
       allow_makeup,
@@ -1268,6 +1292,7 @@ app.register(async function (router) {
     if (group_id !== undefined) { fields.push('group_id = ?'); params.push(group_id); }
     if (start_date !== undefined) { fields.push('start_date = ?'); params.push(start_date); }
     if (end_date !== undefined) { fields.push('end_date = ?'); params.push(end_date); }
+    if (signup_deadline !== undefined) { fields.push('signup_deadline = ?'); params.push(signup_deadline || null); }
     if (required_text !== undefined) { fields.push('required_text = ?'); params.push(required_text); }
     if (reward_rules !== undefined) { fields.push('reward_rules = ?'); params.push(reward_rules); }
     if (allow_makeup !== undefined) { fields.push('allow_makeup = ?'); params.push(normalizeBoolean(allow_makeup)); }
@@ -1355,6 +1380,10 @@ app.register(async function (router) {
       INSERT INTO checkin_records (event_id, participant_id, checkin_date, note)
       VALUES (?, ?, ?, ?)
     `).run(eventId, participant_id, checkin_date, note || null);
+    const participantWx = db.prepare('SELECT wx_user_id FROM checkin_participants WHERE id = ?').get(participant_id) as any;
+    if (participantWx?.wx_user_id) {
+      grantCheckinPoints(participantWx.wx_user_id, r.lastInsertRowid as number);
+    }
     return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
   });
 
@@ -1364,6 +1393,10 @@ app.register(async function (router) {
     const record = db.prepare('SELECT * FROM checkin_records WHERE id = ? AND event_id = ?').get(rid, eventId) as any;
     if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在' });
     db.prepare('DELETE FROM checkin_records WHERE id = ?').run(rid);
+    const participant = db.prepare('SELECT wx_user_id FROM checkin_participants WHERE id = ?').get(record.participant_id) as any;
+    if (participant?.wx_user_id) {
+      revokeByRef(participant.wx_user_id, 'checkin_record', rid);
+    }
     return ok(null);
   });
 
@@ -1380,7 +1413,13 @@ app.register(async function (router) {
     `);
     const insertBatch = db.transaction((pids: number[]) => {
       for (const pid of pids) {
-        insertRecord.run(eventId, pid, checkin_date, note || null);
+        const res = insertRecord.run(eventId, pid, checkin_date, note || null);
+        if (res.changes > 0) {
+          const participantWx = db.prepare('SELECT wx_user_id FROM checkin_participants WHERE id = ?').get(pid) as any;
+          if (participantWx?.wx_user_id) {
+            grantCheckinPoints(participantWx.wx_user_id, res.lastInsertRowid as number);
+          }
+        }
       }
     });
     insertBatch(participant_ids);
@@ -1599,6 +1638,25 @@ app.post('/api/wx/update-profile', { preHandler: [wxAuthMiddleware] }, async (re
   return ok(updated);
 });
 
+app.get('/api/wx/user-info', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const userInfo = db.prepare('SELECT id, nickname, avatar_url, child_name, points FROM wx_users WHERE id = ?').get(user.id);
+  return ok(userInfo);
+});
+
+app.get('/api/wx/my-points', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+  const user = request.wxUser;
+  const row = db.prepare('SELECT points FROM wx_users WHERE id = ?').get(user.id) as any;
+  const items = db.prepare(`
+    SELECT id, amount, type, note, created_at
+    FROM points_ledger
+    WHERE wx_user_id = ?
+    ORDER BY id DESC
+    LIMIT 50
+  `).all(user.id);
+  return ok({ balance: row?.points ?? 0, items });
+});
+
 app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any) => {
   const user = request.wxUser;
   const today = bjtToday();
@@ -1610,7 +1668,7 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
     WHERE e.is_deleted = 0
       AND e.status = 'active'
       AND (
-        (e.start_date > date('now') AND e.start_date <= date('now', '+3 days'))
+        (e.start_date > date('now') AND e.start_date <= date('now', '+14 days'))
         OR (e.start_date <= date('now') AND e.end_date >= date('now'))
         OR (e.end_date < date('now') AND e.end_date >= date('now', '-5 days'))
       )
@@ -1649,10 +1707,12 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
       name: e.name,
       start_date: e.start_date,
       end_date: e.end_date,
+      signup_deadline: e.signup_deadline || e.start_date,
       required_text: e.required_text,
       reward_rules: e.reward_rules,
       status: e.status,
       event_status: eventStatus,
+      can_signup: today < (e.signup_deadline || e.start_date),
       participant_count: e.participant_count,
       total_days: e.total_days,
       days_left: daysLeft,
@@ -1676,6 +1736,10 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
   if (event.status !== 'active') return reply.code(400).send({ success: false, error: '活动已结束' });
 
+  const today = bjtToday();
+  const signupDeadline = event.signup_deadline || event.start_date;
+  if (today >= signupDeadline) return reply.code(400).send({ success: false, error: '报名已截止，无法加入' });
+
   const existing = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id);
   if (existing) return reply.code(409).send({ success: false, error: '您已加入该活动' });
   
@@ -1686,6 +1750,20 @@ app.post('/api/wx/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, 
   `).run(eventId, user.id, nickname, user.child_name || null);
   
   return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid)));
+});
+
+app.get('/api/wx/checkin-events/:id/share-link', async (request: any, reply: any) => {
+  const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+
+  try {
+    const link = getEventShareLink(eventId, request.query?.env_version);
+    return ok(link);
+  } catch (e: any) {
+    request.log.error({ err: e }, '生成分享链接失败');
+    return reply.code(502).send({ success: false, error: e.message || '分享链接生成失败' });
+  }
 });
 
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
@@ -1750,11 +1828,17 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
         SET note = ?, image_url = ?, image_hash = ?, media_type = ?, is_makeup = ?, status = ?, display_name = ?, review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, created_at = datetime('now')
         WHERE id = ?
       `).run(note || null, image_url || null, image_hash || null, finalMediaType, isMakeup ? 1 : 0, recordStatus, display_name || null, (existing as any).id);
+      let pointsEarned = 0;
+      if (recordStatus === 'approved') {
+        const grant = grantCheckinPoints(user.id, (existing as any).id);
+        pointsEarned = grant ? grant.points_earned : 0;
+      }
       return ok({
         ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get((existing as any).id) as object),
         checkin_number: null,
         pending_review: recordStatus === 'pending',
-        new_badges: []
+        new_badges: [],
+        points_earned: pointsEarned
       });
     }
     return reply.code(400).send({ success: false, error: isMakeup ? '该日期已经提交过打卡' : '今日已打卡，明天再来吧~' });
@@ -1768,6 +1852,12 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
     INSERT INTO checkin_records (event_id, participant_id, checkin_date, note, image_url, image_hash, media_type, is_makeup, status, display_name)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(event_id, participant.id, targetDate, note || null, image_url || null, image_hash || null, finalMediaType, isMakeup ? 1 : 0, recordStatus, finalDisplayName);
+
+  let pointsEarned = 0;
+  if (recordStatus === 'approved') {
+    const grant = grantCheckinPoints(user.id, r.lastInsertRowid as number);
+    pointsEarned = grant ? grant.points_earned : 0;
+  }
 
   const newBadges: any[] = [];
   const allApprovedRecords = recordStatus === 'approved'
@@ -1802,7 +1892,8 @@ app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: 
     ...(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid) as object),
     checkin_number: checkinCount,
     pending_review: recordStatus === 'pending',
-    new_badges: newBadges
+    new_badges: newBadges,
+    points_earned: pointsEarned,
   }));
 });
 
@@ -1905,7 +1996,12 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
   const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
 
-  const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ?').all(eventId) as any[];
+  const participants = db.prepare(`
+    SELECT p.*, wu.avatar_url
+    FROM checkin_participants p
+    LEFT JOIN wx_users wu ON p.wx_user_id = wu.id
+    WHERE p.event_id = ?
+  `).all(eventId) as any[];
   const records = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(eventId) as any[];
 
   const me = user ? db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? AND wx_user_id = ?').get(eventId, user.id) as any : null;
@@ -1916,6 +2012,7 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
     return {
       participant_id: p.id,
       nickname: p.nickname,
+      avatar_url: p.avatar_url,
       checkin_days: stats.checkin_days,
       current_streak: stats.current_streak,
       is_me: me ? p.id === me.id : false,
@@ -1930,6 +2027,7 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
   const result = ranking.map((r, i) => ({
     rank: i + 1,
     nickname: r.nickname,
+    avatar_url: r.avatar_url,
     checkin_days: r.checkin_days,
     current_streak: r.current_streak,
     is_me: r.is_me,
@@ -2408,9 +2506,10 @@ app.register(async function (router) {
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
 
     let sql = `
-      SELECT r.*, p.nickname, p.child_name, p.wx_user_id
+      SELECT r.*, p.nickname, p.child_name, p.wx_user_id, wu.avatar_url
       FROM checkin_records r
       JOIN checkin_participants p ON r.participant_id = p.id
+      LEFT JOIN wx_users wu ON p.wx_user_id = wu.id
       WHERE r.event_id = ?
     `;
     const params: any[] = [eventId];
@@ -2446,6 +2545,13 @@ app.register(async function (router) {
       SET status = ?, reviewed_by = ?, reviewed_at = datetime('now'), review_note = ?
       WHERE id = ?
     `).run(status, (request.user as AuthUser).id, review_note || null, recordId);
+
+    if (status === 'approved' && record.status !== 'approved') {
+      const participant = db.prepare('SELECT wx_user_id FROM checkin_participants WHERE id = ?').get(record.participant_id) as any;
+      if (participant?.wx_user_id) {
+        grantCheckinPoints(participant.wx_user_id, recordId);
+      }
+    }
 
     return ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId));
   });
@@ -2629,6 +2735,133 @@ app.register(async function (router) {
   });
 }, { prefix: '/api/checkin-events' });
 
+// ---- 微信用户与积分管理 ----
+app.register(async function (router) {
+  router.addHook('preHandler', authMiddleware);
+
+  router.get('/', async (request: any) => {
+    const { search, unlinked } = request.query as any;
+    let sql = `
+      SELECT wu.*, c.name AS customer_name
+      FROM wx_users wu
+      LEFT JOIN customers c ON wu.customer_id = c.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    if (search) {
+      sql += ' AND (wu.nickname LIKE ? OR wu.child_name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (unlinked === 'true' || unlinked === '1') {
+      sql += ' AND wu.customer_id IS NULL';
+    }
+    sql += ' ORDER BY wu.last_login_at DESC, wu.id DESC';
+    const users = db.prepare(sql).all(...params);
+    const total = (db.prepare('SELECT COUNT(*) as total FROM wx_users').get() as any).total;
+    return ok({ users, total });
+  });
+
+  router.put('/:id/link', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id) as any;
+    if (!user) return reply.code(404).send({ success: false, error: '微信用户不存在' });
+    const { customer_id } = request.body;
+    if (customer_id != null) {
+      const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(parseInt(customer_id, 10) || 0);
+      if (!customer) return reply.code(400).send({ success: false, error: '客户不存在' });
+      // 保持客户↔微信用户 1:1，避免订单积分归属歧义
+      db.prepare('UPDATE wx_users SET customer_id = NULL WHERE customer_id = ?').run(parseInt(customer_id, 10));
+    }
+    db.prepare("UPDATE wx_users SET customer_id = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(customer_id != null ? parseInt(customer_id, 10) : null, id);
+    const updated = db.prepare(`
+      SELECT wu.*, c.name AS customer_name
+      FROM wx_users wu
+      LEFT JOIN customers c ON wu.customer_id = c.id
+      WHERE wu.id = ?
+    `).get(id);
+    return ok(updated);
+  });
+
+  router.post('/:id/points', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const user = db.prepare('SELECT points FROM wx_users WHERE id = ?').get(id) as any;
+    if (!user) return reply.code(404).send({ success: false, error: '微信用户不存在' });
+    const { amount, note } = request.body;
+    const amt = parseInt(amount, 10);
+    if (!Number.isFinite(amt) || amt === 0) return reply.code(400).send({ success: false, error: '积分数量必须是非零整数' });
+    const newBalance = (user.points || 0) + amt;
+    if (newBalance < 0) return reply.code(400).send({ success: false, error: '积分余额不足' });
+    const grant = grantPoints({
+      wxUserId: id,
+      amount: amt,
+      type: 'adjust',
+      refType: 'none',
+      note: note || null,
+      operatorId: (request.user as AuthUser).id,
+    });
+    return ok({ new_balance: newBalance, ledger_id: grant?.ledgerId ?? null });
+  });
+
+  router.get('/:id/points', async (request: any, reply: any) => {
+    const id = parseInt(request.params.id);
+    const user = db.prepare('SELECT points FROM wx_users WHERE id = ?').get(id) as any;
+    if (!user) return reply.code(404).send({ success: false, error: '微信用户不存在' });
+    const { page = '1', limit = '20' } = request.query as any;
+    const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
+    const items = db.prepare('SELECT * FROM points_ledger WHERE wx_user_id = ? ORDER BY id DESC LIMIT ? OFFSET ?').all(id, limitNum, offset);
+    const total = (db.prepare('SELECT COUNT(*) as total FROM points_ledger WHERE wx_user_id = ?').get(id) as any).total;
+    return ok({ items, total, balance: user.points });
+  });
+}, { prefix: '/api/wx-users' });
+
+app.get('/api/settings/points', { preHandler: [authMiddleware] }, async () => {
+  return ok({ points_checkin: getIntSetting('points_checkin'), points_order_rate: getIntSetting('points_order_rate') });
+});
+
+app.put('/api/settings/points', { preHandler: [authMiddleware, adminOnly] }, async (request: any, reply: any) => {
+  const { points_checkin, points_order_rate } = request.body;
+  const upsert = db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))");
+  if (points_checkin !== undefined) {
+    const v = parseInt(points_checkin, 10);
+    if (!Number.isFinite(v) || v <= 0 || v > 10000) return reply.code(400).send({ success: false, error: '打卡积分必须是 1-10000 的整数' });
+    upsert.run('points_checkin', String(v));
+  }
+  if (points_order_rate !== undefined) {
+    const v = parseInt(points_order_rate, 10);
+    if (!Number.isFinite(v) || v <= 0 || v > 100) return reply.code(400).send({ success: false, error: '订单积分比例必须是 1-100 的整数' });
+    upsert.run('points_order_rate', String(v));
+  }
+  return ok({ points_checkin: getIntSetting('points_checkin'), points_order_rate: getIntSetting('points_order_rate') });
+});
+
+// ---- 数据备份管理 ----
+app.get('/api/admin/backups', { preHandler: [authMiddleware, adminOnly] }, async () => {
+  const backups = listBackups().map(({ filePath, ...rest }) => rest);
+  return ok(backups);
+});
+
+app.post('/api/admin/backup', { preHandler: [authMiddleware, adminOnly] }, async (request: any, reply: any) => {
+  try {
+    const backup = await createBackup();
+    return ok({ name: backup.name, size: backup.size, createdAt: backup.createdAt });
+  } catch (err: any) {
+    request.log.error({ err }, '创建备份失败');
+    return reply.code(500).send({ success: false, error: `创建备份失败：${err.message}` });
+  }
+});
+
+app.get('/api/admin/backup/download', { preHandler: [authMiddleware, adminOnly] }, async (request: any, reply: any) => {
+  const { name } = request.query as any;
+  if (!isValidBackupName(name || '')) return reply.code(400).send({ success: false, error: '无效的备份文件名' });
+  const filePath = path.join(backupsDir, name);
+  if (!fs.existsSync(filePath)) return reply.code(404).send({ success: false, error: '备份文件不存在' });
+  reply.header('Content-Type', 'application/zip');
+  reply.header('Content-Disposition', `attachment; filename="${name}"`);
+  reply.header('Content-Length', String(fs.statSync(filePath).size));
+  return reply.send(fs.createReadStream(filePath));
+});
+
 app.setErrorHandler((error: any, request, reply) => {
   if (error.statusCode) {
     return reply.code(error.statusCode).send({ success: false, error: error.message });
@@ -2659,7 +2892,21 @@ if (process.env.NODE_ENV !== 'test' && !globalThis.__checkinReminderTimerStarted
   globalThis.__checkinReminderTimerStarted = true;
   setInterval(() => {
     runDueCheckinReminders().catch(err => app.log.error(err));
+    maybeRunAutoBackup().catch(err => app.log.error(err));
   }, 60 * 1000);
+}
+
+// 每日自动备份：到达设定时间（北京时间，默认 03:30）且当天未备份时执行一次
+async function maybeRunAutoBackup() {
+  const nowHHMM = new Date(Date.now() + BJT_MS).toISOString().slice(11, 16);
+  if (nowHHMM < AUTO_BACKUP_TIME) return;
+  const today = bjtToday();
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'last_auto_backup_date'").get() as any;
+  if (row && row.value === today) return;
+  const backup = await createBackup();
+  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('last_auto_backup_date', ?, datetime('now'))")
+    .run(today);
+  app.log.info(`每日自动备份完成：${backup.name} (${backup.size} bytes)`);
 }
 
 export default app;

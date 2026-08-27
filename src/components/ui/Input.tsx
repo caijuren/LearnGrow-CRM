@@ -106,11 +106,7 @@ export const Textarea: React.FC<TextareaProps> = ({
         </label>
       )}
       <textarea
-        className={`w-full border border-border-default rounded-md px-3 py-2
-                    text-sm text-text-primary bg-bg-surface
-                    focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10
-                    transition-all duration-150 ease-out
-                    placeholder:text-text-tertiary resize-y min-h-[80px] ${stateClass} ${className}`}
+        className={`textarea ${stateClass} ${className}`}
         {...rest}
       />
     </div>

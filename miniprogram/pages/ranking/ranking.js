@@ -6,7 +6,8 @@ Page({
     eventId: null,
     ranking: [],
     myRank: null,
-    isLoggedIn: false
+    isLoggedIn: false,
+    baseUrl: app.globalData.baseUrl
   },
 
   onLoad(options) {

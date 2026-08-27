@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
-  Plus, X, Edit2, Trash2, Package, Loader2, BookOpen,
+  Plus, Edit2, Trash2, Loader2, BookOpen,
   ToggleLeft, ToggleRight, AlertTriangle, GraduationCap,
 } from 'lucide-react';
 import { useStore } from '@/store';
 import {
-  PRODUCT_TIER_LABELS, PRODUCT_TIER_COLORS, DEFAULT_CATEGORIES,
+  PRODUCT_TIER_LABELS, DEFAULT_CATEGORIES,
   type ProductTier, type Product,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Loading from '@/components/ui/Loading';
 import Modal from '@/components/Modal';
-
-const TIER_ACCENTS: Record<ProductTier, string> = {
-  traffic: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  main: 'bg-sky-50 text-sky-700 border-sky-100',
-  premium: 'bg-violet-50 text-violet-700 border-violet-100',
-};
 
 const CATEGORY_ICONS: Record<string, string> = {
   '语文': '📖',
@@ -67,7 +62,6 @@ export default function ProductList() {
     editProduct,
     deleteProduct,
     setProductTier,
-    productTier,
   } = useStore();
 
   const [activeTier, setActiveTier] = useState<TabFilter>('all');
@@ -81,7 +75,7 @@ export default function ProductList() {
 
   useEffect(() => {
     loadProducts({ page: 1, limit: 100 });
-  }, []);
+  }, [loadProducts]);
 
   const filteredProducts = products.filter(p => {
     if (activeTier !== 'all' && p.tier !== activeTier) return false;
@@ -343,16 +337,8 @@ export default function ProductList() {
         </div>
 
         {loading ? (
-          <div
-            className="flex flex-col items-center justify-center py-16"
-            style={{
-              backgroundColor: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border-default)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
-            <Loader2 size={20} strokeWidth={1.8} className="animate-spin" style={{ color: 'var(--color-primary)', marginBottom: '8px' }} />
-            <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-tertiary)' }}>加载中...</p>
+          <div className="panel py-16">
+            <Loading />
           </div>
         ) : filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

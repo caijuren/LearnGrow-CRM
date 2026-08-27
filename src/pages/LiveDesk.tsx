@@ -4,7 +4,7 @@ import {
   Lightbulb, X, Send, Star, Clock, Loader2, Mic2, Baby,
 } from 'lucide-react';
 import { useStore } from '@/store';
-import { IMPORTANCE_LABELS, IMPORTANCE_COLORS, ORDER_TYPE_COLORS, ORDER_TYPE_LABELS } from '../../shared/types';
+import { IMPORTANCE_LABELS, IMPORTANCE_COLORS } from '../../shared/types';
 import type { LiveCustomerCard } from '../../shared/types';
 
 export default function LiveDesk() {
@@ -39,7 +39,7 @@ export default function LiveDesk() {
       liveSearch(searchQuery);
     }, searchQuery.length > 0 ? 150 : 0);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, liveSearch]);
 
   const copyScript = async (text: string, key: string) => {
     try {

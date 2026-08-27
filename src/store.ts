@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, WechatGroup, WechatGroupMember, Child, ChildWithProgress, LearningPath, Textbook, CheckinEvent, CheckinEventDetail, Material } from '../shared/types';
+import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, WechatGroup, WechatGroupMember, Child, ChildWithProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinEventDetail, Material, WxUserWithPoints, PointsLedgerItem, PointsConfig } from '../shared/types';
 import * as api from './lib/api';
 
 interface AppState {
@@ -33,6 +33,12 @@ interface AppState {
   liveSearchResults: LiveCustomerCard[];
 
   users: { id: number; username: string; role: 'admin' | 'assistant'; display_name?: string; created_at: string }[];
+
+  wxUsers: WxUserWithPoints[];
+  wxUsersTotal: number;
+  wxUserPoints: PointsLedgerItem[];
+  wxUserPointsTotal: number;
+  pointsConfig: PointsConfig | null;
 
   groups: WechatGroup[];
   selectedGroup: WechatGroup | null;
@@ -81,8 +87,8 @@ interface AppState {
   clearSelectedChild: () => void;
 
   loadLearningPaths: (params?: { subject?: string; is_active?: boolean }) => Promise<void>;
-  addLearningPath: (data: Partial<LearningPath> & { name: string; subject: string; stages?: any[] }) => Promise<void>;
-  editLearningPath: (id: number, data: Partial<LearningPath> & { stages?: any[] }) => Promise<void>;
+  addLearningPath: (data: Omit<Partial<LearningPath>, 'stages'> & { name: string; subject: string; stages?: Partial<LearningStage>[] }) => Promise<void>;
+  editLearningPath: (id: number, data: Omit<Partial<LearningPath>, 'stages'> & { stages?: Partial<LearningStage>[] }) => Promise<void>;
   removeLearningPath: (id: number) => Promise<void>;
 
   loadTextbooks: (params?: { region?: string }) => Promise<void>;
@@ -104,6 +110,13 @@ interface AppState {
   addUser: (data: { username: string; password: string; role: string; display_name?: string }) => Promise<void>;
   editUser: (id: number, data: { password?: string; role?: string; display_name?: string }) => Promise<void>;
   removeUser: (id: number) => Promise<void>;
+
+  loadWxUsers: (params?: { search?: string; unlinked?: boolean }) => Promise<void>;
+  linkWxUser: (id: number, customer_id: number | null) => Promise<void>;
+  adjustWxUserPoints: (id: number, amount: number, note?: string) => Promise<void>;
+  loadWxUserPoints: (id: number, params?: { page?: number; limit?: number }) => Promise<void>;
+  loadPointsConfig: () => Promise<void>;
+  updatePointsConfig: (data: Partial<PointsConfig>) => Promise<void>;
 
   loadGroups: (params?: { status?: string; search?: string }) => Promise<void>;
   loadGroup: (id: number) => Promise<void>;
@@ -170,6 +183,11 @@ export const useStore = create<AppState>((set, get) => ({
   todos: [],
   liveSearchResults: [],
   users: [],
+  wxUsers: [],
+  wxUsersTotal: 0,
+  wxUserPoints: [],
+  wxUserPointsTotal: 0,
+  pointsConfig: null,
   groups: [],
   selectedGroup: null,
   groupFilters: {},
@@ -189,8 +207,8 @@ export const useStore = create<AppState>((set, get) => ({
       const data = await api.login(username, password);
       localStorage.setItem('token', data.token);
       set({ token: data.token, currentUser: data.user, isAuthenticated: true, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
+    } catch (e) {
+      set({ error: (e as Error).message, loading: false });
       throw e;
     }
   },
@@ -202,7 +220,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const user = await api.fetchCurrentUser();
       set({ currentUser: user });
-    } catch (e) {
+    } catch {
       localStorage.removeItem('token');
       set({ token: null, currentUser: null, isAuthenticated: false });
     }
@@ -220,13 +238,13 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const data = await api.fetchDashboard();
       set({ dashboard: data, todos: data.todos, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadTodos: async () => {
     try {
       const todos = await api.fetchTodos();
       set({ todos });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
 
   loadCustomers: async (params) => {
@@ -235,14 +253,14 @@ export const useStore = create<AppState>((set, get) => ({
       const filters = { ...get().customerFilters, ...params };
       const data = await api.fetchCustomers({ ...filters, limit: 50 });
       set({ customers: data.customers, totalCustomers: data.total, customerPage: params?.page || 1, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadCustomer: async (id) => {
     set({ loading: true, error: null });
     try {
       const data = await api.fetchCustomer(id);
       set({ selectedCustomer: data, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addCustomer: async (data) => {
     set({ loading: true, error: null });
@@ -250,7 +268,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createCustomer(data);
       await get().loadCustomers({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editCustomer: async (id, data) => {
     set({ loading: true, error: null });
@@ -259,7 +277,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCustomer(id);
       await get().loadCustomers({ page: get().customerPage });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeCustomer: async (id) => {
     set({ loading: true, error: null });
@@ -267,21 +285,21 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteCustomer(id);
       await get().loadCustomers({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   editCustomerTags: async (id, tags) => {
     try {
       await api.updateCustomerTags(id, tags);
       await get().loadCustomer(id);
       await get().loadCustomers({ page: get().customerPage });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
   editCustomerImportance: async (id, importance) => {
     try {
       await api.updateCustomerImportance(id, importance);
       await get().loadCustomer(id);
       await get().loadCustomers({ page: get().customerPage });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
   setCustomerFilters: (filters) => {
     set({ customerFilters: { ...get().customerFilters, ...filters } });
@@ -296,7 +314,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCustomer(customerId);
       await get().loadTodos();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeFollowUp: async (id, customerId) => {
     set({ loading: true, error: null });
@@ -305,7 +323,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCustomer(customerId);
       await get().loadTodos();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   addOrder: async (customerId, data) => {
     set({ loading: true, error: null });
@@ -314,7 +332,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCustomer(customerId);
       await get().loadDashboard();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
 
   loadProducts: async (params) => {
@@ -323,7 +341,7 @@ export const useStore = create<AppState>((set, get) => ({
       const tier = params?.tier ?? get().productTier ?? undefined;
       const data = await api.fetchProducts({ ...params, tier, limit: 100 });
       set({ products: data.products, totalProducts: data.total, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addProduct: async (data) => {
     set({ loading: true, error: null });
@@ -331,7 +349,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createProduct(data);
       await get().loadProducts({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editProduct: async (id, data) => {
     set({ loading: true, error: null });
@@ -339,7 +357,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateProduct(id, data);
       await get().loadProducts({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   deleteProduct: async (id) => {
     set({ loading: true, error: null });
@@ -347,7 +365,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteProduct(id);
       await get().loadProducts({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   setProductTier: (tier) => {
     set({ productTier: tier });
@@ -359,7 +377,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const data = await api.fetchOrders({ ...params, limit: 50 });
       set({ orders: data.orders, totalOrders: data.total, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   removeOrder: async (id) => {
     set({ loading: true, error: null });
@@ -367,7 +385,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteOrder(id);
       await get().loadOrders({ page: 1 });
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
 
   liveSearch: async (q) => {
@@ -375,13 +393,13 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const results = await api.liveSearch(q);
       set({ liveSearchResults: results });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
   liveQuickNote: async (customer_id, content, child_id) => {
     try {
       await api.liveQuickNote(customer_id, content, child_id);
       await get().liveSearch('');
-    } catch (e: any) { set({ error: e.message }); throw e; }
+    } catch (e) { set({ error: (e as Error).message }); throw e; }
   },
 
   loadUsers: async () => {
@@ -389,7 +407,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const users = await api.fetchUsers();
       set({ users, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addUser: async (data) => {
     set({ loading: true, error: null });
@@ -397,7 +415,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createUser(data);
       await get().loadUsers();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editUser: async (id, data) => {
     set({ loading: true, error: null });
@@ -405,7 +423,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateUser(id, data);
       await get().loadUsers();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeUser: async (id) => {
     set({ loading: true, error: null });
@@ -413,7 +431,50 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteUser(id);
       await get().loadUsers();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
+  },
+
+  loadWxUsers: async (params) => {
+    set({ loading: true, error: null });
+    try {
+      const data = await api.fetchWxUsers(params);
+      set({ wxUsers: data.users, wxUsersTotal: data.total, loading: false });
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
+  },
+  linkWxUser: async (id, customer_id) => {
+    set({ loading: true, error: null });
+    try {
+      await api.linkWxUser(id, customer_id);
+      await get().loadWxUsers();
+      set({ loading: false });
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
+  },
+  adjustWxUserPoints: async (id, amount, note) => {
+    set({ loading: true, error: null });
+    try {
+      await api.adjustWxUserPoints(id, amount, note);
+      await get().loadWxUsers();
+      set({ loading: false });
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
+  },
+  loadWxUserPoints: async (id, params) => {
+    set({ loading: true, error: null });
+    try {
+      const data = await api.fetchWxUserPoints(id, params);
+      set({ wxUserPoints: data.items, wxUserPointsTotal: data.total, loading: false });
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
+  },
+  loadPointsConfig: async () => {
+    try {
+      const data = await api.fetchPointsConfig();
+      set({ pointsConfig: data });
+    } catch (e) { set({ error: (e as Error).message }); }
+  },
+  updatePointsConfig: async (data) => {
+    try {
+      const updated = await api.updatePointsConfig(data);
+      set({ pointsConfig: updated });
+    } catch (e) { set({ error: (e as Error).message }); throw e; }
   },
 
   loadGroups: async (params) => {
@@ -422,14 +483,14 @@ export const useStore = create<AppState>((set, get) => ({
       const filters = { ...get().groupFilters, ...params };
       const data = await api.fetchGroups(filters);
       set({ groups: data.groups, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadGroup: async (id) => {
     set({ loading: true, error: null });
     try {
       const data = await api.fetchGroup(id);
       set({ selectedGroup: data, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addGroup: async (data) => {
     set({ loading: true, error: null });
@@ -437,7 +498,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createGroup(data);
       await get().loadGroups();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editGroup: async (id, data) => {
     set({ loading: true, error: null });
@@ -446,7 +507,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadGroup(id);
       await get().loadGroups();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeGroup: async (id) => {
     set({ loading: true, error: null });
@@ -454,7 +515,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteGroup(id);
       await get().loadGroups();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   setGroupFilters: (filters) => {
     set({ groupFilters: { ...get().groupFilters, ...filters } });
@@ -469,7 +530,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadGroup(groupId);
       await get().loadGroups();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   batchAddGroupMembers: async (groupId, names, role = 'new') => {
     set({ loading: true, error: null });
@@ -479,7 +540,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadGroups();
       set({ loading: false });
       return result;
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editGroupMember: async (groupId, memberId, data) => {
     set({ loading: true, error: null });
@@ -487,7 +548,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateGroupMember(groupId, memberId, data);
       await get().loadGroup(groupId);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeGroupMember: async (groupId, memberId) => {
     set({ loading: true, error: null });
@@ -496,7 +557,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadGroup(groupId);
       await get().loadGroups();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
 
   loadChild: async (id) => {
@@ -504,7 +565,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const data = await api.fetchChild(id);
       set({ selectedChild: data, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   clearSelectedChild: () => set({ selectedChild: null }),
   addChild: async (data) => {
@@ -513,7 +574,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createChild(data);
       await get().loadCustomer(data.customer_id);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editChild: async (id, data) => {
     set({ loading: true, error: null });
@@ -523,7 +584,7 @@ export const useStore = create<AppState>((set, get) => ({
       if (child) await get().loadChild(id);
       if (child) await get().loadCustomer(child.customer_id);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeChild: async (id, customerId) => {
     set({ loading: true, error: null });
@@ -531,7 +592,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteChild(id);
       await get().loadCustomer(customerId);
       set({ selectedChild: null, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addChildProgress: async (childId, pathId) => {
     set({ loading: true, error: null });
@@ -539,7 +600,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.addChildProgress(childId, pathId);
       await get().loadChild(childId);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   advanceProgress: async (childId, progressId, data) => {
     set({ loading: true, error: null });
@@ -548,14 +609,14 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadChild(childId);
       await get().loadTodos();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
 
   loadLearningPaths: async (params) => {
     try {
       const data = await api.fetchLearningPaths(params);
       set({ learningPaths: data });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
   addLearningPath: async (data) => {
     set({ loading: true, error: null });
@@ -563,7 +624,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createLearningPath(data);
       await get().loadLearningPaths();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editLearningPath: async (id, data) => {
     set({ loading: true, error: null });
@@ -571,7 +632,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateLearningPath(id, data);
       await get().loadLearningPaths();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeLearningPath: async (id) => {
     set({ loading: true, error: null });
@@ -579,20 +640,20 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteLearningPath(id);
       await get().loadLearningPaths();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
 
   loadTextbooks: async (params) => {
     try {
       const data = await api.fetchTextbooks(params);
       set({ textbooks: data });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
   loadTextbookRegions: async () => {
     try {
       const data = await api.fetchTextbookRegions();
       set({ textbookRegions: data });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e) { set({ error: (e as Error).message }); }
   },
 
   loadCheckinEvents: async (params) => {
@@ -601,14 +662,14 @@ export const useStore = create<AppState>((set, get) => ({
       const filters = { ...get().checkinFilter, ...params };
       const data = await api.fetchCheckinEvents(filters);
       set({ checkinEvents: data.events, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadCheckinEvent: async (id) => {
     set({ loading: true, error: null });
     try {
       const data = await api.fetchCheckinEvent(id);
       set({ selectedCheckinEvent: data, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   addCheckinEvent: async (data) => {
     set({ loading: true, error: null });
@@ -616,7 +677,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.createCheckinEvent(data);
       await get().loadCheckinEvents();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editCheckinEvent: async (id, data) => {
     set({ loading: true, error: null });
@@ -625,7 +686,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadCheckinEvent(id);
       await get().loadCheckinEvents();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeCheckinEvent: async (id) => {
     set({ loading: true, error: null });
@@ -633,14 +694,14 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteCheckinEvent(id);
       await get().loadCheckinEvents();
       set({ selectedCheckinEvent: null, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadDeletedCheckinEvents: async () => {
     set({ loading: true, error: null });
     try {
       const data = await api.fetchDeletedCheckinEvents();
       set({ deletedCheckinEvents: data.events, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   restoreCheckinEvent: async (id) => {
     set({ loading: true, error: null });
@@ -649,7 +710,7 @@ export const useStore = create<AppState>((set, get) => ({
       await get().loadDeletedCheckinEvents();
       await get().loadCheckinEvents();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   permanentlyDeleteCheckinEvent: async (id) => {
     set({ loading: true, error: null });
@@ -657,7 +718,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.permanentlyDeleteCheckinEvent(id);
       await get().loadDeletedCheckinEvents();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   setCheckinFilter: (filter) => {
     set({ checkinFilter: { ...get().checkinFilter, ...filter } });
@@ -671,7 +732,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.addCheckinParticipant(eventId, data);
       await get().loadCheckinEvent(eventId);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeCheckinParticipant: async (eventId, participantId) => {
     set({ loading: true, error: null });
@@ -679,19 +740,19 @@ export const useStore = create<AppState>((set, get) => ({
       await api.removeCheckinParticipant(eventId, participantId);
       await get().loadCheckinEvent(eventId);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   doCheckin: async (eventId, participantId, date, note) => {
     try {
       await api.checkin(eventId, participantId, date, note);
       await get().loadCheckinEvent(eventId);
-    } catch (e: any) { set({ error: e.message }); throw e; }
+    } catch (e) { set({ error: (e as Error).message }); throw e; }
   },
   doUncheckin: async (eventId, recordId) => {
     try {
       await api.uncheckin(eventId, recordId);
       await get().loadCheckinEvent(eventId);
-    } catch (e: any) { set({ error: e.message }); throw e; }
+    } catch (e) { set({ error: (e as Error).message }); throw e; }
   },
   doBatchCheckin: async (eventId, date, participantIds, note) => {
     set({ loading: true, error: null });
@@ -699,7 +760,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.batchCheckin(eventId, date, participantIds, note);
       await get().loadCheckinEvent(eventId);
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
 
   loadMaterials: async (params) => {
@@ -709,7 +770,7 @@ export const useStore = create<AppState>((set, get) => ({
       const search = params?.search ?? get().materialSearch;
       const data = await api.fetchMaterials({ category: category === 'all' ? undefined : category, search, product_id: params?.product_id });
       set({ materials: data, loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   uploadMaterial: async (file, data) => {
     set({ loading: true, error: null });
@@ -717,7 +778,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.uploadMaterial(file, data);
       await get().loadMaterials();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   editMaterial: async (id, data) => {
     set({ loading: true, error: null });
@@ -725,7 +786,7 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateMaterial(id, data);
       await get().loadMaterials();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); throw e; }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
   removeMaterial: async (id) => {
     set({ loading: true, error: null });
@@ -733,13 +794,13 @@ export const useStore = create<AppState>((set, get) => ({
       await api.deleteMaterial(id);
       await get().loadMaterials();
       set({ loading: false });
-    } catch (e: any) { set({ error: e.message, loading: false }); }
+    } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   recordMaterialDownload: async (id) => {
     try {
       const result = await api.recordMaterialDownload(id);
       set({ materials: get().materials.map(m => m.id === id ? { ...m, download_count: result.download_count } : m) });
-    } catch (e: any) { /* silent */ }
+    } catch { /* silent */ }
   },
   setMaterialCategory: (category) => {
     set({ materialCategory: category });

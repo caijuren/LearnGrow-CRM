@@ -51,6 +51,17 @@
       </view>
     </view>
 
+    <view class="points-card" bindtap="goToPoints">
+      <view class="points-info">
+        <view class="points-num font-bold">{{pointsBalance}}</view>
+        <view class="points-label text-muted">我的积分</view>
+      </view>
+      <view class="points-arrow">
+        <text class="text-muted">查看明细</text>
+        <text class="menu-arrow text-muted">→</text>
+      </view>
+    </view>
+
     <view class="stats-card card">
       <view class="stats-row flex gap-2">
         <view class="stat-item flex-1">

@@ -13,7 +13,7 @@
   <view wx:if="{{!isLoggedIn}}" class="login-banner mb-4" bindtap="goToLogin">
     <view class="login-banner-text">
       <text class="login-banner-title">立即登录</text>
-      <text class="login-banner-desc">登录后即可加入活动并打卡</text>
+      <text class="login-banner-desc">登录后即可报名活动并打卡</text>
     </view>
     <text class="login-banner-arrow">→</text>
   </view>
@@ -25,9 +25,9 @@
         <view wx:if="{{todaySummary.joined > 0}}" class="today-title">
           {{todaySummary.pending > 0 ? '还有' + todaySummary.pending + '个待打卡' : '今日已全部完成'}}
         </view>
-        <view wx:else class="today-title">还没有加入活动</view>
+        <view wx:else class="today-title">还没有报名活动</view>
         <view wx:if="{{todaySummary.nextEvent}}" class="today-subtitle truncate">{{todaySummary.nextEvent.name}}</view>
-        <view wx:else class="today-subtitle truncate">加入活动后，这里会显示今天的打卡任务</view>
+        <view wx:else class="today-subtitle truncate">报名活动后，这里会显示今天的打卡任务</view>
       </view>
       <view class="today-ring {{todaySummary.pending === 0 && todaySummary.joined > 0 ? 'done' : ''}}">
         <text class="ring-completed">{{todaySummary.completed}}</text><text class="ring-total">/{{todaySummary.joined}}</text>
@@ -53,7 +53,7 @@
   <view wx:for="{{upcomingEvents}}" wx:key="id" class="event-card upcoming" bindtap="goToDetail" data-id="{{item.id}}">
     <view class="event-header">
       <view class="event-title text-lg font-bold">{{item.name}}</view>
-      <view class="status-pill upcoming">即将开始</view>
+      <view class="status-pill upcoming">{{item.is_joined ? '已报名' : '即将开始'}}</view>
     </view>
 
     <view class="event-meta flex gap-3 mt-2">
@@ -70,7 +70,10 @@
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
-      <button class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
+      <button wx:if="{{isLoggedIn && !item.is_joined && item.can_signup}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
+        立即报名
+      </button>
+      <button wx:if="{{!isLoggedIn || item.is_joined || !item.can_signup}}" class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
         查看详情
       </button>
       <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
@@ -90,7 +93,7 @@
       <view class="event-title text-lg font-bold">{{item.name}}</view>
       <view wx:if="{{isLoggedIn && item.today_checked}}" class="status-pill done">已完成</view>
       <view wx:elif="{{isLoggedIn && item.is_joined}}" class="status-pill pending">待打卡</view>
-      <view wx:else class="badge badge-muted">{{isLoggedIn ? '未加入' : '浏览中'}}</view>
+      <view wx:else class="badge badge-muted">{{isLoggedIn ? '未报名' : '浏览中'}}</view>
     </view>
 
     <view class="event-meta flex gap-3 mt-2">
@@ -122,14 +125,12 @@
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
-      <button wx:if="{{isLoggedIn && !item.is_joined}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
-        立即加入
-      </button>
-      <button wx:elif="{{isLoggedIn && item.is_joined && !item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
-        立即打卡
-      </button>
+      <view wx:if="{{isLoggedIn && !item.is_joined}}" class="btn-disabled btn-small">报名已截止</view>
       <button wx:if="{{!isLoggedIn || !item.is_joined}}" class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
         查看详情
+      </button>
+      <button wx:elif="{{item.is_joined && !item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
+        立即打卡
       </button>
       <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
         排行榜

@@ -13,10 +13,12 @@ const OrderList = lazy(() => import('@/pages/OrderList'));
 const LearningPathConfig = lazy(() => import('@/pages/LearningPathConfig'));
 const LiveDesk = lazy(() => import('@/pages/LiveDesk'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
+const WxUserList = lazy(() => import('@/pages/WxUserList'));
 const MaterialLibrary = lazy(() => import('@/pages/MaterialLibrary'));
 const Login = lazy(() => import('@/pages/Login'));
 const CheckinList = lazy(() => import('@/pages/CheckinList'));
 const CheckinDetail = lazy(() => import('@/pages/CheckinDetail'));
+const Settings = lazy(() => import('@/pages/Settings'));
 
 function PageFallback() {
   return (
@@ -32,6 +34,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated) restoreAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!isAuthenticated) {
@@ -51,7 +54,7 @@ function AppLayout() {
       loadCurrentUser();
       loadDashboard();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadCurrentUser, loadDashboard]);
 
   return <Layout />;
 }
@@ -73,9 +76,11 @@ export default function App() {
             <Route path="learning-paths" element={<LearningPathConfig />} />
             <Route path="live" element={<LiveDesk />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="wx-users" element={<WxUserList />} />
             <Route path="materials" element={<MaterialLibrary />} />
             <Route path="checkin" element={<CheckinList />} />
             <Route path="checkin/:id" element={<CheckinDetail />} />
+            <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>
       </Suspense>

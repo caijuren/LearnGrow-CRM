@@ -13,6 +13,7 @@ import {
   type FollowUpMethod, type ProgressStatus, type ChildLearningProgress,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
+import Loading from '@/components/ui/Loading';
 import Modal from '@/components/Modal';
 
 const PROGRESS_STATUS_LABELS: Record<ProgressStatus, string> = {
@@ -102,7 +103,7 @@ export default function ChildDetail() {
       loadChild(Number(childId));
     }
     return () => clearSelectedChild();
-  }, [childId]);
+  }, [childId, loadChild, clearSelectedChild]);
 
   useEffect(() => {
     if (child) {
@@ -123,7 +124,7 @@ export default function ChildDetail() {
     if (activeTab === 'progress' && learningPaths.length === 0) {
       loadLearningPaths({ subject: '英语', is_active: true });
     }
-  }, [activeTab, learningPaths.length]);
+  }, [activeTab, learningPaths.length, loadLearningPaths]);
 
   const handleAdvance = async () => {
     if (!childId || !currentProgress) return;
@@ -261,8 +262,7 @@ export default function ChildDetail() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-emerald-50/30 to-white flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mx-auto" />
-          <p className="text-sm text-slate-500 mt-3">加载中...</p>
+          <Loading size="lg" />
         </div>
       </div>
     );
@@ -662,7 +662,7 @@ export default function ChildDetail() {
               sortedFollowUps.length > 0 ? (
                 <div className="relative pl-10">
                   <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gradient-to-b from-emerald-200 via-teal-200 to-transparent" />
-                  {sortedFollowUps.map((followUp, index) => {
+                  {sortedFollowUps.map((followUp) => {
                     const Icon = METHOD_ICONS[followUp.method] || FileText;
                     return (
                       <div key={followUp.id} className="relative mb-5 last:mb-0">

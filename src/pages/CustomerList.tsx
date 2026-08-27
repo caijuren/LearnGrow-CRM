@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, X, MessageCircle, Star, Clock,
-  UserPlus, Filter, Tag, Loader2, User,
+  Filter, Tag, Loader2, User,
 } from 'lucide-react';
 import { useStore } from '@/store';
+import Loading from '@/components/ui/Loading';
 import {
   SOURCE_LABELS, IMPORTANCE_LABELS, COMMON_TAGS,
   STAGE_LABELS, WECHAT_ACCOUNT_LABELS,
-  type Importance, type CustomerSource, type CustomerStage, type WechatAccount,
+  type Importance, type CustomerSource, type CustomerStage, type WechatAccount, type Customer,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
 import Modal from '@/components/Modal';
@@ -65,7 +66,7 @@ const emptyForm: CustomerForm = {
   next_talk_topic: '',
 };
 
-function CustomerCard({ customer, onClick }: { customer: any; onClick: () => void }) {
+function CustomerCard({ customer, onClick }: { customer: Customer; onClick: () => void }) {
   const isVip = customer.importance === 'vip';
 
   const formatDate = (dateStr: string | null) => {
@@ -83,119 +84,59 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
   return (
     <div
       onClick={onClick}
-      className="cursor-pointer transition-all duration-150 group relative overflow-hidden"
-      style={{
-        backgroundColor: 'var(--color-bg-surface)',
-        border: '1px solid var(--color-border-default)',
-        borderRadius: 'var(--radius-md)',
-        padding: '1rem',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--color-border-strong)';
-        e.currentTarget.style.boxShadow = '0 1px 3px rgb(16 24 40 / 0.04), 0 4px 12px rgb(16 24 40 / 0.04)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--color-border-default)';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
+      className="clean-card cursor-pointer group relative overflow-hidden p-4 pt-[22px]"
     >
+      {/* 顶部渐变 accent 线 */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[20px]"
+        style={{
+          background: isVip
+            ? 'linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%)'
+            : 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)',
+        }}
+      />
       {/* VIP 左侧色条 */}
       {isVip && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '3px',
-            background: 'linear-gradient(180deg, rgb(245 158 11), rgb(234 179 8))',
-          }}
-        />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b from-warning to-yellow-500" />
       )}
 
-      <div className="flex items-start gap-3" style={{ paddingLeft: isVip ? '0.5rem' : 0 }}>
+      <div className={`flex items-start gap-3 ${isVip ? 'pl-2' : ''}`}>
         <div
-          className="flex items-center justify-center shrink-0"
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[13px] font-semibold"
           style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: isVip ? 'rgb(245 158 11 / 0.08)' : 'var(--color-primary-soft)',
-            color: isVip ? 'rgb(217 119 6)' : 'var(--color-primary)',
-            fontSize: '0.8125rem',
-            fontWeight: 600,
+            backgroundColor: isVip ? 'var(--color-warning-soft)' : 'var(--color-primary-soft)',
+            color: isVip ? 'var(--color-warning)' : 'var(--color-primary)',
           }}
         >
           {customer.name[0]}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <h3
-              className="truncate flex-1"
-              style={{
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-                lineHeight: 1.4,
-              }}
-            >
+            <h3 className="truncate flex-1 text-sm font-semibold text-text-primary leading-snug">
               {customer.name}
             </h3>
             {isVip && (
-              <Star
-                size={12}
-                strokeWidth={2}
-                style={{ color: 'rgb(245 158 11)', fill: 'currentColor', flexShrink: 0 }}
-              />
+              <Star size={12} strokeWidth={2} className="shrink-0" style={{ color: 'var(--color-warning)' }} fill="currentColor" />
             )}
           </div>
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-            <span
-              className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
-              style={{
-                fontSize: '0.6875rem',
-                fontWeight: 500,
-                backgroundColor: 'var(--color-bg-subtle)',
-                color: 'var(--color-text-secondary)',
-                border: '1px solid var(--color-border-subtle)',
-              }}
-            >
+            <span className="text-[11px] text-text-tertiary">
               {STAGE_LABELS[customer.stage as CustomerStage]}
             </span>
             {customer.wechat_account === 'assistant' && (
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
-                style={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 500,
-                  backgroundColor: 'var(--color-bg-subtle)',
-                  color: 'var(--color-text-secondary)',
-                  border: '1px solid var(--color-border-subtle)',
-                }}
-              >
+              <span className="text-[11px] text-text-tertiary bg-bg-subtle px-1.5 py-0.5 rounded">
                 助理号
               </span>
             )}
           </div>
           {customer.wechat_remark && (
-            <div
-              className="flex items-center gap-1 truncate"
-              style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)' }}
-            >
-              <MessageCircle size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            <div className="flex items-center gap-1 truncate text-xs text-text-tertiary">
+              <MessageCircle size={11} strokeWidth={1.8} className="shrink-0" />
               <span className="truncate">{customer.wechat_remark}</span>
             </div>
           )}
           {customer.next_talk_topic && (
-            <div
-              className="mt-1.5 px-2 py-1 rounded-sm truncate"
-              style={{
-                fontSize: '0.6875rem',
-                backgroundColor: 'rgb(245 158 11 / 0.08)',
-                color: 'rgb(180 83 9)',
-                lineHeight: 1.4,
-              }}
-            >
+            <div className="mt-1.5 px-2 py-1 rounded truncate text-[11px] leading-relaxed bg-warning-soft text-warning">
               {customer.next_talk_topic}
             </div>
           )}
@@ -204,27 +145,13 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
               {customer.tags.slice(0, 3).map((tag: string) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
-                  style={{
-                    fontSize: '0.6875rem',
-                    fontWeight: 500,
-                    backgroundColor: 'var(--color-bg-surface)',
-                    color: 'var(--color-text-secondary)',
-                    border: '1px solid var(--color-border-default)',
-                  }}
+                  className="badge badge-neutral text-[11px] px-1.5 py-0.5 rounded"
                 >
                   {tag}
                 </span>
               ))}
               {customer.tags.length > 3 && (
-                <span
-                  className="inline-flex items-center px-1.5 py-0.5 rounded-sm"
-                  style={{
-                    fontSize: '0.6875rem',
-                    fontWeight: 500,
-                    color: 'var(--color-text-tertiary)',
-                  }}
-                >
+                <span className="text-[11px] font-medium text-text-tertiary px-1">
                   +{customer.tags.length - 3}
                 </span>
               )}
@@ -234,85 +161,29 @@ function CustomerCard({ customer, onClick }: { customer: any; onClick: () => voi
       </div>
 
       {/* 底部数据 */}
-      <div
-        className="grid grid-cols-3 gap-2 mt-3 pt-3"
-        style={{
-          borderTop: '1px solid var(--color-border-subtle)',
-          marginLeft: isVip ? '0.5rem' : 0,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.2,
-            }}
-          >
+      <div className={`grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-dashed border-border-subtle ${isVip ? 'ml-2' : ''}`}>
+        <div className="text-center">
+          <div className="text-[15px] font-bold text-text-primary leading-tight">
             ¥{customer.total_spent?.toLocaleString() || 0}
           </div>
-          <div
-            style={{
-              fontSize: '0.6875rem',
-              color: 'var(--color-text-tertiary)',
-              marginTop: '2px',
-            }}
-          >
+          <div className="text-[11px] text-text-tertiary mt-1">
             累计消费
           </div>
         </div>
-        <div
-          style={{
-            borderLeft: '1px solid var(--color-border-subtle)',
-            paddingLeft: '0.5rem',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.2,
-            }}
-          >
+        <div className="text-center border-l border-border-subtle">
+          <div className="text-[15px] font-bold text-text-primary leading-tight">
             {customer.order_count || 0}
           </div>
-          <div
-            style={{
-              fontSize: '0.6875rem',
-              color: 'var(--color-text-tertiary)',
-              marginTop: '2px',
-            }}
-          >
+          <div className="text-[11px] text-text-tertiary mt-1">
             订单数
           </div>
         </div>
-        <div
-          style={{
-            borderLeft: '1px solid var(--color-border-subtle)',
-            paddingLeft: '0.5rem',
-          }}
-        >
-          <div
-            className="flex items-center gap-0.5"
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.2,
-            }}
-          >
+        <div className="text-center border-l border-border-subtle">
+          <div className="flex items-center justify-center gap-0.5 text-xs font-medium text-text-secondary leading-tight">
             <Clock size={10} strokeWidth={1.8} />
             {formatDate(customer.last_follow_date)}
           </div>
-          <div
-            style={{
-              fontSize: '0.6875rem',
-              color: 'var(--color-text-tertiary)',
-              marginTop: '2px',
-            }}
-          >
+          <div className="text-[11px] text-text-tertiary mt-1">
             最后跟进
           </div>
         </div>
@@ -328,7 +199,6 @@ export default function CustomerList() {
     customers,
     loading,
     customerFilters,
-    loadCustomers,
     addCustomer,
     setCustomerFilters,
   } = useStore();
@@ -354,7 +224,7 @@ export default function CustomerList() {
       setShowAdd(true);
     }
     setCustomerFilters({ search, importance, stage, need_follow: needFollow, tag });
-  }, [location.search]);
+  }, [location.search, setCustomerFilters]);
 
   const handleSearch = () => {
     const params = new URLSearchParams(location.search);
@@ -433,15 +303,17 @@ export default function CustomerList() {
         <div className="page-header">
           <div>
             <h1 className="t-display">我的客户</h1>
-            <p className="t-caption mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+            <p className="t-caption mt-1">
               管理您的微信私域客户，记录每一次沟通
             </p>
           </div>
           <button
             onClick={() => { setForm(emptyForm); setShowAdd(true); }}
-            className="btn-primary"
+            className="btn btn-primary"
           >
-            <Plus size={15} strokeWidth={1.8} />
+            <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+              <Plus size={13} strokeWidth={2.5} />
+            </span>
             添加客户
           </button>
         </div>
@@ -453,13 +325,7 @@ export default function CustomerList() {
               <Search
                 size={15}
                 strokeWidth={1.8}
-                style={{
-                  position: 'absolute',
-                  left: '0.875rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-tertiary)',
-                }}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none"
               />
               <input
                 className="input pl-9"
@@ -469,7 +335,7 @@ export default function CustomerList() {
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
               />
             </div>
-            <button onClick={handleSearch} className="btn-secondary">
+            <button onClick={handleSearch} className="btn btn-secondary">
               <Filter size={14} strokeWidth={1.8} />
               筛选
             </button>
@@ -477,15 +343,7 @@ export default function CustomerList() {
 
           <div className="space-y-2.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className="shrink-0"
-                style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: 'var(--color-text-tertiary)',
-                  width: '64px',
-                }}
-              >
+              <span className="shrink-0 w-16 text-xs font-medium text-text-tertiary">
                 重要程度
               </span>
               <div className="flex items-center gap-1 flex-wrap">
@@ -496,25 +354,7 @@ export default function CustomerList() {
                     <button
                       key={filter.value}
                       onClick={() => handleImportanceFilter(filter.value)}
-                      className="transition-all"
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.75rem',
-                        fontWeight: isActive ? 600 : 500,
-                        backgroundColor: isActive
-                          ? isVipFilter
-                            ? 'rgb(245 158 11 / 0.1)'
-                            : 'var(--color-primary-soft)'
-                          : 'transparent',
-                        color: isActive
-                          ? isVipFilter
-                            ? 'rgb(180 83 9)'
-                            : 'var(--color-primary)'
-                          : 'var(--color-text-secondary)',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
+                      className={`filter-chip ${isActive ? 'filter-chip-active' : ''} ${isVipFilter && isActive ? 'filter-chip-warning' : ''}`}
                     >
                       {filter.label}
                     </button>
@@ -523,15 +363,7 @@ export default function CustomerList() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className="shrink-0"
-                style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 500,
-                  color: 'var(--color-text-tertiary)',
-                  width: '64px',
-                }}
-              >
+              <span className="shrink-0 w-16 text-xs font-medium text-text-tertiary">
                 客户阶段
               </span>
               <div className="flex items-center gap-1 flex-wrap">
@@ -541,17 +373,7 @@ export default function CustomerList() {
                     <button
                       key={filter.value}
                       onClick={() => handleStageFilter(filter.value)}
-                      className="transition-all"
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.75rem',
-                        fontWeight: isActive ? 600 : 500,
-                        backgroundColor: isActive ? 'var(--color-primary-soft)' : 'transparent',
-                        color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                        border: 'none',
-                        cursor: 'pointer',
-                      }}
+                      className={`filter-chip ${isActive ? 'filter-chip-active' : ''}`}
                     >
                       {filter.label}
                     </button>
@@ -563,9 +385,8 @@ export default function CustomerList() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={28} strokeWidth={1.8} className="animate-spin" style={{ color: 'var(--color-primary)' }} />
-            <p className="t-caption mt-3" style={{ color: 'var(--color-text-tertiary)' }}>加载中...</p>
+          <div className="py-20">
+            <Loading />
           </div>
         ) : customers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
@@ -579,7 +400,7 @@ export default function CustomerList() {
           </div>
         ) : (
           <Empty
-            icon={<User size={28} strokeWidth={1.5} style={{ color: 'var(--color-text-tertiary)' }} />}
+            icon={<User size={28} strokeWidth={1.5} className="text-text-tertiary" />}
             title="暂无客户"
             description={customerFilters.search || customerFilters.importance || customerFilters.stage
               ? '没有找到匹配的客户，试试调整筛选条件'
@@ -587,9 +408,11 @@ export default function CustomerList() {
             action={
               <button
                 onClick={() => { setForm(emptyForm); setShowAdd(true); }}
-                className="btn-primary"
+                className="btn btn-primary"
               >
-                <Plus size={14} strokeWidth={1.8} />
+                <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                  <Plus size={13} strokeWidth={2.5} />
+                </span>
                 添加第一位客户
               </button>
             }
@@ -604,9 +427,9 @@ export default function CustomerList() {
         size="lg"
         footer={
           <>
-            <button onClick={() => setShowAdd(false)} className="btn-secondary">取消</button>
-            <button onClick={handleAdd} disabled={!form.name.trim() || submitting} className="btn-primary">
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+            <button onClick={() => setShowAdd(false)} className="btn btn-secondary">取消</button>
+            <button onClick={handleAdd} disabled={!form.name.trim() || submitting} className="btn btn-primary">
+              {submitting && <Loader2 size={15} strokeWidth={1.8} className="animate-spin" />}
               确认添加
             </button>
           </>
@@ -754,13 +577,7 @@ export default function CustomerList() {
                         key={tag}
                         type="button"
                         onClick={() => toggleTag(tag)}
-                        className="chip"
-                        style={{
-                          backgroundColor: selected ? 'var(--color-primary-soft)' : 'var(--color-bg-surface)',
-                          borderColor: selected ? 'rgb(91 92 226 / 0.3)' : 'var(--color-border-default)',
-                          color: selected ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                          fontWeight: selected ? 600 : 500,
-                        }}
+                        className={`chip ${selected ? 'chip-primary' : 'chip-neutral'}`}
                       >
                         {tag}
                       </button>
@@ -771,12 +588,7 @@ export default function CustomerList() {
                       key={tag}
                       type="button"
                       onClick={() => toggleTag(tag)}
-                      className="chip"
-                      style={{
-                        backgroundColor: 'rgb(244 63 94 / 0.08)',
-                        borderColor: 'rgb(244 63 94 / 0.2)',
-                        color: '#E11D48',
-                      }}
+                      className="chip chip-danger"
                     >
                       {tag}
                       <X size={12} strokeWidth={1.8} />
@@ -785,8 +597,7 @@ export default function CustomerList() {
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="input flex-1"
-                    style={{ fontSize: '0.8125rem' }}
+                    className="input flex-1 text-[13px]"
                     placeholder="自定义标签"
                     value={customTag}
                     onChange={e => setCustomTag(e.target.value)}
@@ -795,7 +606,7 @@ export default function CustomerList() {
                   <button
                     type="button"
                     onClick={addCustomTag}
-                    className="btn-secondary btn-sm"
+                    className="btn btn-secondary"
                   >
                     添加
                   </button>
@@ -805,7 +616,7 @@ export default function CustomerList() {
               <div>
                 <label className="form-label">备注</label>
                 <textarea
-                  className="input resize-none"
+                  className="textarea"
                   rows={3}
                   placeholder="记录一些关于这个客户的信息，比如家庭情况、谁管孩子学习、预算多少..."
                   value={form.remark}

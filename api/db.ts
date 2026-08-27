@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -538,6 +539,7 @@ sqlite.exec(`
     group_id INTEGER,
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
+    signup_deadline TEXT,
     required_text TEXT,
     reward_rules TEXT,
     allow_makeup INTEGER NOT NULL DEFAULT 0,
@@ -636,6 +638,9 @@ if (!existingCheckinParticipantCols.includes('reward_note')) {
 }
 
 const existingCheckinEventCols = (sqlite.prepare("PRAGMA table_info(checkin_events)").all() as any[]).map(c => c.name);
+if (!existingCheckinEventCols.includes('signup_deadline')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN signup_deadline TEXT");
+}
 if (!existingCheckinEventCols.includes('allow_makeup')) {
   sqlite.exec("ALTER TABLE checkin_events ADD COLUMN allow_makeup INTEGER NOT NULL DEFAULT 0");
 }
@@ -785,4 +790,26 @@ sqlite.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_wx_users_openid ON wx_users(openid);
   CREATE INDEX IF NOT EXISTS idx_wx_users_customer_id ON wx_users(customer_id);
+`);
+
+const existingWxUserCols = (sqlite.prepare("PRAGMA table_info(wx_users)").all() as any[]).map(c => c.name);
+if (!existingWxUserCols.includes('points')) {
+  sqlite.exec("ALTER TABLE wx_users ADD COLUMN points INTEGER NOT NULL DEFAULT 0");
+}
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS points_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    wx_user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('checkin', 'order', 'adjust')),
+    ref_type TEXT NOT NULL DEFAULT 'none' CHECK(ref_type IN ('none', 'checkin_record', 'order')),
+    ref_id INTEGER,
+    note TEXT,
+    operator_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (wx_user_id) REFERENCES wx_users(id) ON DELETE CASCADE
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_points_ledger_ref_unique ON points_ledger(ref_type, ref_id);
+  CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(wx_user_id);
 `);

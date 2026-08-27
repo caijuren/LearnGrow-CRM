@@ -112,6 +112,13 @@ function updateProfile(data) {
   });
 }
 
+function getUserInfo() {
+  return request({
+    url: '/api/wx/user-info',
+    method: 'GET'
+  });
+}
+
 function getEvents() {
   return request({ url: '/api/wx/checkin-events' });
 }
@@ -180,8 +187,16 @@ function getEventBadges(eventId) {
   return request({ url: `/api/wx/checkin-events/${eventId}/badges` });
 }
 
+function getEventShareLink(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/share-link` });
+}
+
 function getMyBadges() {
   return request({ url: '/api/wx/my-badges' });
+}
+
+function getMyPoints() {
+  return request({ url: '/api/wx/my-points' });
 }
 
 function formatDate(dateStr) {
@@ -216,6 +231,7 @@ module.exports = {
   uploadMedia,
   login,
   updateProfile,
+  getUserInfo,
   getEvents,
   joinEvent,
   doCheckin,
@@ -228,7 +244,9 @@ module.exports = {
   toggleRecordLike,
   getEventMaterials,
   getEventBadges,
+  getEventShareLink,
   getMyBadges,
+  getMyPoints,
   formatDate,
   getDayOfWeek,
   isToday,

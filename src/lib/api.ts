@@ -1,4 +1,5 @@
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress, CheckinEvent, CheckinEventDetail, CheckinParticipant, CheckinRecord, Material } from '../../shared/types';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress, CheckinEvent, CheckinEventDetail, CheckinParticipant, CheckinRecord, Material, WxUserWithPoints, PointsLedgerItem, PointsConfig } from '../../shared/types';
 
 const API_BASE = '/api';
 
@@ -246,11 +247,11 @@ export async function fetchLearningPaths(params: { subject?: string; is_active?:
   return request<LearningPath[]>(`/learning-paths?${qs.toString()}`);
 }
 
-export async function createLearningPath(data: Partial<LearningPath> & { name: string; subject: string; stages?: Partial<LearningStage>[] }) {
+export async function createLearningPath(data: Omit<Partial<LearningPath>, 'stages'> & { name: string; subject: string; stages?: Partial<LearningStage>[] }) {
   return request<LearningPath>('/learning-paths', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function updateLearningPath(id: number, data: Partial<LearningPath> & { stages?: Partial<LearningStage>[] }) {
+export async function updateLearningPath(id: number, data: Omit<Partial<LearningPath>, 'stages'> & { stages?: Partial<LearningStage>[] }) {
   return request<LearningPath>(`/learning-paths/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
@@ -427,4 +428,72 @@ export async function distributeReward(eventId: number, participantId: number, r
 export function getExportUrl(eventId: number) {
   const token = getToken();
   return `/api/checkin-events/${eventId}/export?token=${token}`;
+}
+
+// ========== 数据备份 ==========
+
+export interface BackupFileInfo {
+  name: string;
+  size: number;
+  createdAt: string;
+}
+
+export async function fetchBackups() {
+  return request<BackupFileInfo[]>('/admin/backups');
+}
+
+export async function createBackup() {
+  return request<BackupFileInfo>('/admin/backup', { method: 'POST' });
+}
+
+export async function downloadBackup(name: string) {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/admin/backup/download?name=${encodeURIComponent(name)}`, {
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || '下载失败');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ========== 微信用户与积分 ==========
+
+export async function fetchWxUsers(params: { search?: string; unlinked?: boolean } = {}) {
+  const qs = new URLSearchParams();
+  if (params.search) qs.set('search', params.search);
+  if (params.unlinked) qs.set('unlinked', 'true');
+  return request<{ users: WxUserWithPoints[]; total: number }>(`/wx-users?${qs.toString()}`);
+}
+
+export async function linkWxUser(id: number, customer_id: number | null) {
+  return request<WxUserWithPoints>(`/wx-users/${id}/link`, { method: 'PUT', body: JSON.stringify({ customer_id }) });
+}
+
+export async function adjustWxUserPoints(id: number, amount: number, note?: string) {
+  return request<{ new_balance: number }>(`/wx-users/${id}/points`, { method: 'POST', body: JSON.stringify({ amount, note }) });
+}
+
+export async function fetchWxUserPoints(id: number, params: { page?: number; limit?: number } = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set('page', String(params.page));
+  if (params.limit) qs.set('limit', String(params.limit));
+  return request<{ items: PointsLedgerItem[]; total: number; balance: number }>(`/wx-users/${id}/points?${qs.toString()}`);
+}
+
+export async function fetchPointsConfig() {
+  return request<PointsConfig>('/settings/points');
+}
+
+export async function updatePointsConfig(data: Partial<PointsConfig>) {
+  return request<PointsConfig>('/settings/points', { method: 'PUT', body: JSON.stringify(data) });
 }

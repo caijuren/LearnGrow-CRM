@@ -27,6 +27,7 @@ rsync -avz \
   --exclude='.env.local' \
   --exclude='.env.production' \
   --exclude='uploads' \
+  --exclude='backups' \
   "/Users/grubby/Desktop/LearnGrow CRM/" \
   "$SERVER_USER@$SERVER_HOST:$TMP_DIR/"
 
@@ -42,10 +43,14 @@ ssh $SERVER_USER@$SERVER_HOST << ENDSSH
     --exclude='dist' \
     --exclude='data' \
     --exclude='uploads' \
+    --exclude='backups' \
     --exclude='.env' \
     --exclude='.env.local' \
     --exclude='.env.production' \
     $TMP_DIR/ $PROJECT_DIR/
+  
+  # 历史遗留的 root 属主目录会导致 ubuntu 的 PM2 进程写不进（uploads/backups 曾因此报 EACCES）
+  sudo chown -R ubuntu:ubuntu $PROJECT_DIR/uploads $PROJECT_DIR/data $PROJECT_DIR/backups 2>/dev/null || true
   
   cd $PROJECT_DIR
   
