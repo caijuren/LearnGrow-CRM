@@ -50,3 +50,5 @@ miniprogram-avatar.png
 .vite
 # Uploaded user files
 uploads/
+# UI 自动化回归截图（每次运行重新生成，体积大且不入库）
+qa-screenshots/
