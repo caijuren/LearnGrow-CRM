@@ -4,7 +4,8 @@ Page({
   data: {
     balance: 0,
     items: [],
-    loading: true
+    loading: true,
+    loadedOnce: false
   },
 
   onLoad() {
@@ -22,7 +23,7 @@ Page({
     } catch (e) {
       wx.showToast({ title: '积分明细加载失败', icon: 'none' });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadedOnce: true });
     }
   },
 

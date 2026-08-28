@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const avatarUtil = require('../../utils/avatar.js');
 const app = getApp();
 
 Page({
@@ -12,10 +13,17 @@ Page({
       joined: 0,
       nextEvent: null
     },
+    todayRingPercent: 0,
+    loadedOnce: false,
     userInfo: null,
     loading: true,
     isLoggedIn: false,
-    baseUrl: app.globalData.baseUrl
+    baseUrl: app.globalData.baseUrl,
+    brokenAvatars: {}
+  },
+
+  onAvatarError(e) {
+    avatarUtil.onAvatarError(e, this);
   },
 
   onLoad() {
@@ -61,12 +69,13 @@ Page({
           completed: completedEvents.length,
           joined: joinedEvents.length,
           nextEvent: pendingEvents[0] || joinedEvents[0] || null
-        }
+        },
+        todayRingPercent: joinedEvents.length > 0 ? Math.round((completedEvents.length / joinedEvents.length) * 100) : 0
       });
     } catch (e) {
       wx.showToast({ title: '活动加载失败', icon: 'none' });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadedOnce: true });
     }
   },
 
@@ -122,5 +131,13 @@ Page({
 
   onPullDownRefresh() {
     this.loadEvents().then(() => wx.stopPullDownRefresh());
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '源来是糖 · 每天坚持，养成好习惯',
+      path: '/pages/index/index',
+      imageUrl: `${this.data.baseUrl}/uploads/share_brand.png`,
+    };
   }
 });

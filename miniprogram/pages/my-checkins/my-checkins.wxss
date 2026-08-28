@@ -17,6 +17,12 @@
   border: none;
   box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
   background: linear-gradient(180deg, rgba(244, 63, 122, 0.08) 0%, var(--surface) 40%);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.checkin-card:active {
+  transform: scale(0.98);
+  opacity: 0.92;
 }
 
 .checkin-card::before {

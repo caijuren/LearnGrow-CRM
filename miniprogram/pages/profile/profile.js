@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const avatarUtil = require('../../utils/avatar.js');
 const app = getApp();
 
 Page({
@@ -18,7 +19,12 @@ Page({
     saving: false,
     isLoggedIn: false,
     baseUrl: app.globalData.baseUrl,
-    appVersion: app.globalData.appVersion
+    appVersion: app.globalData.appVersion,
+    brokenAvatars: {}
+  },
+
+  onAvatarError(e) {
+    avatarUtil.onAvatarError(e, this);
   },
 
   onLoad() {
@@ -34,6 +40,14 @@ Page({
       this.setData({ userInfo: app.globalData.userInfo });
       this.loadStats();
     }
+  },
+
+  onPullDownRefresh() {
+    if (!app.checkLogin()) {
+      wx.stopPullDownRefresh();
+      return;
+    }
+    this.loadStats().then(() => wx.stopPullDownRefresh());
   },
 
   async loadStats() {
@@ -109,7 +123,8 @@ Page({
       const uploadRes = await api.uploadImage(tempFilePath);
       this.setData({
         editAvatarUrl: this.data.baseUrl + uploadRes.url,
-        editAvatarPath: uploadRes.url
+        editAvatarPath: uploadRes.url,
+        brokenAvatars: {}
       });
     } catch (err) {
       wx.showToast({ title: '头像上传失败', icon: 'none' });

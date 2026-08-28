@@ -26,7 +26,13 @@ export default defineConfig({
             console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
           });
         },
-      }
+      },
+      // 头像与打卡图存的是 /uploads/<file>，dev 下同样需要转发到后端
+      '/uploads': {
+        target: 'http://localhost:3456',
+        changeOrigin: true,
+        secure: false,
+      },
     }
   },
   test: {

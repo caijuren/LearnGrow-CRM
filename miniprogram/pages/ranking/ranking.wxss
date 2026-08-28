@@ -5,7 +5,7 @@
 .ranking-header {
   background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
   margin: -32rpx -28rpx 0;
-  padding: 180rpx 40rpx 150rpx;
+  padding: 56rpx 40rpx 130rpx;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -57,13 +57,14 @@
   justify-content: space-between;
   gap: 24rpx;
   background: var(--surface);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 28rpx 32rpx;
-  margin: -100rpx 0 28rpx;
+  margin: -84rpx 0 28rpx;
   position: relative;
   z-index: 12;
   box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.28);
   border: 2rpx solid var(--border);
+  animation: rank-fade-up 0.4s ease-out both;
 }
 
 .my-rank-main {
@@ -119,14 +120,14 @@ image.my-rank-avatar {
 }
 
 .my-rank-gap {
-  min-width: 128rpx;
-  height: 64rpx;
   padding: 0 20rpx;
+  height: 64rpx;
   border-radius: 999rpx;
   background: var(--warning-soft);
   color: var(--warning);
   font-size: 26rpx;
   font-weight: 700;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -139,10 +140,11 @@ image.my-rank-avatar {
   justify-content: center;
   align-items: flex-end;
   gap: 20rpx;
-  margin: -40rpx 0 32rpx;
-  padding: 0 4rpx;
+  margin: 0 0 32rpx;
+  padding-top: 24rpx;
   position: relative;
   z-index: 10;
+  animation: rank-fade-up 0.4s ease-out 0.08s both;
 }
 
 .podium-item {
@@ -159,7 +161,7 @@ image.my-rank-avatar {
 }
 
 .podium-item.first {
-  transform: translateY(-20rpx) scale(1.05);
+  padding: 44rpx 12rpx 30rpx;
   z-index: 2;
   background: linear-gradient(180deg, rgba(251, 191, 36, 0.12) 0%, var(--surface) 60%);
   box-shadow: 0 16rpx 48rpx rgba(251, 191, 36, 0.15);
@@ -176,6 +178,7 @@ image.my-rank-avatar {
 
 .podium-crown {
   margin-bottom: 6rpx;
+  will-change: transform;
   animation: bounce 2s ease-in-out infinite;
 }
 
@@ -190,6 +193,17 @@ image.my-rank-avatar {
   50% { transform: translateY(-8rpx); }
 }
 
+@keyframes rank-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .podium-rank {
   width: 52rpx;
   height: 52rpx;
@@ -201,6 +215,11 @@ image.my-rank-avatar {
   font-weight: 800;
   margin-bottom: 10rpx;
   color: var(--text);
+}
+
+.podium-rank.rank-1 {
+  background: rgba(251, 191, 36, 0.22);
+  color: #fcd34d;
 }
 
 .podium-rank.rank-2 {
@@ -231,6 +250,9 @@ image.my-rank-avatar {
 .podium-avatar.gold {
   background: linear-gradient(135deg, #fbbf24, #f59e0b);
   box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+  width: 104rpx;
+  height: 104rpx;
+  font-size: 40rpx;
 }
 
 .podium-avatar.bronze {
@@ -284,28 +306,8 @@ image.podium-avatar {
   border: 2rpx solid var(--border);
 }
 
-.empty {
-  padding: 64rpx 32rpx;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 72rpx;
-  color: var(--text-muted);
-  margin-bottom: 16rpx;
-  opacity: 0.6;
-}
-
-.empty-text {
-  font-size: 30rpx;
-  color: var(--text-secondary);
-  font-weight: 600;
-  margin-bottom: 8rpx;
-}
-
-.empty-subtext {
-  font-size: 24rpx;
-  color: var(--text-muted);
+.ranking-skeleton .ranking-item:last-child {
+  border-bottom: none;
 }
 
 .ranking-item {
@@ -377,13 +379,22 @@ image.user-avatar {
   color: var(--text);
   display: flex;
   align-items: center;
+  min-width: 0;
   margin-bottom: 6rpx;
+}
+
+.user-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   padding: 2rpx 12rpx;
   border-radius: 999rpx;
   font-size: 20rpx;
@@ -405,9 +416,6 @@ image.user-avatar {
 .user-days {
   font-size: 30rpx;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--primary);
   flex-shrink: 0;
 }

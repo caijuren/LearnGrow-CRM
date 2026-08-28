@@ -122,9 +122,8 @@
   width: 118rpx;
   height: 118rpx;
   border-radius: 50%;
-  background: var(--bg);
-  border: 7rpx solid var(--primary);
-  display: inline-flex;
+  background: conic-gradient(var(--primary) var(--progress), var(--border) 0);
+  display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary);
@@ -134,10 +133,19 @@
 }
 
 .today-ring.done {
-  background: var(--bg);
-  border-color: var(--success);
+  background: conic-gradient(var(--success) var(--progress), var(--border) 0);
   color: var(--success);
   box-shadow: 0 0 24rpx rgba(52, 211, 153, 0.25);
+}
+
+.ring-hole {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ring-completed {
@@ -225,6 +233,12 @@
   position: relative;
   overflow: hidden;
   border: 2rpx solid var(--border);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.event-card:active {
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
 .event-card::before {
@@ -399,10 +413,35 @@
 }
 
 .event-actions .btn-small {
-  flex: 1;
   height: 72rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 20rpx;
+}
+
+.event-actions .btn-primary.btn-small {
+  flex: 1;
+}
+
+.event-actions .btn-secondary.btn-small {
+  flex: none;
+  width: 200rpx;
+}
+
+/* 骨架屏（页面级布局） */
+.skeleton-today {
+  padding: 28rpx;
+}
+
+.skeleton-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28rpx;
+}
+
+.skeleton-col {
+  flex: 1;
+  min-width: 0;
 }

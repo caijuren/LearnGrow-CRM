@@ -41,7 +41,7 @@
           <image
             wx:if="{{setupAvatarUrl}}"
             class="avatar-picker-img"
-            src="{{setupAvatarUrl}}"
+            src="{{setupAvatarFile || (baseUrl + setupAvatarUrl)}}"
             mode="aspectFill"
           />
           <view wx:else class="avatar-placeholder">

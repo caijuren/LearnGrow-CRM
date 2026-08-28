@@ -1,3 +1,38 @@
+<!-- 加载中骨架屏 -->
+<view class="container" wx:if="{{!event && !eventNotFound}}">
+  <view class="hero-skeleton">
+    <view class="skeleton-line sk-w-70"></view>
+    <view class="skeleton-line sk-w-40 mt-3"></view>
+  </view>
+  <view class="skeleton-card">
+    <view class="flex-between">
+      <view class="skeleton-line sk-w-40"></view>
+      <view class="skeleton-line sk-w-30"></view>
+    </view>
+    <view class="skeleton-line sk-w-90 mt-3"></view>
+  </view>
+  <view class="skeleton-card">
+    <view class="flex-between">
+      <view class="skeleton-line sk-w-40"></view>
+      <view class="skeleton-line sk-w-30"></view>
+    </view>
+    <view class="skeleton-line sk-w-80 mt-3"></view>
+    <view class="skeleton-line sk-w-60 mt-2"></view>
+  </view>
+  <view class="skeleton-card">
+    <view class="skeleton-line sk-w-40"></view>
+    <view class="skeleton-line sk-w-60 mt-3"></view>
+    <view class="skeleton-line sk-w-50 mt-2"></view>
+  </view>
+</view>
+
+<!-- 活动不存在 -->
+<view wx:if="{{eventNotFound}}" class="empty">
+  <view class="empty-icon">○</view>
+  <view class="empty-title">活动不存在</view>
+  <view class="empty-desc">链接可能已失效，去首页看看其他活动吧</view>
+</view>
+
 <view class="container" wx:if="{{event}}">
   <view class="event-hero">
     <view class="hero-title text-xl font-bold text-white">{{event.name}}</view>
@@ -130,7 +165,7 @@
       </block>
     </view>
 
-    <view wx:elif="{{todayChecked && !isEditingTodayRecord}}" class="checked-status">
+    <view wx:elif="{{todayChecked && !isEditingTodayRecord && !makeupDate}}" class="checked-status">
       <view class="check-icon">✓</view>
       <view class="text-success font-bold text-lg mt-2 check-status-title">今日已打卡</view>
       <view class="text-muted mt-1 check-status-desc">明天继续加油哦~</view>
@@ -219,7 +254,7 @@
       <view class="calendar-weekday" wx:for="{{['日','一','二','三','四','五','六']}}" wx:key="*this">{{item}}</view>
       <view wx:for="{{calendarDays}}" wx:key="date" bindtap="selectMakeupDate" data-date="{{item.date}}" data-can-makeup="{{item.can_makeup}}" class="calendar-day {{item.checked ? 'checked' : ''}} {{item.status === 'pending' ? 'pending' : ''}} {{item.status === 'rejected' ? 'rejected' : ''}} {{item.can_makeup ? 'can-makeup' : ''}} {{item.missed && !item.can_makeup ? 'missed' : ''}} {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
         <text>{{item.day}}</text>
-        <text wx:if="{{item.can_makup}}" class="day-tag">补</text>
+        <text wx:if="{{item.can_makeup}}" class="day-tag">补</text>
         <text wx:elif="{{item.status === 'pending'}}" class="day-tag">审</text>
       </view>
     </view>
@@ -253,7 +288,7 @@
     <view class="feed-list">
       <view wx:for="{{feed}}" wx:key="id" class="feed-item">
         <view class="feed-avatar">
-          <image wx:if="{{item.avatar_url}}" class="feed-avatar-img" src="{{baseUrl}}{{item.avatar_url}}" mode="aspectFill"/>
+          <image wx:if="{{item.avatar_url && !brokenAvatars['i' + index]}}" class="feed-avatar-img" src="{{baseUrl}}{{item.avatar_url}}" mode="aspectFill" binderror="onAvatarError" data-key="{{'i' + index}}"/>
           <text wx:else>{{item.nickname ? item.nickname[0] : '学'}}</text>
         </view>
         <view class="feed-body">
@@ -321,6 +356,7 @@
   <!-- 打卡成功分享弹窗 -->
   <view wx:if="{{showSuccessActions}}" class="modal-mask" bindtap="closeSuccessActions">
     <view class="modal-content success-content" catchtap="preventClose">
+      <view class="success-check">✓</view>
       <view class="modal-title">打卡成功</view>
       <view class="modal-desc">坚持就是胜利，把这份成就感分享出去吧~</view>
       <view class="success-actions">

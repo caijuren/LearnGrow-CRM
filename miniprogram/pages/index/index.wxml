@@ -5,7 +5,7 @@
       <view class="text-secondary mt-1">{{isLoggedIn ? '今天也要坚持打卡哦' : '登录后可参与打卡活动'}}</view>
     </view>
     <view class="avatar" bindtap="{{isLoggedIn ? 'goToProfile' : 'goToLogin'}}">
-      <image wx:if="{{isLoggedIn && userInfo.avatar_url}}" class="avatar-img" src="{{baseUrl}}{{userInfo.avatar_url}}" mode="aspectFill" />
+      <image wx:if="{{isLoggedIn && userInfo.avatar_url && !brokenAvatars.mine}}" class="avatar-img" src="{{baseUrl}}{{userInfo.avatar_url}}" mode="aspectFill" binderror="onAvatarError" data-key="mine" />
       <text wx:else>{{isLoggedIn ? (userInfo.nickname ? userInfo.nickname[0] : '我') : '登'}}</text>
     </view>
   </view>
@@ -18,6 +18,46 @@
     <text class="login-banner-arrow">→</text>
   </view>
 
+  <!-- 首次加载骨架屏 -->
+  <block wx:if="{{loading && !loadedOnce}}">
+    <block wx:if="{{isLoggedIn}}">
+      <view class="skeleton-card skeleton-today">
+        <view class="skeleton-main">
+          <view class="skeleton-col">
+            <view class="skeleton-line sk-w-40"></view>
+            <view class="skeleton-line sk-w-70 mt-2"></view>
+          </view>
+          <view class="skeleton-circle"></view>
+        </view>
+        <view class="skeleton-line sk-w-100 mt-3"></view>
+      </view>
+    </block>
+    <view class="skeleton-card">
+      <view class="flex-between">
+        <view class="skeleton-line sk-w-50"></view>
+        <view class="skeleton-pill"></view>
+      </view>
+      <view class="skeleton-line sk-w-80 mt-3"></view>
+      <view class="skeleton-line sk-w-60 mt-2"></view>
+      <view class="skeleton-actions">
+        <view class="skeleton-btn sk-w-60"></view>
+        <view class="skeleton-btn sk-w-30"></view>
+      </view>
+    </view>
+    <view class="skeleton-card">
+      <view class="flex-between">
+        <view class="skeleton-line sk-w-50"></view>
+        <view class="skeleton-pill"></view>
+      </view>
+      <view class="skeleton-line sk-w-80 mt-3"></view>
+      <view class="skeleton-line sk-w-60 mt-2"></view>
+      <view class="skeleton-actions">
+        <view class="skeleton-btn sk-w-60"></view>
+        <view class="skeleton-btn sk-w-30"></view>
+      </view>
+    </view>
+  </block>
+  <block wx:else>
   <view wx:if="{{isLoggedIn}}" class="today-panel">
     <view class="today-main">
       <view class="today-text">
@@ -29,8 +69,10 @@
         <view wx:if="{{todaySummary.nextEvent}}" class="today-subtitle truncate">{{todaySummary.nextEvent.name}}</view>
         <view wx:else class="today-subtitle truncate">报名活动后，这里会显示今天的打卡任务</view>
       </view>
-      <view class="today-ring {{todaySummary.pending === 0 && todaySummary.joined > 0 ? 'done' : ''}}">
-        <text class="ring-completed">{{todaySummary.completed}}</text><text class="ring-total">/{{todaySummary.joined}}</text>
+      <view class="today-ring {{todaySummary.pending === 0 && todaySummary.joined > 0 ? 'done' : ''}}" style="--progress: {{todayRingPercent}}%">
+        <view class="ring-hole">
+          <text class="ring-completed">{{todaySummary.completed}}</text><text class="ring-total">/{{todaySummary.joined}}</text>
+        </view>
       </view>
     </view>
     <button wx:if="{{todaySummary.nextEvent && todaySummary.pending > 0}}" class="today-action" bindtap="goToTodayTask">
@@ -72,9 +114,6 @@
     <view class="event-actions mt-3 flex gap-2">
       <button wx:if="{{isLoggedIn && !item.is_joined && item.can_signup}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
         立即报名
-      </button>
-      <button wx:if="{{!isLoggedIn || item.is_joined || !item.can_signup}}" class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
-        查看详情
       </button>
       <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
         排行榜
@@ -125,11 +164,11 @@
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
-      <view wx:if="{{isLoggedIn && !item.is_joined}}" class="btn-disabled btn-small">报名已截止</view>
-      <button wx:if="{{!isLoggedIn || !item.is_joined}}" class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
-        查看详情
+      <button wx:if="{{isLoggedIn && !item.is_joined && item.can_signup}}" class="btn-primary btn-small" catchtap="handleJoin" data-id="{{item.id}}" data-name="{{item.name}}">
+        立即报名
       </button>
-      <button wx:elif="{{item.is_joined && !item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
+      <view wx:elif="{{isLoggedIn && !item.is_joined}}" class="btn-disabled btn-small">报名已截止</view>
+      <button wx:if="{{isLoggedIn && item.is_joined && !item.today_checked}}" class="btn-primary btn-small" catchtap="handleQuickCheckin" data-id="{{item.id}}">
         立即打卡
       </button>
       <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
@@ -177,9 +216,6 @@
     </view>
 
     <view class="event-actions mt-3 flex gap-2">
-      <button class="btn-primary btn-small" catchtap="goToDetail" data-id="{{item.id}}">
-        查看详情
-      </button>
       <button class="btn-secondary btn-small" catchtap="goToRanking" data-id="{{item.id}}">
         排行榜
       </button>
@@ -191,6 +227,7 @@
     <view class="empty-title">暂无活动</view>
     <view class="empty-desc">暂时没有进行中的活动，稍后再来看看吧～</view>
   </view>
+  </block>
 
   <view class="bottom-nav">
     <view class="nav-item active">

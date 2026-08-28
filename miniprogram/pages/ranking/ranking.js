@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const avatarUtil = require('../../utils/avatar.js');
 const app = getApp();
 
 Page({
@@ -6,8 +7,14 @@ Page({
     eventId: null,
     ranking: [],
     myRank: null,
+    loading: true,
     isLoggedIn: false,
-    baseUrl: app.globalData.baseUrl
+    baseUrl: app.globalData.baseUrl,
+    brokenAvatars: {}
+  },
+
+  onAvatarError(e) {
+    avatarUtil.onAvatarError(e, this);
   },
 
   onLoad(options) {
@@ -22,6 +29,10 @@ Page({
     this.setData({ isLoggedIn: app.checkLogin() });
   },
 
+  onPullDownRefresh() {
+    this.loadRanking().then(() => wx.stopPullDownRefresh());
+  },
+
   async loadRanking() {
     try {
       const ranking = await api.getRanking(this.data.eventId);
@@ -34,9 +45,11 @@ Page({
           gap_to_previous: previous ? Math.max(0, previous.checkin_days - ranking[myIndex].checkin_days) : 0
         };
       }
-      this.setData({ ranking, myRank });
+      this.setData({ ranking, myRank, brokenAvatars: {} });
     } catch (e) {
       wx.showToast({ title: '排行榜加载失败', icon: 'none' });
+    } finally {
+      this.setData({ loading: false });
     }
   }
 });

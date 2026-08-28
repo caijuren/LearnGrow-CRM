@@ -1,10 +1,12 @@
 const api = require('../../utils/api.js');
+const avatarUtil = require('../../utils/avatar.js');
 const app = getApp();
 
 Page({
   data: {
     eventId: null,
     event: null,
+    eventNotFound: false,
     myStats: { checkin_days: 0, current_streak: 0, max_streak: 0 },
     calendarDays: [],
     todayChecked: false,
@@ -38,7 +40,12 @@ Page({
       remind_time: '20:00',
       template_id: null
     },
-    savingReminder: false
+    savingReminder: false,
+    brokenAvatars: {}
+  },
+
+  onAvatarError(e) {
+    avatarUtil.onAvatarError(e, this);
   },
 
   onLoad(options) {
@@ -70,6 +77,7 @@ Page({
       const event = events.find(e => e.id === this.data.eventId);
       if (!event) {
         wx.showToast({ title: '活动不存在', icon: 'none' });
+        this.setData({ eventNotFound: true });
         return;
       }
 
@@ -158,7 +166,8 @@ Page({
         achievedBadges,
         materials,
         feed,
-        reminder
+        reminder,
+        brokenAvatars: {}
       });
     } catch (e) {
       wx.showToast({ title: '活动详情加载失败', icon: 'none' });
@@ -844,6 +853,7 @@ Page({
     return {
       title: event ? `我正在坚持「${event.name}」打卡` : '一起来打卡',
       path: `/pages/event-detail/event-detail?id=${this.data.eventId}`,
+      imageUrl: `${this.data.baseUrl}/uploads/share_brand.png`,
     };
   }
 });

@@ -5,11 +5,23 @@ const API_BASE_URLS = {
   develop: 'http://127.0.0.1:3456'
 };
 
-const envVersion = typeof __wxConfig !== 'undefined' ? __wxConfig.envVersion : 'develop';
+// __wxConfig 是未公开的内部变量，部分基础库取不到；真机误判成 develop 会去请求 127.0.0.1
+function resolveEnvVersion() {
+  try {
+    const info = wx.getAccountInfoSync();
+    const v = info && info.miniProgram && info.miniProgram.envVersion;
+    if (v === 'develop' || v === 'trial' || v === 'release') return v;
+  } catch (e) {
+    // 老基础库无 getAccountInfoSync
+  }
+  return 'release';
+}
+
+const envVersion = resolveEnvVersion();
 const apiBaseUrl = API_BASE_URLS[envVersion] || API_BASE_URLS.release;
 
 // 小程序本地版本号，独立于后端版本，用于“我的”页展示；升级小程序时同步更新
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.6.0';
 
 if (envVersion !== 'develop' && !apiBaseUrl.startsWith('https://')) {
   throw new Error('正式版和体验版必须使用 HTTPS API 域名');
@@ -17,5 +29,6 @@ if (envVersion !== 'develop' && !apiBaseUrl.startsWith('https://')) {
 
 module.exports = {
   apiBaseUrl,
-  appVersion: APP_VERSION
+  appVersion: APP_VERSION,
+  envVersion
 };

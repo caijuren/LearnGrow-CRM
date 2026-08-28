@@ -39,13 +39,15 @@ function request(options) {
         }
       },
       fail: (err) => {
+        const message = '网络连接失败，请检查网络后重试';
+        console.error('[api] 请求失败', options.url, err && err.errMsg);
         if (options.showError !== false) {
           wx.showToast({
-            title: '网络错误',
+            title: message,
             icon: 'none'
           });
         }
-        reject(err);
+        reject(new Error(message));
       }
     });
   });

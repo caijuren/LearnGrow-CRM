@@ -1545,8 +1545,19 @@ async function wxOptionalAuthMiddleware(request: any, _reply: any) {
   }
 }
 
+function wxLoginErrorMessage(errcode: number) {
+  const map: Record<number, string> = {
+    40029: '登录凭证已失效，请重试',
+    40163: '登录凭证已使用，请重试',
+    40013: '微信登录配置异常，请联系老师',
+    40125: '微信登录配置异常，请联系老师',
+    45011: '登录请求过于频繁，请稍后再试'
+  };
+  return map[errcode] || '微信登录失败，请稍后重试';
+}
+
 app.post('/api/wx/login', async (request: any, reply: any) => {
-  const { code, nickname, avatar_url, child_name } = request.body;
+  const { code, nickname, avatar_url, child_name } = request.body || {};
   
   let openid: string;
   const WX_APPID = process.env.WX_APPID;
@@ -1577,7 +1588,8 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
       openid = data.openid;
     } else if (isProduction) {
       request.log.error({ wxErrcode: data.errcode, wxErrmsg: data.errmsg }, '微信 jscode2session 返回错误');
-      return reply.code(401).send({ success: false, error: data.errmsg || '微信登录失败' });
+      // 不能用 401：客户端会把 401 当会话过期强制登出并跳登录页
+      return reply.code(400).send({ success: false, error: wxLoginErrorMessage(data.errcode) });
     } else {
       openid = `dev_${code}`;
     }
@@ -1612,7 +1624,7 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
 
 app.post('/api/wx/update-profile', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
-  const { nickname, avatar_url, child_name } = request.body;
+  const { nickname, avatar_url, child_name } = request.body || {};
   const updates: string[] = [];
   const params: any[] = [];
   if (nickname !== undefined) { updates.push('nickname = ?'); params.push(nickname); }
@@ -1768,7 +1780,7 @@ app.get('/api/wx/checkin-events/:id/share-link', async (request: any, reply: any
 
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
-  const { event_id, note, image_url, image_hash, checkin_date, display_name, media_type } = request.body;
+  const { event_id, note, image_url, image_hash, checkin_date, display_name, media_type } = request.body || {};
 
   if (!event_id) return reply.code(400).send({ success: false, error: '活动不能为空' });
   if (!image_url || !String(image_url).trim()) {
@@ -2039,7 +2051,7 @@ app.get('/api/wx/checkin-events/:id/ranking', { preHandler: [wxOptionalAuthMiddl
 app.put('/api/wx/checkin-records/:id', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const recordId = parseInt(request.params.id);
-  const { image_url, image_hash, note, media_type } = request.body;
+  const { image_url, image_hash, note, media_type } = request.body || {};
 
   if (!image_url || !String(image_url).trim()) {
     return reply.code(400).send({ success: false, error: '请上传打卡图片或视频' });
@@ -2179,10 +2191,10 @@ app.get('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware] 
 app.post('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const eventId = parseInt(request.params.id);
-  const { is_enabled, remind_time = '20:00' } = request.body;
+  const { is_enabled, remind_time = '20:00' } = request.body || {};
   const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
   if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
-  if (!/^\d{2}:\d{2}$/.test(remind_time)) return reply.code(400).send({ success: false, error: '提醒时间格式无效' });
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(remind_time)) return reply.code(400).send({ success: false, error: '提醒时间格式无效' });
 
   db.prepare(`
     INSERT INTO checkin_reminders (wx_user_id, event_id, remind_time, is_enabled, created_at, updated_at)
@@ -2280,6 +2292,9 @@ app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (requ
 
   const ext = detectImageExtension(buffer);
   if (!ext) return reply.code(400).send({ success: false, error: '文件内容不是受支持的图片格式' });
+  if (buffer.length > 10 * 1024 * 1024) {
+    return reply.code(413).send({ success: false, error: '图片不能超过 10MB' });
+  }
 
   const imageHash = createHash('sha256').update(buffer).digest('hex');
   const today = bjtToday();
@@ -2370,9 +2385,9 @@ async function sendWxSubscribeMessage(openid: string, templateId: string, data: 
 }
 
 async function runDueCheckinReminders() {
-  const now = new Date();
   const today = bjtToday();
-  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const nowBjt = new Date(Date.now() + BJT_MS);
+  const hhmm = `${String(nowBjt.getUTCHours()).padStart(2, '0')}:${String(nowBjt.getUTCMinutes()).padStart(2, '0')}`;
   const template = db.prepare(`
     SELECT template_id FROM wx_subscribe_templates
     WHERE scene = ? AND is_active = 1
@@ -2875,8 +2890,13 @@ if (process.env.NODE_ENV === 'production') {
   const __dirname = path.dirname(__filename);
   const distPath = path.join(__dirname, '..', 'dist');
   app.setNotFoundHandler((request, reply) => {
-    if (request.url.startsWith('/api/')) {
+    const urlPath = request.url.split('?')[0];
+    if (urlPath.startsWith('/api/')) {
       return reply.code(404).send({ success: false, error: 'API不存在' });
+    }
+    // 缺失的上传文件必须返回 404：返回 200 + index.html 会让 <image> 静默空白，文件丢失无从发现
+    if (urlPath.startsWith('/uploads/')) {
+      return reply.code(404).send();
     }
     return reply.sendFile('index.html', distPath);
   });

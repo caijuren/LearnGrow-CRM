@@ -5,6 +5,7 @@ Page({
   data: {
     checkins: [],
     loading: true,
+    loadedOnce: false,
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false
   },
@@ -28,7 +29,7 @@ Page({
     } catch (e) {
       wx.showToast({ title: '打卡记录加载失败', icon: 'none' });
     } finally {
-      this.setData({ loading: false });
+      this.setData({ loading: false, loadedOnce: true });
     }
   },
 

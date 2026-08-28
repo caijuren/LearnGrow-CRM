@@ -11,6 +11,21 @@
       <text class="text-muted ledger-count">共 {{items.length}} 条</text>
     </view>
 
+    <block wx:if="{{loading && !loadedOnce}}">
+      <view class="ledger-item">
+        <view class="skeleton-line sk-w-40"></view>
+        <view class="skeleton-line sk-w-30"></view>
+      </view>
+      <view class="ledger-item">
+        <view class="skeleton-line sk-w-40"></view>
+        <view class="skeleton-line sk-w-30"></view>
+      </view>
+      <view class="ledger-item skeleton-last">
+        <view class="skeleton-line sk-w-40"></view>
+        <view class="skeleton-line sk-w-30"></view>
+      </view>
+    </block>
+
     <view wx:if="{{items.length === 0 && !loading}}" class="empty">
       <view class="empty-icon">分</view>
       <view class="empty-title">暂无积分记录</view>

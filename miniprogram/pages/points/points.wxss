@@ -131,25 +131,6 @@
   color: var(--danger);
 }
 
-.empty {
-  text-align: center;
-  padding: 60rpx 0;
-}
-
-.empty-icon {
-  font-size: 48rpx;
-  margin-bottom: 20rpx;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.empty-desc {
-  font-size: 24rpx;
-  color: var(--text-muted);
-  margin-top: 12rpx;
+.skeleton-last {
+  border-bottom: none;
 }

@@ -14,7 +14,7 @@
   <block wx:if="{{isLoggedIn}}">
     <view class="profile-header">
       <view wx:if="{{!editing}}" class="profile-avatar avatar avatar-lg">
-        <image wx:if="{{userInfo.avatar_url}}" class="profile-avatar-img" src="{{baseUrl}}{{userInfo.avatar_url}}" mode="aspectFill" />
+        <image wx:if="{{userInfo.avatar_url && !brokenAvatars.mine}}" class="profile-avatar-img" src="{{baseUrl}}{{userInfo.avatar_url}}" mode="aspectFill" binderror="onAvatarError" data-key="mine" />
         <text wx:else>{{userInfo.nickname ? userInfo.nickname[0] : '我'}}</text>
       </view>
       <view wx:if="{{!editing}}" class="profile-info">
@@ -31,7 +31,7 @@
           bind:chooseavatar="onChooseAvatar"
         >
           <view class="avatar-inner">
-            <image wx:if="{{editAvatarUrl}}" class="profile-avatar-img" src="{{editAvatarUrl}}" mode="aspectFill" />
+            <image wx:if="{{editAvatarUrl && !brokenAvatars.edit}}" class="profile-avatar-img" src="{{editAvatarUrl}}" mode="aspectFill" binderror="onAvatarError" data-key="edit" />
             <text wx:else>{{editNickname ? editNickname[0] : '我'}}</text>
           </view>
           <view class="avatar-edit-badge">

@@ -361,7 +361,7 @@
 .event-item {
   padding: 28rpx 0;
   border-bottom: 2rpx solid var(--border);
-  transition: opacity 0.2s;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .event-item:last-child {
@@ -369,7 +369,8 @@
 }
 
 .event-item:active {
-  opacity: 0.7;
+  transform: scale(0.98);
+  opacity: 0.92;
 }
 
 .event-name {
@@ -505,11 +506,12 @@
   box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.14) 0%, rgba(245, 158, 11, 0.05) 100%);
   border: 2rpx solid rgba(251, 191, 36, 0.2);
-  transition: opacity 0.2s;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .points-card:active {
-  opacity: 0.7;
+  transform: scale(0.98);
+  opacity: 0.92;
 }
 
 .points-info {

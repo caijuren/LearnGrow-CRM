@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const config = require('../../config.js');
 const app = getApp();
 
 Page({
@@ -11,6 +12,7 @@ Page({
     setupChildName: '',
     setupAvatarUrl: '',
     setupAvatarFile: '',
+    baseUrl: app.globalData.baseUrl,
     saving: false
   },
 
@@ -64,6 +66,15 @@ Page({
         });
         code = loginRes.code || '';
       } catch (e) {
+        code = '';
+      }
+
+      if (!code) {
+        // 仅开发者工具允许用假 code 联调；真机传假 code 会被微信判成 invalid code
+        if (config.envVersion !== 'develop') {
+          wx.showToast({ title: '微信登录未就绪，请重试', icon: 'none' });
+          return;
+        }
         code = 'dev_' + Date.now();
       }
 

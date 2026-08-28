@@ -1037,6 +1037,7 @@
   align-items: center;
   justify-content: center;
   padding: 40rpx;
+  animation: modal-fade-in 0.2s ease-out;
 }
 
 .modal-content {
@@ -1112,6 +1113,23 @@
 
 .success-content {
   padding: 48rpx 36rpx 36rpx;
+  animation: success-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.success-check {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.18), rgba(52, 211, 153, 0.08));
+  color: var(--success);
+  font-size: 64rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(52, 211, 153, 0.2), 0 0 0 1rpx rgba(52, 211, 153, 0.25);
+  animation: check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s both;
 }
 
 .success-actions {
@@ -1228,4 +1246,16 @@
   color: var(--text-muted);
   text-align: center;
   margin-bottom: 28rpx;
+}
+
+/* 详情页骨架屏 */
+.hero-skeleton {
+  background: linear-gradient(135deg, rgba(244, 63, 122, 0.35) 0%, rgba(139, 92, 246, 0.35) 100%);
+  margin: -32rpx -28rpx 32rpx;
+  padding: 80rpx 40rpx 56rpx;
+  border-radius: 0 0 40rpx 40rpx;
+}
+
+.hero-skeleton .skeleton-line {
+  background: rgba(255, 255, 255, 0.25);
 }
