@@ -9,10 +9,16 @@
  *
  * 恢复前会自动把当前 data/ 与 uploads/ 另存一份（-before-restore-<时间戳> 后缀），以防误操作。
  * 用法：npm run backup:restore -- <备份文件路径>
+ * 安全闸门一：若备份包内的媒体文件少于当前 uploads/，脚本会拒绝执行；确认要覆盖时追加 --force：
+ *   npm run backup:restore -- backups/backup_20260827_033000.zip --force
+ * 安全闸门二：恢复完成后会核对「库里引用的 /uploads 文件是否都在盘上」，有缺失即报错退出；
+ *   只需要数据库（媒体本来就不在包里）时追加 --allow-missing-media：
+ *   npm run backup:restore -- backups/backup_20260827_033000.zip --allow-missing-media
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { scanMediaReferences } from '../api/services/backup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,7 +57,20 @@ async function main() {
     console.error('❌ 备份文件缺少 data/learngrow.db，不是有效的备份包');
     process.exit(1);
   }
-  const hasUploads = entries.some((e: string) => e.startsWith('uploads/'));
+  const uploadsInZip = entries.filter((e: string) => e.startsWith('uploads/') && !e.endsWith('/')).length;
+  const hasUploads = uploadsInZip > 0;
+
+  // 安全闸门：必须在任何写盘动作之前判定，否则会留下「新库 + 旧图」的半恢复状态
+  const uploadsOnDisk = fs.existsSync(uploadsDir)
+    ? fs.readdirSync(uploadsDir).filter((f) => !f.startsWith('.')).length
+    : 0;
+  if (hasUploads && uploadsOnDisk > uploadsInZip && !args.includes('--force')) {
+    console.error(
+      `❌ 备份包内媒体 ${uploadsInZip} 个 < 当前 uploads/ ${uploadsOnDisk} 个，恢复会净删除 ${uploadsOnDisk - uploadsInZip} 个文件。\n` +
+        `   本次未改动任何数据。确认要覆盖请追加 --force（届时当前 uploads/ 与 data/ 都会先另存为 *-before-restore-<时间戳>）`
+    );
+    process.exit(1);
+  }
 
   // 1. 解压到临时目录
   const tmpDir = path.join(projectRoot, '.restore-tmp');
@@ -69,7 +88,7 @@ async function main() {
     fs.cpSync(dataDir, dataBackup, { recursive: true });
     console.log(`🛟 当前数据库已另存：${dataBackup}`);
   }
-  if (hasUploads && fs.existsSync(uploadsDir)) {
+  if (fs.existsSync(uploadsDir)) {
     fs.cpSync(uploadsDir, uploadsBackup, { recursive: true });
     console.log(`🛟 当前媒体目录已另存：${uploadsBackup}`);
   }
@@ -81,7 +100,7 @@ async function main() {
   fs.copyFileSync(path.join(tmpDir, 'data', 'learngrow.db'), path.join(dataDir, 'learngrow.db'));
   console.log('✅ 数据库已还原：data/learngrow.db');
 
-  // 4. 还原 uploads 媒体
+  // 4. 还原 uploads 媒体（数量差异已在解压前拦截）
   if (hasUploads) {
     fs.rmSync(uploadsDir, { recursive: true, force: true });
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -91,6 +110,21 @@ async function main() {
 
   // 5. 清理临时目录
   fs.rmSync(tmpDir, { recursive: true, force: true });
+
+  // 6. 库里引用的媒体是否真的在盘上：上面的数量闸门比的是「磁盘 vs 包内」，
+  //    遇到「磁盘本来就空 + 包里根本没有媒体」的旧备份会双双为 0 而放行，丢失就此静默发生
+  const media = scanMediaReferences(path.join(dataDir, 'learngrow.db'), uploadsDir);
+  console.log(`🔎 库中引用 /uploads 文件 ${media.referenced} 个，磁盘缺失 ${media.missing} 个`);
+  if (media.missing > 0 && !args.includes('--allow-missing-media')) {
+    console.error(
+      `❌ 恢复动作已完成，但库里有 ${media.missing} 个媒体文件在磁盘上不存在：\n` +
+        `   ${media.samples.join('\n   ')}\n` +
+        `   多半是这个备份包不含 uploads 媒体（2026-08-27 21:21 之前的备份都是这样）。\n` +
+        `   当前 data/ 与 uploads/ 已另存为 *-before-restore-${suffix}，可按需回退。\n` +
+        `   确认可以接受（例如只想要数据库）请追加 --allow-missing-media`
+    );
+    process.exit(1);
+  }
 
   console.log('');
   console.log('🎉 恢复完成！请启动服务：pm2 startOrReload ecosystem.config.cjs --only learngrow-crm');

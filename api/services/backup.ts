@@ -55,6 +55,78 @@ export function bjtNowHHMM(): string {
   return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(11, 16);
 }
 
+function countUploadsOnDisk(): number {
+  if (!fs.existsSync(uploadsDir)) return 0;
+  return fs.readdirSync(uploadsDir).filter((name) => {
+    try {
+      return fs.statSync(path.join(uploadsDir, name)).isFile();
+    } catch {
+      return false;
+    }
+  }).length;
+}
+
+async function countUploadsInZip(zipPath: string): Promise<number> {
+  // adm-zip 无内置类型声明，与 scripts/restore-backup.ts 保持一致的动态导入方式
+  const { default: AdmZip } = (await import('adm-zip')) as any;
+  const zip = new AdmZip(zipPath);
+  return (zip.getEntries() as Array<{ entryName: string }>).filter(
+    (e) => e.entryName.startsWith('uploads/') && !e.entryName.endsWith('/')
+  ).length;
+}
+
+// 库里存了 /uploads 相对路径的全部位置；新增媒体字段时要一并登记，否则体检会漏算
+const MEDIA_COLUMNS: Array<{ table: string; column: string }> = [
+  { table: 'wx_users', column: 'avatar_url' },
+  { table: 'checkin_records', column: 'image_url' },
+  { table: 'checkin_materials', column: 'file_url' },
+  { table: 'materials', column: 'file_url' },
+  { table: 'banners', column: 'image_url' },
+];
+
+export interface MediaReferenceScan {
+  referenced: number;
+  missing: number;
+  samples: string[];
+}
+
+/**
+ * 统计库里引用的 /uploads 文件有多少在磁盘上不存在。
+ * 「库有记录、盘上没文件」正是 2026-08-27 那批头像与打卡图丢失的形状：
+ * 当天 21:21 之前的备份包根本不含 uploads，恢复旧库后引用全部悬空。
+ */
+export function scanMediaReferences(dbPath: string, mediaDir: string = uploadsDir): MediaReferenceScan {
+  const result: MediaReferenceScan = { referenced: 0, missing: 0, samples: [] };
+  if (!fs.existsSync(dbPath)) return result;
+  const present = new Set(fs.existsSync(mediaDir) ? fs.readdirSync(mediaDir) : []);
+  const refs = new Set<string>();
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    for (const { table, column } of MEDIA_COLUMNS) {
+      // 表或列还不存在（如尚未上线的 banners）时跳过，不必为体检建迁移
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (!columns.some((c) => c.name === column)) continue;
+      const rows = db
+        .prepare(`SELECT ${column} AS v FROM ${table} WHERE ${column} LIKE '%/uploads/%'`)
+        .all() as Array<{ v: string }>;
+      for (const row of rows) {
+        const value = String(row.v || '');
+        const name = path.basename(value.split('?')[0]);
+        if (!name || refs.has(name)) continue;
+        refs.add(name);
+        if (!present.has(name)) {
+          result.missing += 1;
+          if (result.samples.length < 5) result.samples.push(value);
+        }
+      }
+    }
+  } finally {
+    db.close();
+  }
+  result.referenced = refs.size;
+  return result;
+}
+
 function backupMeta(): Record<string, any> {
   let version = 'dev';
   try {
@@ -63,11 +135,15 @@ function backupMeta(): Record<string, any> {
   } catch {
     /* ignore */
   }
+  const media = scanMediaReferences(path.join(dataDir, 'learngrow.db'));
   return {
     created_at: bjtNowString(),
     version,
     database: 'data/learngrow.db',
     uploads: 'uploads/',
+    uploads_count: countUploadsOnDisk(),
+    db_referenced_uploads: media.referenced,
+    missing_on_disk: media.missing,
     note: '乐学长打卡 完整备份（数据库 + 打卡媒体）',
   };
 }
@@ -121,6 +197,9 @@ export async function createBackup(): Promise<BackupFileInfo> {
     throw new Error(`数据库文件不存在：${dbPath}`);
   }
 
+  // 打包前的媒体文件数，作为备份完整性校验基准
+  const uploadsBefore = countUploadsOnDisk();
+
   // 1. 使用 SQLite 在线备份 API 生成一致性快照，不锁库、不影响线上服务
   const conn = new Database(dbPath);
   try {
@@ -151,6 +230,14 @@ export async function createBackup(): Promise<BackupFileInfo> {
     } catch {
       /* ignore */
     }
+  }
+
+  // 3. 校验媒体是否真的进了包：只成功不完整的备份会让人以为有退路
+  const uploadsInZip = await countUploadsInZip(filePath);
+  if (uploadsInZip < uploadsBefore) {
+    throw new Error(
+      `备份校验失败：uploads 磁盘上 ${uploadsBefore} 个文件，备份包内仅 ${uploadsInZip} 个（${filePath}）`
+    );
   }
 
   cleanupOldBackups();
