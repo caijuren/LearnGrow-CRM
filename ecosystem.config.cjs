@@ -39,7 +39,8 @@ module.exports = {
         JWT_SECRET: envConfig.JWT_SECRET,
         INITIAL_ADMIN_PASSWORD: envConfig.INITIAL_ADMIN_PASSWORD,
         WX_APPID: envConfig.WX_APPID,
-        WX_SECRET: envConfig.WX_SECRET
+        WX_SECRET: envConfig.WX_SECRET,
+        BACKUP_ENCRYPTION_KEY: envConfig.BACKUP_ENCRYPTION_KEY
       },
       error_file: path.join(pm2LogDir, 'learngrow-crm-error.log'),
       out_file: path.join(pm2LogDir, 'learngrow-crm-out.log'),
