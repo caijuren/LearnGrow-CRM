@@ -1,0 +1,194 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_ENV: production
+  DATA_DIR: ${{ vars.DATA_DIR || './data' }}
+  DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/learngrow-crm' }}
+
+jobs:
+  test:
+    name: Run Tests & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: TypeScript type check
+        run: npm run check
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'production' }}
+    needs: test
+    runs-on: self-hosted
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set deployment variables
+        run: |
+          echo "DEPLOY_ENV=${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_ENV
+          echo "DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)" >> $GITHUB_ENV
+          echo "BACKUP_DIR=${{ vars.DEPLOY_DIR }}/backups" >> $GITHUB_ENV
+          echo "RELEASE_DIR=${{ vars.DEPLOY_DIR }}/releases/${{ github.sha }}" >> $GITHUB_ENV
+      
+      - name: Backup current deployment
+        if: env.DEPLOY_ENV == 'production'
+        run: |
+          mkdir -p $BACKUP_DIR
+          if [ -d "${{ vars.DEPLOY_DIR }}/current" ]; then
+            cp -r ${{ vars.DEPLOY_DIR }}/current $BACKUP_DIR/release_$(date +%Y%m%d_%H%M%S)
+            echo "Backup created at $BACKUP_DIR"
+          fi
+      
+      - name: Deploy to release directory
+        run: |
+          mkdir -p $RELEASE_DIR
+          rsync -av --exclude='node_modules' --exclude='.git' --exclude='data' --exclude='.env*' ./ $RELEASE_DIR/
+          cd $RELEASE_DIR
+          npm ci --omit=dev
+      
+      - name: Copy environment files
+        run: |
+          if [ "$DEPLOY_ENV" = "staging" ]; then
+            cp ${{ vars.DEPLOY_DIR }}/.env.staging $RELEASE_DIR/.env.production 2>/dev/null || true
+          else
+            cp ${{ vars.DEPLOY_DIR }}/.env.production $RELEASE_DIR/.env.production 2>/dev/null || true
+          fi
+      
+      - name: Run database migrations
+        run: |
+          cd $RELEASE_DIR
+          NODE_ENV=production npx drizzle-kit migrate --config=drizzle.config.ts
+      
+      - name: Build frontend
+        run: |
+          cd $RELEASE_DIR
+          npm run build
+      
+      - name: Switch to new release (atomic deploy)
+        run: |
+          cd ${{ vars.DEPLOY_DIR }}
+          ln -sfn $RELEASE_DIR current
+          rm -f latest
+          ln -sfn $RELEASE_DIR latest
+      
+      - name: Reload PM2 services
+        run: |
+          cd ${{ vars.DEPLOY_DIR }}/current
+          pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+      
+      - name: Health check
+        run: |
+          echo "Waiting for services to start..."
+          sleep 10
+          
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -f http://localhost:3456/api/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Health check attempt $RETRY_COUNT failed, retrying in 5 seconds..."
+            sleep 5
+          done
+          
+          echo "Health check failed after $MAX_RETRIES attempts"
+          exit 1
+      
+      - name: Send success notification
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.WECHAT_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"content\": \"✅ **部署成功**\n\n**环境**: $DEPLOY_ENV\n**版本**: $(git rev-parse --short HEAD)\n**提交**: ${GITHUB_SHA}\n**时间**: $(date '+%Y-%m-%d %H:%M:%S')\n**耗时**: ${{ job.status }}\"
+              }
+            }"
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.WECHAT_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"content\": \"❌ **部署失败**\n\n**环境**: $DEPLOY_ENV\n**版本**: $(git rev-parse --short HEAD)\n**提交**: ${GITHUB_SHA}\n**时间**: $(date '+%Y-%m-%d %H:%M:%S')\n\n请检查 GitHub Actions 日志获取详细信息\"
+              }
+            }"
+      
+      - name: Auto rollback on failure
+        if: failure() && env.DEPLOY_ENV == 'production'
+        run: |
+          echo "Attempting automatic rollback..."
+          
+          # Find previous release
+          PREV_RELEASE=$(ls -t ${{ vars.DEPLOY_DIR }}/releases/ | head -n 2 | tail -n 1)
+          
+          if [ -n "$PREV_RELEASE" ] && [ "$PREV_RELEASE" != "${{ github.sha }}" ]; then
+            echo "Rolling back to: $PREV_RELEASE"
+            cd ${{ vars.DEPLOY_DIR }}
+            ln -sfn releases/$PREV_RELEASE current
+            
+            # Restart PM2
+            cd current
+            pm2 reload ecosystem.config.js --env production || pm2 restart all
+            
+            echo "Rollback completed"
+          else
+            echo "No previous release found for rollback"
+          fi
+
+  cleanup:
+    name: Cleanup Old Releases
+    needs: deploy
+    runs-on: self-hosted
+    if: always()
+    
+    steps:
+      - name: Remove old releases (keep last 3)
+        run: |
+          cd ${{ vars.DEPLOY_DIR }}/releases
+          ls -t | tail -n +4 | xargs -r rm -rf
+          echo "Old releases cleaned up, keeping last 3 versions"
