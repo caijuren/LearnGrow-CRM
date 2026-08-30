@@ -4,6 +4,8 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { z } from 'zod';
 import { adminOnly, authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
 import { AUTO_BACKUP_TIME, backupsDir, createBackup, isValidBackupName, listBackups } from './services/backup.js';
@@ -252,6 +254,57 @@ const APP_VERSION: string = (() => {
   }
 })();
 const app = Fastify({ trustProxy: true, logger: { level: 'info', transport: { target: 'pino-pretty', options: { translateTime: 'HH:mm:ss Z', ignore: 'pid,hostname' } } } });
+
+// 注册Swagger文档
+await app.register(swagger, {
+  openapi: {
+    info: {
+      title: 'LearnGrow CRM API',
+      description: '乐学长打卡系统API文档 - 教育私域运营管理系统',
+      version: APP_VERSION,
+    },
+    servers: [
+      {
+        url: 'http://localhost:3456',
+        description: '本地开发环境',
+      },
+      {
+        url: 'https://your-production-domain.com',
+        description: '生产环境',
+      },
+    ],
+    tags: [
+      { name: '认证', description: '用户登录和认证相关接口' },
+      { name: '微信用户', description: '微信用户管理接口' },
+      { name: '打卡', description: '打卡活动、记录和参与者管理' },
+      { name: '订单', description: '订单管理和积分计算' },
+      { name: '产品', description: '产品管理接口' },
+      { name: '孩子档案', description: '孩子学习档案管理' },
+      { name: '微信群', description: '微信群管理接口' },
+      { name: '素材库', description: '素材库管理接口' },
+      { name: '系统', description: '系统配置和健康检查' },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+});
+
+await app.register(swaggerUi, {
+  routePrefix: '/api-docs',
+  uiConfig: {
+    docExpansion: 'list',
+    deepLinking: false,
+  },
+  staticCSP: true,
+});
+
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
 await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
