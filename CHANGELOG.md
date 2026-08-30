@@ -10,20 +10,31 @@
 
 ### 新增
 - ✨ 用户数据删除接口 (`DELETE /api/wx-users/:id`)
-- ✨ 小程序隐私政策页面 (`/pages/privacy/privacy`)
+  - 支持软删除（标记deleted_at）和硬删除（物理清除）
+  - 级联清理9个关联表的数据
+  - 自动记录审计日志
+- ✨ 批量删除功能 (`POST /api/wx-users/batch-delete`)
+- ✨ 过期数据清理功能 (`POST /api/wx-users/purge-expired`)
+- ✨ 小程序隐私政策页面更新（符合《个人信息保护法》）
 - ✨ 备份文件AES256加密功能
+  - 自动加密新生成的备份
+  - 解密工具 (`scripts/decrypt-backup.ts`)
+- ✨ 密钥轮换脚本 (`scripts/rotate-keys.ts`)
 
 ### 改进
-- ♻️ 密钥轮换机制，增强安全性
-- ♻️ git历史敏感信息清理
+- ♻️ 为9个数据库表添加deleted_at字段和索引
+- ♻️ 增强审计日志系统
+- ♻️ 优化备份服务，支持加密选项
 
 ### 修复
 - 🐛 修复备份文件未加密的安全隐患
 - 🐛 修复用户删除时关联数据残留问题
 
 ### 文档
-- 📝 新增隐私政策文档
-- 📝 更新环境变量说明
+- 📝 新增隐私政策文档 (`docs/PRIVACY_POLICY.md`)
+- 📝 新增备份加密指南 (`docs/BACKUP_ENCRYPTION.md`)
+- 📝 新增密钥轮换指南 (`docs/KEY_ROTATION.md`)
+- 📝 更新环境变量说明 (`.env.example`)
 
 **完整对比:** [v2.6.0...v2.7.0](https://github.com/caijuren/LearnGrow-CRM/compare/v2.6.0...v2.7.0)
 
