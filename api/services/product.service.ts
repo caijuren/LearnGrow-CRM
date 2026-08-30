@@ -105,6 +105,11 @@ export function createProduct(data: CreateProductData) {
 }
 
 export function updateProduct(id: number, data: Partial<CreateProductData>) {
+  // 验证记录存在
+  if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) {
+    throw new Error('产品不存在');
+  }
+  
   const fields: string[] = [];
   const params: any[] = [];
   
