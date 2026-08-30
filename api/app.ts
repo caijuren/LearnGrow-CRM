@@ -18,6 +18,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID, createHash } from 'crypto';
 import type { WxUser, Product, FollowUp, TodoItem, CustomerSuggestion, WxUser360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithWxUser, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinParticipant, CheckinRecord, CheckinParticipantStats, CheckinEventDetail, CustomerStage, Material, MaterialCategory } from '../shared/types.js';
+import { metricsMiddleware, registerMetricsRoutes } from './middleware/metrics.middleware.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -308,6 +309,9 @@ await app.register(swaggerUi, {
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
 await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } });
+
+// 注册指标收集中间件
+app.addHook('onRequest', metricsMiddleware);
 
 await app.register(fastifyStatic, {
   root: uploadsDir,
@@ -3205,5 +3209,8 @@ async function maybeRunAutoBackup() {
     .run(today);
   app.log.info(`每日自动备份完成：${backup.name} (${backup.size} bytes)`);
 }
+
+// 注册指标监控路由
+registerMetricsRoutes(app);
 
 export default app;
