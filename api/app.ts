@@ -333,7 +333,51 @@ if (process.env.NODE_ENV === 'production') {
 app.get('/api/health', async () => ({ success: true, message: 'ok', version: APP_VERSION }));
 app.get('/api/version', async () => ok({ version: APP_VERSION }));
 
-app.post('/api/auth/login', async (request, reply) => {
+app.post('/api/auth/login', {
+  schema: {
+    tags: ['认证'],
+    summary: '管理端登录',
+    description: '使用用户名和密码登录管理后台，返回JWT token',
+    body: {
+      type: 'object',
+      required: ['username', 'password'],
+      properties: {
+        username: { type: 'string', description: '用户名' },
+        password: { type: 'string', format: 'password', description: '密码' }
+      }
+    },
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          data: {
+            type: 'object',
+            properties: {
+              token: { type: 'string' },
+              user: {
+                type: 'object',
+                properties: {
+                  id: { type: 'integer' },
+                  username: { type: 'string' },
+                  role: { type: 'string' },
+                  display_name: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
+      },
+      401: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          error: { type: 'string' }
+        }
+      }
+    }
+  }
+}, async (request, reply) => {
   if (!allowAdminLogin(request, reply)) return;
   const parsed = z.object({ username: z.string().min(1), password: z.string().min(1) }).safeParse(request.body);
   if (!parsed.success) return reply.code(400).send({ success: false, error: '用户名和密码不能为空' });
