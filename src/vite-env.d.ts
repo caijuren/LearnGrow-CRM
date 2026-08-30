@@ -31,3 +31,34 @@ declare module 'react-dom/client' {
   export function createRoot(container: Element | DocumentFragment): Root;
   export function hydrateRoot(container: Element | Document, initialChildren: React.ReactNode): Root;
 }
+
+// Archiver module declaration (CI/CD fallback)
+declare module 'archiver' {
+  import { Readable } from 'stream';
+  
+  interface ArchiverOptions {
+    zlib?: { level?: number };
+  }
+  
+  interface Archiver extends Readable {
+    pipe<T extends NodeJS.WritableStream>(destination: T): T;
+    file(filepath: string, data?: any): this;
+    directory(dirpath: string, destpath?: string): this;
+    finalize(): Promise<void>;
+    on(event: 'error', listener: (err: Error) => void): this;
+    on(event: 'warning', listener: (err: Error) => void): this;
+    on(event: 'end', listener: () => void): this;
+  }
+  
+  export class ZipArchive {
+    constructor(options?: ArchiverOptions);
+    pipe<T extends NodeJS.WritableStream>(destination: T): T;
+    file(filepath: string, data?: any): this;
+    directory(dirpath: string, destpath?: string): this;
+    append(source: string | Buffer | Readable, data?: any): this;
+    finalize(): Promise<void>;
+    on(event: 'error', listener: (err: Error) => void): this;
+    on(event: 'warning', listener: (err: Error) => void): this;
+    on(event: 'end', listener: () => void): this;
+  }
+}
