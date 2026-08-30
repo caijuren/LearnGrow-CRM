@@ -20,8 +20,6 @@ export async function registerUserDeleteRoutes(fastify: FastifyInstance) {
   fastify.delete('/wx-users/:id', {
     preHandler: [adminOnly],
     schema: {
-      summary: '删除微信用户',
-      description: '删除指定用户及其所有关联数据。默认软删除，可通过参数选择硬删除。',
       params: {
         type: 'object',
         properties: {
@@ -128,8 +126,6 @@ export async function registerUserDeleteRoutes(fastify: FastifyInstance) {
   fastify.post('/wx-users/batch-delete', {
     preHandler: [adminOnly],
     schema: {
-      summary: '批量软删除用户',
-      description: '批量软删除多个用户，用于清理测试数据或违规用户',
       body: {
         type: 'object',
         properties: {
@@ -221,8 +217,6 @@ export async function registerUserDeleteRoutes(fastify: FastifyInstance) {
   fastify.get('/wx-users/expired-deletions', {
     preHandler: [adminOnly],
     schema: {
-      summary: '查询待清理的过期软删除用户',
-      description: '查询超过保留期的软删除用户，可用于定期清理任务',
       querystring: {
         type: 'object',
         properties: {
@@ -281,8 +275,6 @@ export async function registerUserDeleteRoutes(fastify: FastifyInstance) {
   fastify.post('/wx-users/purge-expired', {
     preHandler: [adminOnly],
     schema: {
-      summary: '永久清除过期的软删除用户',
-      description: '将超过保留期的软删除用户进行硬删除，释放存储空间',
       body: {
         type: 'object',
         properties: {
