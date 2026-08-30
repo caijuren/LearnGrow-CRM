@@ -599,19 +599,17 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_materials_product_id ON materials(product_id);
 `);
 
-const userCount = (sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as any).count;
-if (userCount === 0) {
-  const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
-  if (isProduction && (!initialAdminPassword || initialAdminPassword.length < 12)) {
-    throw new Error('生产环境初始化管理员时必须配置至少12位 INITIAL_ADMIN_PASSWORD');
-  }
-  const hash = bcrypt.hashSync(initialAdminPassword || 'admin123', 10);
-  sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
-    .run('admin', hash, 'admin', '主播');
-  if (!isProduction) {
-    sqlite.prepare("INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
-      .run('assistant', bcrypt.hashSync('assist123', 10), 'assistant', '小助理');
-  }
+// 使用 INSERT OR IGNORE 防止多线程/多进程初始化时重复插入
+const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
+if (isProduction && (!initialAdminPassword || initialAdminPassword.length < 12)) {
+  throw new Error('生产环境初始化管理员时必须配置至少12位 INITIAL_ADMIN_PASSWORD');
+}
+const hash = bcrypt.hashSync(initialAdminPassword || 'admin123', 10);
+sqlite.prepare("INSERT OR IGNORE INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
+  .run('admin', hash, 'admin', '主播');
+if (!isProduction) {
+  sqlite.prepare("INSERT OR IGNORE INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?)")
+    .run('assistant', bcrypt.hashSync('assist123', 10), 'assistant', '小助理');
 }
 
 if (isProduction) {
