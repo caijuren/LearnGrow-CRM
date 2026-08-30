@@ -97,7 +97,7 @@ export function listWxUsers(options: {
   };
 
   const sortConfig = SORTS[sort] || SORTS.activity;
-  const orderDir = dir === 'asc' ? 'ASC' : dir === 'desc' ? 'DESC' : sortConfig.dir;
+  const orderDir = dir?.toLowerCase() === 'asc' ? 'ASC' : dir?.toLowerCase() === 'desc' ? 'DESC' : sortConfig.dir;
   const offset = (page - 1) * limit;
 
   // 查询总数

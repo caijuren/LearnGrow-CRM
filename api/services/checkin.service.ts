@@ -256,7 +256,7 @@ export function submitCheckinRecord(data: {
 /**
  * 审核打卡记录
  */
-export function approveCheckinRecord(recordId: number, comment?: string) {
+export async function approveCheckinRecord(recordId: number, comment?: string) {
   const record = db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId) as any;
   if (!record) throw new Error('记录不存在');
 
@@ -271,8 +271,8 @@ export function approveCheckinRecord(recordId: number, comment?: string) {
   const event = getCheckinEventById(participant.event_id);
 
   if (event && event.points_per_checkin > 0) {
-    const { grantCheckinPoints } = await import('./points.js');
-    grantCheckinPoints(participant.wx_user_id, recordId, event.points_per_checkin);
+    const pointsModule = await import('./points.js');
+    pointsModule.grantCheckinPoints(participant.wx_user_id, recordId);
   }
 
   return true;

@@ -226,7 +226,7 @@ export function advanceChildProgress(childId: number, progressId: number, data: 
     if (currentIdx >= 0 && currentIdx < stages.length - 1) {
       nextStageId = stages[currentIdx + 1].id;
     } else {
-      nextStageId = null;
+      nextStageId = undefined;
       status = 'completed';
     }
   }

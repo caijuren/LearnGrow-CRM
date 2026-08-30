@@ -380,7 +380,9 @@ app.post('/api/auth/login', {
 }, async (request, reply) => {
   if (!allowAdminLogin(request, reply)) return;
   const parsed = z.object({ username: z.string().min(1), password: z.string().min(1) }).safeParse(request.body);
-  if (!parsed.success) return reply.code(400).send({ success: false, error: '用户名和密码不能为空' });
+  if (!parsed.success) {
+    return reply.code(400 as any).send({ success: false, error: '用户名和密码不能为空' });
+  }
   const { username, password } = parsed.data;
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
   if (!user) return reply.code(401).send({ success: false, error: '用户名或密码错误' });

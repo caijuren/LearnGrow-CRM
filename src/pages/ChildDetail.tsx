@@ -132,9 +132,9 @@ export default function ChildDetail() {
     setSubmitting(true);
     try {
       await advanceProgress(Number(childId), currentProgress.id, {
-        completed_date: advanceForm.completed_date || null,
-        notes: advanceForm.notes || null,
-        next_stage_id: currentProgress.next_stage?.id ?? null,
+        completed_date: advanceForm.completed_date || undefined,
+        notes: advanceForm.notes || undefined,
+        next_stage_id: currentProgress.next_stage?.id ?? undefined,
       });
       setShowAdvance(false);
       setCurrentProgress(null);

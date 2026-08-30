@@ -13,7 +13,8 @@ import fs from 'fs';
 
 export async function registerBackupRoutes(app: FastifyInstance) {
   app.register(async function (router) {
-    router.addHook('preHandler', [authMiddleware, adminOnly]);
+    router.addHook('preHandler', authMiddleware);
+    router.addHook('preHandler', adminOnly);
     
     // 获取备份列表
     router.get('/', async () => {

@@ -5,7 +5,7 @@
  */
 
 import { FastifyInstance } from 'fastify';
-import { authMiddleware } from '../middleware/auth.middleware.js';
+import { authMiddleware, type AuthUser } from '../middleware/auth.middleware.js';
 import { 
   listMaterials, 
   getMaterialById, 
@@ -18,7 +18,6 @@ import {
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import type { AuthUser } from '../services/auth.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,8 +83,8 @@ export async function registerMaterialRoutes(app: FastifyInstance) {
           mime_type: data.mimetype,
           category: cat,
           tags,
-          description: description?.value || null,
-          product_id: pid,
+          description: description?.value || undefined,
+          product_id: pid || undefined,
           uploaded_by: userId
         });
 

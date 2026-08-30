@@ -20,7 +20,7 @@ export async function registerSettingsRoutes(app: FastifyInstance) {
     });
     
     // 更新积分设置（仅管理员）
-    router.put('/points', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
+    router.put('/points', { preHandler: adminOnly }, async (request: any, reply: any) => {
       try {
         const settings = updatePointsSettings(request.body);
         return { success: true, data: settings };

@@ -71,7 +71,7 @@ export function getOrderById(id: number) {
   return order || null;
 }
 
-export function createOrder(data: CreateOrderData) {
+export async function createOrder(data: CreateOrderData) {
   const { wx_user_id, product_id, amount, order_type, remark, shipping_note, child_id } = data;
   
   // 验证产品是否存在
@@ -97,8 +97,8 @@ export function createOrder(data: CreateOrderData) {
   // 计算并授予积分
   const earned = Math.floor(finalAmount * getIntSetting('points_order_rate'));
   if (earned > 0) {
-    const { grantOrderPoints } = await import('./points.js');
-    grantOrderPoints(wx_user_id, orderId, earned);
+    const pointsModule = await import('./points.js');
+    pointsModule.grantOrderPoints(wx_user_id, orderId, earned);
   }
   
   // 更新用户统计
@@ -111,7 +111,7 @@ export function createOrder(data: CreateOrderData) {
   return db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId) as any;
 }
 
-export function deleteOrder(id: number) {
+export async function deleteOrder(id: number) {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
   if (!order) {
     throw new Error('订单不存在');
@@ -121,8 +121,8 @@ export function deleteOrder(id: number) {
   db.prepare('DELETE FROM orders WHERE id = ?').run(id);
   
   // 撤销相关积分
-  const { revokeByRef } = await import('./points.js');
-  revokeByRef(order.wx_user_id, 'order', id);
+  const pointsModule = await import('./points.js');
+  pointsModule.revokeByRef(order.wx_user_id, 'order', id);
   
   // 更新统计
   updateWxUserStats(order.wx_user_id);

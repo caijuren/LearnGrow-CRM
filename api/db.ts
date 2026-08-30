@@ -392,7 +392,8 @@ if (pathCount === 0) {
       [4, 3, '作文提升', '修改润色+不同文体', 28, '[7,5]', '作文达到班级中上水平'],
     ];
     for (const s of allStages) {
-      insertStage.run(stagesData[s[0]].pathId, s[1], s[2], s[3], s[4], s[5], s[6]);
+      const stageData = stagesData[s[0] as number];
+      insertStage.run(stageData.pathId, s[1], s[2], s[3], s[4], s[5], s[6]);
     }
   });
   insertPaths();

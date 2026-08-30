@@ -305,7 +305,7 @@ export default function CheckinDetail() {
     if (!newParticipantName.trim()) return;
     await addCheckinParticipant(eventId, {
       nickname: newParticipantName.trim(),
-      child_name: newParticipantChild.trim() || null,
+      child_name: newParticipantChild.trim() || undefined,
     });
     setNewParticipantName('');
     setNewParticipantChild('');
@@ -360,7 +360,7 @@ export default function CheckinDetail() {
       const calendarDay = event.calendar.find((c: any) => c.date === dateStr);
       const isEventDay = dateStr >= event.start_date && dateStr <= event.end_date;
       days.push({
-        date: dateStr,
+        date: dateStr || null,
         count: calendarDay?.count || 0,
         isEventDay,
         isSelected: dateStr === selectedDate,
@@ -587,7 +587,7 @@ export default function CheckinDetail() {
                     <div key={i} className="aspect-square">
                       {day.date ? (
                         <button
-                          onClick={() => day.isEventDay && setSelectedDate(day.date)}
+                          onClick={() => day.isEventDay && setSelectedDate(day.date!)}
                           disabled={!day.isEventDay}
                           className={`w-full h-full rounded flex flex-col items-center justify-center transition-all duration-150 ${bgColor} ${textColor}
                             ${!day.isEventDay ? 'cursor-default' : 'cursor-pointer'}
