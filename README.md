@@ -76,6 +76,54 @@ npm run dev
 # - API: http://localhost:3456
 ```
 
+### 环境变量说明
+
+创建 `.env` 或 `.env.production` 文件，配置以下变量：
+
+```bash
+# ============================================
+# LearnGrow CRM - 环境变量配置
+# ============================================
+
+# 服务端安全配置
+# 生产环境必须使用至少32位随机字符串
+JWT_SECRET=replace_with_a_long_random_secret_at_least_32_chars
+
+# 首次初始化生产数据库时使用，至少12位；已有用户后不会再使用
+INITIAL_ADMIN_PASSWORD=replace_with_a_strong_initial_password
+
+# 可选：生产环境数据库目录，默认使用项目 data 目录
+DATA_DIR=/absolute/path/to/learngrow-data
+
+# 微信小程序配置
+WX_APPID=your_wx_appid_here
+WX_SECRET=your_wx_secret_here
+
+# 备份加密密钥（64位十六进制字符串）
+BACKUP_ENCRYPTION_KEY=generate_with_node_crypto_randomBytes_32_hex
+
+# 上传限流配置（可选，默认每分钟30次）
+UPLOAD_RATE_PER_MIN=30
+```
+
+**生成安全的密钥：**
+```bash
+# JWT_SECRET (至少32字符)
+node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"
+
+# BACKUP_ENCRYPTION_KEY (64位十六进制)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# INITIAL_ADMIN_PASSWORD (至少12位强密码)
+node -e "console.log(require('crypto').randomBytes(9).toString('base64'))"
+```
+
+**⚠️ 安全提醒：**
+- `.env` 和 `.env.production` 已加入 `.gitignore`，不会提交到代码库
+- 生产环境务必使用强随机密钥，不要使用示例值
+- 定期轮换密钥（建议JWT_SECRET每3个月，BACKUP_ENCRYPTION_KEY每6个月）
+- 参考 [密钥轮换指南](./docs/KEY_ROTATION.md) 了解详细流程
+
 ### 常用命令
 
 ```bash
@@ -119,6 +167,139 @@ LearnGrow-CRM/
     ├── backup.ts        # 数据库备份
     └── deploy.sh        # 部署脚本
 ```
+
+---
+
+## 🚀 生产环境部署指南
+
+### 前置要求
+
+- Node.js >= 20.9.0 (推荐 v24.x)
+- npm >= 10.x
+- Linux服务器 (Ubuntu 22.04 LTS推荐)
+- PM2进程管理器 (用于生产环境)
+
+### 部署步骤
+
+#### 1. 服务器准备
+
+```bash
+# SSH登录服务器
+ssh ubuntu@your-server-ip
+
+# 创建项目目录
+sudo mkdir -p /var/www/learngrow-crm
+sudo chown -R ubuntu:ubuntu /var/www/learngrow-crm
+cd /var/www/learngrow-crm
+
+# 安装PM2 (如未安装)
+npm install -g pm2
+```
+
+#### 2. 代码同步
+
+使用提供的deploy.sh脚本自动部署：
+
+```bash
+# 在本地机器执行
+cd LearnGrow-CRM
+bash deploy.sh
+```
+
+该脚本会自动：
+- 上传代码到服务器临时目录
+- 同步到项目目录（排除node_modules、数据库等）
+- 安装依赖 (`npm ci`)
+- 运行类型检查和测试
+- 构建前端资源
+- 执行生产预检
+- 重启PM2服务
+- 验证API健康状态
+
+#### 3. 环境变量配置
+
+首次部署需要配置 `.env.production`：
+
+```bash
+ssh ubuntu@your-server-ip
+cd /var/www/learngrow-crm
+
+# 复制模板并编辑
+cp .env.example .env.production
+nano .env.production
+```
+
+填入真实值后，重启PM2加载配置：
+
+```bash
+pm2 restart learngrow-crm --update-env
+```
+
+#### 4. 数据库迁移
+
+如果版本包含数据库schema变更：
+
+```bash
+cd /var/www/learngrow-crm
+npx tsx scripts/add-deleted-at-columns.ts  # 示例迁移脚本
+```
+
+**重要：** 迁移前务必备份数据库！
+
+```bash
+cd /var/www/learngrow-crm
+npm run backup
+```
+
+#### 5. 验证部署
+
+```bash
+# 检查PM2状态
+pm2 status
+
+# 查看日志
+pm2 logs learngrow-crm --lines 50
+
+# 测试API
+curl http://localhost:3456/api/health
+
+# 预期输出:
+# {"success":true,"message":"ok","version":"2.7.0"}
+```
+
+### 回滚方案
+
+如果部署后出现问题：
+
+```bash
+# 方法1: 回滚到上一个git版本
+ssh ubuntu@your-server-ip
+cd /var/www/learngrow-crm
+git checkout <previous-version-tag>
+npm ci
+npm run build
+pm2 restart learngrow-crm --update-env
+
+# 方法2: 恢复数据库备份
+cd /var/www/learngrow-crm
+npx tsx scripts/restore-backup.ts backups/latest_backup.zip
+```
+
+### 常见问题
+
+**Q: 部署后API返回502错误？**  
+A: 检查PM2日志 `pm2 logs learngrow-crm`，确认服务是否正常启动。
+
+**Q: 前端页面空白？**  
+A: 确认 `npm run build` 是否成功，检查 `dist/` 目录是否存在。
+
+**Q: 数据库连接失败？**  
+A: 检查 `DATA_DIR` 环境变量是否正确，确认数据库文件权限。
+
+**Q: 上传文件失败？**  
+A: 确认 `uploads/` 目录权限，应为 `ubuntu:ubuntu` 所有。
+
+详细部署问题参考 [部署检查清单](./docs/DEPLOYMENT-CHECKLIST.md)。
 
 ---
 
