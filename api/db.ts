@@ -461,10 +461,11 @@ if (!isProduction && productCount === 0) {
   ]);
 }
 
+// 使用 INSERT OR IGNORE 防止多线程初始化时重复插入种子数据
 const wxUserSeedCount = (sqlite.prepare('SELECT COUNT(*) as count FROM wx_users').get() as any).count;
 if (!isProduction && wxUserSeedCount === 0) {
   const insertCustomer = sqlite.prepare(`
-    INSERT INTO wx_users (openid, name, nickname, phone, douyin_nickname, source, importance, tags, remark,
+    INSERT OR IGNORE INTO wx_users (openid, name, nickname, phone, douyin_nickname, source, importance, tags, remark,
       total_spent, order_count, last_order_date, last_follow_date, stage, wechat_add_date, wechat_remark)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
