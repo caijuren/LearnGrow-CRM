@@ -880,4 +880,11 @@ sqlite.exec(`
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_points_ledger_ref_unique ON points_ledger(ref_type, ref_id);
   CREATE INDEX IF NOT EXISTS idx_points_ledger_user ON points_ledger(wx_user_id);
+
+  -- ===== v3.3.0 性能优化：Dashboard 高频查询索引 =====
+  CREATE INDEX IF NOT EXISTS idx_wx_users_created_at_date ON wx_users(date(created_at));
+  CREATE INDEX IF NOT EXISTS idx_checkin_records_status_date ON checkin_records(status, date(checkin_date));
+  CREATE INDEX IF NOT EXISTS idx_checkin_participants_wx_user_event ON checkin_participants(wx_user_id, event_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_purchase_date_amount ON orders(purchase_date, amount);
+  CREATE INDEX IF NOT EXISTS idx_follow_ups_date_result ON follow_ups(date, result);
 `);

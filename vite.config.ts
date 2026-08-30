@@ -22,6 +22,44 @@ export default defineConfig({
     // 将版本号注入到环境变量，前端可通过 import.meta.env.VITE_APP_VERSION 访问
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
   },
+  build: {
+    // 代码分割优化
+    rollupOptions: {
+      output: {
+        // 手动分割 chunk
+        manualChunks: (id) => {
+          // React 相关库单独打包
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor-react';
+          }
+          // React Router 单独打包
+          if (id.includes('node_modules/react-router')) {
+            return 'vendor-router';
+          }
+          // UI 库单独打包（如果有）
+          if (id.includes('node_modules/@mui') || id.includes('node_modules/antd')) {
+            return 'vendor-ui';
+          }
+          // Sentry 单独打包（体积较大）
+          if (id.includes('node_modules/@sentry')) {
+            return 'vendor-sentry';
+          }
+        },
+        // 资源文件名格式
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        entryFileNames: 'entries/[name]-[hash].js',
+      },
+    },
+    // 压缩配置
+    minify: 'esbuild',
+    // sourcemap 在生产环境关闭
+    sourcemap: false,
+    // 目标浏览器
+    target: 'es2015',
+    // chunk 大小警告阈值
+    chunkSizeWarningLimit: 500,
+  },
   server: {
     proxy: {
       '/api': {

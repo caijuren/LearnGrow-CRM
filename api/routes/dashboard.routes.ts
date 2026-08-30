@@ -14,7 +14,7 @@ export async function registerDashboardRoutes(app: FastifyInstance) {
     
     // 获取Dashboard统计数据
     router.get('/', async () => {
-      const data = getDashboardData();
+      const data = await getDashboardData();
       return { success: true, data };
     });
   }, { prefix: '/api/dashboard' });

@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import type { DashboardData, CustomerStage } from '../../shared/types.js';
+import { cache, DASHBOARD_CACHE_TTL, DASHBOARD_CACHE_KEY } from '../cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +38,13 @@ function needFollowClause(): { sql: string; params: any[] } {
   };
 }
 
-export function getDashboardData(): DashboardData {
+export async function getDashboardData(): Promise<DashboardData> {
+  // 尝试从缓存获取
+  const cached = cache.get<DashboardData>(DASHBOARD_CACHE_KEY);
+  if (cached) {
+    return cached;
+  }
+
   const today = bjtToday();
   const yesterday = bjtDaysAgo(1);
   const sevenDaysAgo = bjtDaysAgo(7);
@@ -195,7 +202,7 @@ export function getDashboardData(): DashboardData {
     };
   });
 
-  return {
+  const dashboardData = {
     stats: {
       total_wx_users: totalWxUsers,
       today_new_wx_users: todayNewWxUsers,
@@ -221,4 +228,9 @@ export function getDashboardData(): DashboardData {
     sourceChannels,
     topCheckinUsers,
   };
+
+  // 存入缓存
+  cache.set(DASHBOARD_CACHE_KEY, dashboardData, { ttlMs: DASHBOARD_CACHE_TTL });
+
+  return dashboardData;
 }
