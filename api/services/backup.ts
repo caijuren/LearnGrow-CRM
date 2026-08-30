@@ -216,8 +216,8 @@ export async function createBackup(): Promise<BackupFileInfo> {
       const output = fs.createWriteStream(filePath);
       const archive = new ZipArchive({ zlib: { level: 6 } });
       output.on('close', () => resolve());
-      output.on('error', (err) => reject(err));
-      archive.on('error', (err) => reject(err));
+      output.on('error', (err: Error) => reject(err));
+      archive.on('error', (err: Error) => reject(err));
       archive.pipe(output);
       archive.file(snapshotPath, { name: 'data/learngrow.db' });
       if (fs.existsSync(uploadsDir)) {
