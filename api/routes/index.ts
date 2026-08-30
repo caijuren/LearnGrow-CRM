@@ -9,6 +9,7 @@ import { registerAuthRoutes } from './auth.routes.js';
 import { registerWxUserRoutes } from './wxUser.routes.js';
 import { registerCheckinRoutes } from './checkin.routes.js';
 import { registerOrderRoutes } from './order.routes.js';
+import { registerDashboardRoutes } from './dashboard.routes.js';
 
 export async function registerAllRoutes(app: FastifyInstance) {
   // 系统接口
@@ -26,4 +27,7 @@ export async function registerAllRoutes(app: FastifyInstance) {
 
   // 订单管理
   await registerOrderRoutes(app);
+
+  // 驾驶舱
+  await registerDashboardRoutes(app);
 }
