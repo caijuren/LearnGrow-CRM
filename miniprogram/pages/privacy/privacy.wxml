@@ -1,7 +1,7 @@
 <view class="privacy-container">
   <view class="privacy-header">
     <view class="privacy-header-title">隐私政策</view>
-    <view class="privacy-header-subtitle">最后更新：2026年6月29日</view>
+    <view class="privacy-header-subtitle">最后更新：2026年9月1日</view>
   </view>
 
   <view class="privacy-content card">
@@ -61,7 +61,19 @@
     <view class="section">
       <view class="section-title">五、您的权利</view>
       <view class="section-text">
-        您有权访问、更正、删除您的个人信息。如需操作，请在"个人中心"进行设置，或联系我们的客服。
+        您享有以下个人信息相关权利：
+      </view>
+      <view class="section-text">
+        1. <text class="bold">访问权：</text>您可以随时在"个人中心"查看您的个人信息；
+      </view>
+      <view class="section-text">
+        2. <text class="bold">更正权：</text>您可以在"个人中心"修改昵称、头像等信息；
+      </view>
+      <view class="section-text">
+        3. <text class="bold">删除权：</text>您可以联系客服申请删除账号及关联数据（包括打卡记录、孩子档案等），我们将在7个工作日内处理；
+      </view>
+      <view class="section-text">
+        4. <text class="bold">注销权：</text>您可以申请注销账号，我们将彻底删除您的所有个人信息。
       </view>
     </view>
 
