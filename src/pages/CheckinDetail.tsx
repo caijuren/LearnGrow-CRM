@@ -420,7 +420,7 @@ export default function CheckinDetail() {
                   event.status === 'active' ? 'badge-primary' :
                   event.status === 'ended' ? 'badge-neutral' : 'badge-warning'
                 }`}>
-                  {CHECKIN_STATUS_LABELS[event.status]}
+                  {CHECKIN_STATUS_LABELS[event.status as keyof typeof CHECKIN_STATUS_LABELS]}
                 </span>
               </div>
             </div>

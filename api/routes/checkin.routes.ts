@@ -4,7 +4,7 @@
  * 处理打卡活动、参与者、记录等管理端接口
  */
 
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { authMiddleware, adminOnly, wxAuthMiddleware, wxOptionalAuthMiddleware } from '../middleware/auth.middleware.js';
 import {
   listCheckinEvents,

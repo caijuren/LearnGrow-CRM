@@ -23,6 +23,14 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Relax no-explicit-any to warning for gradual migration
+      '@typescript-eslint/no-explicit-any': 'warn',
+      // Relax unused vars to warning for gradual cleanup
+      '@typescript-eslint/no-unused-vars': ['warn', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
     },
   },
 )

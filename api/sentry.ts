@@ -111,11 +111,8 @@ export function addBreadcrumb(message: string, category: string = 'default', lev
 /**
  * 启动事务（用于性能监控）
  */
-export function startTransaction(name: string, op: string = 'function') {
-  return Sentry.startSpan({
-    name,
-    op,
-  });
+export function startTransaction<T>(name: string, op: string = 'function', callback: () => T): T {
+  return Sentry.startSpan({ name, op }, callback);
 }
 
 // 导出 Sentry 实例供直接使用

@@ -53,7 +53,7 @@ export async function authMiddleware(
 ) {
   try {
     await request.jwtVerify();
-  } catch (err) {
+  } catch (_err) {
     return reply.code(401).send({
       success: false,
       error: '登录已过期，请重新登录'
@@ -124,7 +124,7 @@ export function wxAuthMiddleware(
  */
 export function wxOptionalAuthMiddleware(
   request: any,
-  reply: any
+  _reply: any
 ) {
   const openid = request.headers['x-wx-openid'];
   if (openid) {

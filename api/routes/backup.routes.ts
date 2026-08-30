@@ -18,7 +18,7 @@ export async function registerBackupRoutes(app: FastifyInstance) {
     
     // 获取备份列表
     router.get('/', async () => {
-      const backups = listBackups().map(({ filePath, ...rest }) => rest);
+      const backups = listBackups().map(({ filePath: _filePath, ...rest }) => rest);
       return { success: true, data: backups };
     });
     
