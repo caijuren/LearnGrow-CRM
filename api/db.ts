@@ -212,24 +212,22 @@ if (!existingFollowUpCols.includes('child_id')) {
 }
 
 const existingCustomerCols = (sqlite.prepare("PRAGMA table_info(customers)").all() as any[]).map(c => c.name);
-if (!existingCustomerCols.includes('wechat_id')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_id TEXT");
+function safeAddColumn(table: string, column: string, definition: string) {
+  if (!existingCustomerCols.includes(column)) {
+    try {
+      sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    } catch {
+      // Column already exists, ignore
+    }
+  }
 }
-if (!existingCustomerCols.includes('wechat_remark')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_remark TEXT");
-}
-if (!existingCustomerCols.includes('wechat_add_date')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_add_date TEXT");
-}
-if (!existingCustomerCols.includes('wechat_account')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN wechat_account TEXT DEFAULT 'main'");
-}
-if (!existingCustomerCols.includes('stage')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN stage TEXT NOT NULL DEFAULT 'new_friend'");
-}
-if (!existingCustomerCols.includes('next_talk_topic')) {
-  sqlite.exec("ALTER TABLE customers ADD COLUMN next_talk_topic TEXT");
-}
+
+safeAddColumn('customers', 'wechat_id', 'TEXT');
+safeAddColumn('customers', 'wechat_remark', 'TEXT');
+safeAddColumn('customers', 'wechat_add_date', 'TEXT');
+safeAddColumn('customers', 'wechat_account', "TEXT DEFAULT 'main'");
+safeAddColumn('customers', 'stage', "TEXT NOT NULL DEFAULT 'new_friend'");
+safeAddColumn('customers', 'next_talk_topic', 'TEXT');
 
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS wechat_groups (
