@@ -608,7 +608,32 @@ app.register(async function (router) {
     return ok(mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id', async (request: any) => { db.prepare('DELETE FROM wx_users WHERE id = ?').run(parseInt(request.params.id)); return ok({ deleted: true }); });
+  // v2.7.0: 使用新的用户删除服务（支持级联删除和审计日志）
+  router.delete('/:id', async (request: any, reply: any) => {
+    const { registerUserDeleteRoutes } = await import('./routes/user-delete.routes.js');
+    // 注意: 这里简化处理，实际应该直接在主路由中注册
+    const id = parseInt(request.params.id);
+    const user = (request as any).user;
+    
+    if (!user || user.role !== 'admin') {
+      return reply.code(403).send({ success: false, error: '需要管理员权限' });
+    }
+    
+    const { deleteUser } = await import('./services/user-delete.service.js');
+    const result = await deleteUser(id, false, user);
+    
+    if (!result.success) {
+      return reply.code(404).send({ success: false, error: result.error });
+    }
+    
+    return reply.send({ 
+      success: true, 
+      data: {
+        user_id: result.user_id,
+        cascade_deleted: result.cascade_deleted
+      }
+    });
+  });
 
   router.post('/:id/follow-ups', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
