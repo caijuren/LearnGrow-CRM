@@ -94,7 +94,7 @@ export const Layout: React.FC = () => {
           </div>
           <div className="sidebar-brand-copy">
             <div className="text-[15px] font-semibold text-text-primary leading-none">源来是糖</div>
-            <div className="text-[11px] text-text-tertiary mt-1">运营后台 v3.0</div>
+            <div className="text-[11px] text-text-tertiary mt-1">运营后台 v{import.meta.env.VITE_APP_VERSION || '2.7.0'}</div>
           </div>
         </div>
 

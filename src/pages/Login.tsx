@@ -51,7 +51,7 @@ export default function Login() {
             </div>
             <div>
               <h1 className="text-base font-bold tracking-tight text-text-primary">源来是糖</h1>
-              <p className="text-[10px] text-text-tertiary font-medium mt-1">运营后台 v3.0</p>
+              <p className="text-[10px] text-text-tertiary font-medium mt-1">运营后台 v{import.meta.env.VITE_APP_VERSION || '2.7.0'}</p>
             </div>
           </div>
 
