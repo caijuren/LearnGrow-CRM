@@ -10,6 +10,12 @@ import { registerWxUserRoutes } from './wxUser.routes.js';
 import { registerCheckinRoutes } from './checkin.routes.js';
 import { registerOrderRoutes } from './order.routes.js';
 import { registerDashboardRoutes } from './dashboard.routes.js';
+import { registerProductRoutes } from './product.routes.js';
+import { registerChildRoutes } from './child.routes.js';
+import { registerGroupRoutes } from './group.routes.js';
+import { registerMaterialRoutes } from './material.routes.js';
+import { registerSettingsRoutes } from './settings.routes.js';
+import { registerBackupRoutes } from './backup.routes.js';
 
 export async function registerAllRoutes(app: FastifyInstance) {
   // 系统接口
@@ -30,4 +36,22 @@ export async function registerAllRoutes(app: FastifyInstance) {
 
   // 驾驶舱
   await registerDashboardRoutes(app);
+
+  // 产品管理
+  await registerProductRoutes(app);
+
+  // 孩子档案
+  await registerChildRoutes(app);
+
+  // 群组管理
+  await registerGroupRoutes(app);
+
+  // 素材管理
+  await registerMaterialRoutes(app);
+
+  // 系统设置
+  await registerSettingsRoutes(app);
+
+  // 备份管理
+  await registerBackupRoutes(app);
 }
