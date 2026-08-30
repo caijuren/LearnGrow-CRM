@@ -32,6 +32,34 @@ const existingFollowUpColsEarly = (sqlite.prepare("PRAGMA table_info(follow_ups)
 if (existingFollowUpColsEarly.length > 0 && !existingFollowUpColsEarly.includes('wx_user_id') && existingFollowUpColsEarly.includes('customer_id')) {
   sqlite.exec(`ALTER TABLE follow_ups RENAME COLUMN customer_id TO wx_user_id;`);
 }
+
+// 老库 wx_users 补齐 CRM 列（必须在 CREATE TABLE IF NOT EXISTS + CREATE INDEX 之前）
+const existingWxUserColsEarly = (sqlite.prepare("PRAGMA table_info(wx_users)").all() as any[]).map(c => c.name);
+const wxUserColDefsEarly: [string, string][] = [
+  ['points', 'INTEGER NOT NULL DEFAULT 0'],
+  ['name', 'TEXT'],
+  ['phone', 'TEXT'],
+  ['douyin_nickname', 'TEXT'],
+  ['source', 'TEXT'],
+  ['importance', "TEXT NOT NULL DEFAULT 'normal'"],
+  ['tags', "TEXT DEFAULT '[]'"],
+  ['remark', 'TEXT'],
+  ['total_spent', 'REAL NOT NULL DEFAULT 0'],
+  ['order_count', 'INTEGER NOT NULL DEFAULT 0'],
+  ['last_order_date', 'TEXT'],
+  ['last_follow_date', 'TEXT'],
+  ['wechat_id', 'TEXT'],
+  ['wechat_remark', 'TEXT'],
+  ['wechat_add_date', 'TEXT'],
+  ['wechat_account', "TEXT DEFAULT 'main'"],
+  ['stage', "TEXT NOT NULL DEFAULT 'new_friend'"],
+  ['next_talk_topic', 'TEXT'],
+];
+for (const [col, def] of wxUserColDefsEarly) {
+  if (!existingWxUserColsEarly.includes(col)) {
+    sqlite.exec(`ALTER TABLE wx_users ADD COLUMN ${col} ${def}`);
+  }
+}
 // ====================================================
 
 sqlite.exec(`
@@ -156,35 +184,6 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_wx_users_last_follow ON wx_users(last_follow_date);
   CREATE INDEX IF NOT EXISTS idx_wx_users_source ON wx_users(source);
 `);
-
-// 老库（未跑 merge 迁移）补齐 CRM 列，保证代码在新旧库上都能启动
-const existingWxUserCols = (sqlite.prepare("PRAGMA table_info(wx_users)").all() as any[]).map(c => c.name);
-const wxUserColDefs: [string, string][] = [
-  ['points', 'INTEGER NOT NULL DEFAULT 0'],
-  ['name', 'TEXT'],
-  ['phone', 'TEXT'],
-  ['douyin_nickname', 'TEXT'],
-  ['source', 'TEXT'],
-  ['importance', "TEXT NOT NULL DEFAULT 'normal'"],
-  ['tags', "TEXT DEFAULT '[]'"],
-  ['remark', 'TEXT'],
-  ['total_spent', 'REAL NOT NULL DEFAULT 0'],
-  ['order_count', 'INTEGER NOT NULL DEFAULT 0'],
-  ['last_order_date', 'TEXT'],
-  ['last_follow_date', 'TEXT'],
-  ['wechat_id', 'TEXT'],
-  ['wechat_remark', 'TEXT'],
-  ['wechat_add_date', 'TEXT'],
-  ['wechat_account', "TEXT DEFAULT 'main'"],
-  ['stage', "TEXT NOT NULL DEFAULT 'new_friend'"],
-  ['next_talk_topic', 'TEXT'],
-];
-for (const [col, def] of wxUserColDefs) {
-  if (!existingWxUserCols.includes(col)) {
-    sqlite.exec(`ALTER TABLE wx_users ADD COLUMN ${col} ${def}`);
-  }
-}
-
 
 const existingProductCols = (sqlite.prepare("PRAGMA table_info(products)").all() as any[]).map(c => c.name);
 if (!existingProductCols.includes('commission_percent')) {
