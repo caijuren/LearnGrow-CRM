@@ -40,6 +40,9 @@ jobs:
       - name: TypeScript type check
         run: npm run check
       
+      - name: Create data directory for test database
+        run: mkdir -p ./data
+      
       - name: Run database migrations for tests
         run: npx drizzle-kit migrate --config=drizzle.config.ts
       
