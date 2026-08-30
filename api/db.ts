@@ -541,7 +541,12 @@ if (!isProduction && wxUserSeedCount === 0) {
     ];
     for (const f of followUps) insertFollowUp.run(...f);
   });
-  seedCustomers();
+  
+  // 只在没有 wx_users 数据时才插入种子数据（避免迁移后重复插入）
+  const wxUserCount = (sqlite.prepare('SELECT COUNT(*) as count FROM wx_users').get() as any).count;
+  if (wxUserCount === 0) {
+    seedCustomers();
+  }
 }
 
 const childCount = (sqlite.prepare('SELECT COUNT(*) as count FROM children').get() as any).count;
