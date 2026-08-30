@@ -6,11 +6,6 @@
 
 import { FastifyInstance } from 'fastify';
 import { registerAuthRoutes } from './auth.routes.js';
-import { registerWxUserRoutes } from './wxUser.routes.js';
-import { registerCheckinRoutes } from './checkin.routes.js';
-import { registerOrderRoutes } from './order.routes.js';
-import { registerDashboardRoutes } from './dashboard.routes.js';
-import { registerUserDeleteRoutes } from './user-delete.routes.js';
 
 export async function registerAllRoutes(app: FastifyInstance) {
   // 系统接口
@@ -20,26 +15,9 @@ export async function registerAllRoutes(app: FastifyInstance) {
   // 认证相关
   await registerAuthRoutes(app);
 
-  // 微信用户管理
-  await registerWxUserRoutes(app);
-
-  // 打卡管理
-  await registerCheckinRoutes(app);
-
-  // 订单管理
-  await registerOrderRoutes(app);
-
-  // 驾驶舱
-  await registerDashboardRoutes(app);
-
-  // 用户删除（v2.7.0已实现）
-  await registerUserDeleteRoutes(app);
-
-  // TODO: 继续添加其他路由模块
-  // - registerProductRoutes(app);
-  // - registerChildRoutes(app);
-  // - registerGroupRoutes(app);
-  // - registerMaterialRoutes(app);
-  // - registerSettingsRoutes(app);
-  // - registerBackupRoutes(app);
+  // TODO: 继续添加其他路由模块（后续重构阶段完成）
+  // - await registerWxUserRoutes(app);
+  // - await registerCheckinRoutes(app);
+  // - await registerOrderRoutes(app);
+  // - await registerDashboardRoutes(app);
 }
