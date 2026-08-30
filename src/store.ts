@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, WechatGroup, WechatGroupMember, Child, ChildWithProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinEventDetail, Material, WxUserWithPoints, PointsLedgerItem, PointsConfig } from '../shared/types';
+import type { WxUser, WxUserFacets, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, WxUser360, WechatGroup, WechatGroupMember, Child, ChildPatch, ChildWithProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinEventDetail, Material, PointsLedgerItem, PointsConfig } from '../shared/types';
 import * as api from './lib/api';
+
+export const WX_USERS_PAGE_SIZE = 50;
 
 interface AppState {
   token: string | null;
@@ -8,11 +10,12 @@ interface AppState {
   isAuthenticated: boolean;
 
   dashboard: DashboardData | null;
-  customers: Customer[];
-  totalCustomers: number;
-  customerPage: number;
-  selectedCustomer: Customer360 | null;
-  customerFilters: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string };
+  wxUsers: WxUser[];
+  totalWxUsers: number;
+  wxUserPage: number;
+  selectedWxUser: WxUser360 | null;
+  wxUserFilters: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; sort?: string; dir?: string };
+  wxUserFacets: WxUserFacets | null;
   allTags: string[];
 
   products: Product[];
@@ -20,7 +23,7 @@ interface AppState {
   productTier: string | null;
   allProducts: Product[];
 
-  orders: (Order & { customer_name: string; product_name: string; product_tier: string; child_name?: string | null })[];
+  orders: (Order & { wx_user_name: string; product_name: string; product_tier: string; child_name?: string | null })[];
   totalOrders: number;
 
   selectedChild: ChildWithProgress | null;
@@ -34,8 +37,6 @@ interface AppState {
 
   users: { id: number; username: string; role: 'admin' | 'assistant'; display_name?: string; created_at: string }[];
 
-  wxUsers: WxUserWithPoints[];
-  wxUsersTotal: number;
   wxUserPoints: PointsLedgerItem[];
   wxUserPointsTotal: number;
   pointsConfig: PointsConfig | null;
@@ -64,24 +65,24 @@ interface AppState {
   loadDashboard: () => Promise<void>;
   loadTodos: () => Promise<void>;
 
-  loadCustomers: (params?: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; page?: number; limit?: number }) => Promise<void>;
-  loadCustomer: (id: number) => Promise<void>;
-  addCustomer: (data: Partial<Customer>) => Promise<void>;
-  editCustomer: (id: number, data: Partial<Customer>) => Promise<void>;
-  removeCustomer: (id: number) => Promise<void>;
-  editCustomerTags: (id: number, tags: string[]) => Promise<void>;
-  editCustomerImportance: (id: number, importance: string) => Promise<void>;
-  setCustomerFilters: (filters: Partial<AppState['customerFilters']>) => void;
-  clearSelectedCustomer: () => void;
+  loadWxUsers: (params?: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; sort?: string; dir?: string; page?: number; limit?: number }) => Promise<void>;
+  loadWxUser: (id: number) => Promise<void>;
+  addWxUser: (data: Partial<WxUser>) => Promise<void>;
+  editWxUser: (id: number, data: Partial<WxUser>) => Promise<void>;
+  removeWxUser: (id: number) => Promise<void>;
+  editWxUserTags: (id: number, tags: string[]) => Promise<void>;
+  editWxUserImportance: (id: number, importance: string) => Promise<void>;
+  setWxUserFilters: (filters: Partial<AppState['wxUserFilters']>) => void;
+  clearSelectedWxUser: () => void;
 
-  addFollowUp: (customerId: number, data: Partial<FollowUp>) => Promise<void>;
-  removeFollowUp: (id: number, customerId: number) => Promise<void>;
-  addOrder: (customerId: number, data: Partial<Order>) => Promise<void>;
+  addFollowUp: (wxUserId: number, data: Partial<FollowUp>) => Promise<void>;
+  removeFollowUp: (id: number, wxUserId: number) => Promise<void>;
+  addOrder: (wxUserId: number, data: Partial<Order>) => Promise<void>;
 
   loadChild: (id: number) => Promise<void>;
-  addChild: (data: Partial<Child> & { customer_id: number }) => Promise<void>;
-  editChild: (id: number, data: Partial<Child>) => Promise<void>;
-  removeChild: (id: number, customerId: number) => Promise<void>;
+  addChild: (data: Partial<Child> & { wx_user_id: number }) => Promise<void>;
+  editChild: (id: number, data: ChildPatch) => Promise<void>;
+  removeChild: (id: number, wxUserId: number) => Promise<void>;
   addChildProgress: (childId: number, pathId: number) => Promise<void>;
   advanceProgress: (childId: number, progressId: number, data: { completed_date?: string; notes?: string; next_stage_id?: number | null }) => Promise<void>;
   clearSelectedChild: () => void;
@@ -100,19 +101,17 @@ interface AppState {
   deleteProduct: (id: number) => Promise<void>;
   setProductTier: (tier: string | null) => void;
 
-  loadOrders: (params?: { customer_id?: number; page?: number; limit?: number }) => Promise<void>;
+  loadOrders: (params?: { wx_user_id?: number; page?: number; limit?: number }) => Promise<void>;
   removeOrder: (id: number) => Promise<void>;
 
   liveSearch: (q: string) => Promise<void>;
-  liveQuickNote: (customer_id: number, content: string, child_id?: number | null) => Promise<void>;
+  liveQuickNote: (wx_user_id: number, content: string, child_id?: number | null) => Promise<void>;
 
   loadUsers: () => Promise<void>;
   addUser: (data: { username: string; password: string; role: string; display_name?: string }) => Promise<void>;
   editUser: (id: number, data: { password?: string; role?: string; display_name?: string }) => Promise<void>;
   removeUser: (id: number) => Promise<void>;
 
-  loadWxUsers: (params?: { search?: string; unlinked?: boolean }) => Promise<void>;
-  linkWxUser: (id: number, customer_id: number | null) => Promise<void>;
   adjustWxUserPoints: (id: number, amount: number, note?: string) => Promise<void>;
   loadWxUserPoints: (id: number, params?: { page?: number; limit?: number }) => Promise<void>;
   loadPointsConfig: () => Promise<void>;
@@ -142,7 +141,7 @@ interface AppState {
   setCheckinFilter: (filter: Partial<AppState['checkinFilter']>) => void;
   clearSelectedCheckinEvent: () => void;
 
-  addCheckinParticipant: (eventId: number, data: { nickname: string; child_name?: string; member_id?: number; customer_id?: number }) => Promise<void>;
+  addCheckinParticipant: (eventId: number, data: { nickname: string; child_name?: string; member_id?: number; wx_user_id?: number }) => Promise<void>;
   removeCheckinParticipant: (eventId: number, participantId: number) => Promise<void>;
   doCheckin: (eventId: number, participantId: number, date: string, note?: string) => Promise<void>;
   doUncheckin: (eventId: number, recordId: number) => Promise<void>;
@@ -164,11 +163,12 @@ export const useStore = create<AppState>((set, get) => ({
   currentUser: null,
   isAuthenticated: !!localStorage.getItem('token'),
   dashboard: null,
-  customers: [],
-  totalCustomers: 0,
-  customerPage: 1,
-  selectedCustomer: null,
-  customerFilters: {},
+  wxUsers: [],
+  totalWxUsers: 0,
+  wxUserPage: 1,
+  selectedWxUser: null,
+  wxUserFilters: {},
+  wxUserFacets: null,
   allTags: [],
   products: [],
   totalProducts: 0,
@@ -183,8 +183,6 @@ export const useStore = create<AppState>((set, get) => ({
   todos: [],
   liveSearchResults: [],
   users: [],
-  wxUsers: [],
-  wxUsersTotal: 0,
   wxUserPoints: [],
   wxUserPointsTotal: 0,
   pointsConfig: null,
@@ -237,7 +235,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.fetchDashboard();
-      set({ dashboard: data, todos: data.todos, loading: false });
+      set({ dashboard: data, loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
   loadTodos: async () => {
@@ -247,89 +245,89 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (e) { set({ error: (e as Error).message }); }
   },
 
-  loadCustomers: async (params) => {
+  loadWxUsers: async (params) => {
     set({ loading: true, error: null });
     try {
-      const filters = { ...get().customerFilters, ...params };
-      const data = await api.fetchCustomers({ ...filters, limit: 50 });
-      set({ customers: data.customers, totalCustomers: data.total, customerPage: params?.page || 1, loading: false });
+      const filters = { ...get().wxUserFilters, ...params };
+      const data = await api.fetchWxUsers({ ...filters, limit: WX_USERS_PAGE_SIZE });
+      set({ wxUsers: data.users, totalWxUsers: data.total, wxUserFacets: data.facets ?? null, wxUserPage: params?.page || 1, loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
-  loadCustomer: async (id) => {
+  loadWxUser: async (id) => {
     set({ loading: true, error: null });
     try {
-      const data = await api.fetchCustomer(id);
-      set({ selectedCustomer: data, loading: false });
+      const data = await api.fetchWxUser(id);
+      set({ selectedWxUser: data, loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
-  addCustomer: async (data) => {
+  addWxUser: async (data) => {
     set({ loading: true, error: null });
     try {
-      await api.createCustomer(data);
-      await get().loadCustomers({ page: 1 });
+      await api.createWxUser(data);
+      await get().loadWxUsers({ page: 1 });
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
-  editCustomer: async (id, data) => {
+  editWxUser: async (id, data) => {
     set({ loading: true, error: null });
     try {
-      await api.updateCustomer(id, data);
-      await get().loadCustomer(id);
-      await get().loadCustomers({ page: get().customerPage });
+      await api.updateWxUser(id, data);
+      await get().loadWxUser(id);
+      await get().loadWxUsers({ page: get().wxUserPage });
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
-  removeCustomer: async (id) => {
+  removeWxUser: async (id) => {
     set({ loading: true, error: null });
     try {
-      await api.deleteCustomer(id);
-      await get().loadCustomers({ page: 1 });
+      await api.deleteWxUser(id);
+      await get().loadWxUsers({ page: 1 });
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
-  editCustomerTags: async (id, tags) => {
+  editWxUserTags: async (id, tags) => {
     try {
-      await api.updateCustomerTags(id, tags);
-      await get().loadCustomer(id);
-      await get().loadCustomers({ page: get().customerPage });
+      await api.updateWxUserTags(id, tags);
+      await get().loadWxUser(id);
+      await get().loadWxUsers({ page: get().wxUserPage });
     } catch (e) { set({ error: (e as Error).message }); }
   },
-  editCustomerImportance: async (id, importance) => {
+  editWxUserImportance: async (id, importance) => {
     try {
-      await api.updateCustomerImportance(id, importance);
-      await get().loadCustomer(id);
-      await get().loadCustomers({ page: get().customerPage });
+      await api.updateWxUserImportance(id, importance);
+      await get().loadWxUser(id);
+      await get().loadWxUsers({ page: get().wxUserPage });
     } catch (e) { set({ error: (e as Error).message }); }
   },
-  setCustomerFilters: (filters) => {
-    set({ customerFilters: { ...get().customerFilters, ...filters } });
-    get().loadCustomers({ page: 1 });
+  setWxUserFilters: (filters) => {
+    set({ wxUserFilters: { ...get().wxUserFilters, ...filters } });
+    get().loadWxUsers({ page: 1 });
   },
-  clearSelectedCustomer: () => set({ selectedCustomer: null }),
+  clearSelectedWxUser: () => set({ selectedWxUser: null }),
 
-  addFollowUp: async (customerId, data) => {
+  addFollowUp: async (wxUserId, data) => {
     set({ loading: true, error: null });
     try {
-      await api.createFollowUp(customerId, data);
-      await get().loadCustomer(customerId);
+      await api.createFollowUp(wxUserId, data);
+      await get().loadWxUser(wxUserId);
       await get().loadTodos();
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
-  removeFollowUp: async (id, customerId) => {
+  removeFollowUp: async (id, wxUserId) => {
     set({ loading: true, error: null });
     try {
       await api.deleteFollowUp(id);
-      await get().loadCustomer(customerId);
+      await get().loadWxUser(wxUserId);
       await get().loadTodos();
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
-  addOrder: async (customerId, data) => {
+  addOrder: async (wxUserId, data) => {
     set({ loading: true, error: null });
     try {
-      await api.createOrder(customerId, data);
-      await get().loadCustomer(customerId);
+      await api.createOrder(wxUserId, data);
+      await get().loadWxUser(wxUserId);
       await get().loadDashboard();
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
@@ -395,9 +393,9 @@ export const useStore = create<AppState>((set, get) => ({
       set({ liveSearchResults: results });
     } catch (e) { set({ error: (e as Error).message }); }
   },
-  liveQuickNote: async (customer_id, content, child_id) => {
+  liveQuickNote: async (wx_user_id, content, child_id) => {
     try {
-      await api.liveQuickNote(customer_id, content, child_id);
+      await api.liveQuickNote(wx_user_id, content, child_id);
       await get().liveSearch('');
     } catch (e) { set({ error: (e as Error).message }); throw e; }
   },
@@ -434,21 +432,6 @@ export const useStore = create<AppState>((set, get) => ({
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },
 
-  loadWxUsers: async (params) => {
-    set({ loading: true, error: null });
-    try {
-      const data = await api.fetchWxUsers(params);
-      set({ wxUsers: data.users, wxUsersTotal: data.total, loading: false });
-    } catch (e) { set({ error: (e as Error).message, loading: false }); }
-  },
-  linkWxUser: async (id, customer_id) => {
-    set({ loading: true, error: null });
-    try {
-      await api.linkWxUser(id, customer_id);
-      await get().loadWxUsers();
-      set({ loading: false });
-    } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
-  },
   adjustWxUserPoints: async (id, amount, note) => {
     set({ loading: true, error: null });
     try {
@@ -572,7 +555,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await api.createChild(data);
-      await get().loadCustomer(data.customer_id);
+      await get().loadWxUser(data.wx_user_id);
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
@@ -582,15 +565,15 @@ export const useStore = create<AppState>((set, get) => ({
       await api.updateChild(id, data);
       const child = get().selectedChild;
       if (child) await get().loadChild(id);
-      if (child) await get().loadCustomer(child.customer_id);
+      if (child) await get().loadWxUser(child.wx_user_id);
       set({ loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); throw e; }
   },
-  removeChild: async (id, customerId) => {
+  removeChild: async (id, wxUserId) => {
     set({ loading: true, error: null });
     try {
       await api.deleteChild(id);
-      await get().loadCustomer(customerId);
+      await get().loadWxUser(wxUserId);
       set({ selectedChild: null, loading: false });
     } catch (e) { set({ error: (e as Error).message, loading: false }); }
   },

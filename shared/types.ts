@@ -12,11 +12,13 @@ export type ProgressStatus = 'not_started' | 'in_progress' | 'completed' | 'paus
 
 export interface Child {
   id: number;
-  customer_id: number;
+  wx_user_id: number;
   nickname: string;
   gender: 'boy' | 'girl' | null;
   birth_date: string | null;
   grade: string;
+  /** 这个年级是在哪天确认的（YYYY-MM-DD）；落在旧学年即视为待确认 */
+  grade_as_of: string | null;
   region: string | null;
   textbook_version: string | null;
   weak_subjects: string[];
@@ -24,6 +26,9 @@ export interface Child {
   created_at: string;
   updated_at: string;
 }
+
+/** 更新孩子档案的请求体。confirm_grade = 年级没变，只是重新确认过一次 */
+export type ChildPatch = Partial<Child> & { confirm_grade?: boolean };
 
 export interface Textbook {
   id: number;
@@ -83,17 +88,22 @@ export interface ChildWithProgress extends Child {
   follow_ups: FollowUp[];
 }
 
-export interface Customer {
+export interface WxUser {
   id: number;
-  name: string;
+  openid: string;
   nickname: string | null;
+  avatar_url: string | null;
+  child_name: string | null;
+  points: number;
+  last_login_at: string | null;
+  name: string;
+  display_name?: string;
   phone: string | null;
   wechat_id: string | null;
   wechat_remark: string | null;
   wechat_add_date: string | null;
   wechat_account: WechatAccount;
   douyin_nickname: string | null;
-  avatar: string | null;
   source: CustomerSource | null;
   stage: CustomerStage;
   importance: Importance;
@@ -106,6 +116,23 @@ export interface Customer {
   last_follow_date: string | null;
   created_at: string;
   updated_at: string;
+  /** 以下三项由列表接口 join 打卡数据得出，其他场景可能缺失 */
+  signup_count?: number;
+  checkin_count?: number;
+  last_checkin_date?: string | null;
+}
+
+/** 微信用户列表可点击排序的列 */
+export type WxUserSortKey = 'activity' | 'joined' | 'points';
+
+/** @deprecated Use WxUser instead */
+export type Customer = WxUser;
+
+/** 各筛选项在当前其他筛选条件下的命中人数（key 缺失按 0 处理） */
+export interface WxUserFacets {
+  importance: Partial<Record<Importance, number>>;
+  stage: Partial<Record<CustomerStage, number>>;
+  need_follow: number;
 }
 
 export interface Product {
@@ -127,7 +154,7 @@ export interface Product {
 export interface Order {
   id: number;
   order_no: string;
-  customer_id: number;
+  wx_user_id: number;
   child_id: number | null;
   product_id: number;
   amount: number;
@@ -140,7 +167,7 @@ export interface Order {
 
 export interface FollowUp {
   id: number;
-  customer_id: number;
+  wx_user_id: number;
   child_id: number | null;
   child_name?: string | null;
   date: string;
@@ -156,8 +183,8 @@ export interface TodoItem {
   id: string;
   type: TodoType;
   priority: TodoPriority;
-  customer_id: number;
-  customer_name: string;
+  wx_user_id: number;
+  wx_user_name: string;
   child_id?: number;
   child_name?: string;
   title: string;
@@ -181,9 +208,11 @@ export interface CustomerSuggestion {
   script: string;
 }
 
-export interface Customer360 {
+export interface WxUser360 {
   id: number;
+  openid: string;
   name: string;
+  display_name?: string;
   nickname: string | null;
   phone: string | null;
   wechat_id: string | null;
@@ -191,7 +220,7 @@ export interface Customer360 {
   wechat_add_date: string | null;
   wechat_account: WechatAccount;
   douyin_nickname: string | null;
-  avatar: string | null;
+  avatar_url: string | null;
   source: CustomerSource | null;
   stage: CustomerStage;
   importance: Importance;
@@ -202,12 +231,18 @@ export interface Customer360 {
   order_count: number;
   last_order_date: string | null;
   last_follow_date: string | null;
+  points: number;
+  last_login_at: string | null;
+  child_name: string | null;
   created_at: string;
   children: Child[];
   orders: OrderWithProduct[];
   follow_ups: FollowUp[];
   suggestions: CustomerSuggestion[];
 }
+
+/** @deprecated Use WxUser360 instead */
+export type Customer360 = WxUser360;
 
 export interface OrderWithProduct extends Order {
   product_name: string;
@@ -234,26 +269,58 @@ export interface LiveCustomerCard {
 
 export interface DashboardData {
   stats: {
-    today_revenue: number;
-    month_revenue: number;
-    total_customers: number;
-    today_new_customers: number;
-    pending_todos: number;
-    need_follow_count: number;
-    new_friends_count: number;
-    silent_count: number;
+    total_wx_users: number;
+    today_new_wx_users: number;
+    yesterday_new_wx_users: number;
+    total_checkins: number;
+    today_checkins: number;
+    week_checkins: number;
+    active_users_7d: number;
+    checkin_rate: number;
+    total_participants: number;
   };
   stageStats: { stage: CustomerStage; count: number }[];
-  needFollowCustomers: Pick<Customer, 'id' | 'name' | 'stage' | 'wechat_id' | 'wechat_account' | 'last_follow_date' | 'next_talk_topic' | 'importance'>[];
-  revenueTrend: { date: string; revenue: number }[];
-  todos: TodoItem[];
-  recentOrders: OrderWithCustomer[];
+  needFollowUsers: Pick<WxUser, 'id' | 'name' | 'stage' | 'wechat_id' | 'wechat_account' | 'last_follow_date' | 'next_talk_topic' | 'importance'>[];
+  newUserTrend: { date: string; count: number }[];
+  checkinTrend: { date: string; count: number }[];
+  popularActivities: {
+    name: string;
+    participant_count: number;
+    checkin_count: number;
+    avg_checkins_per_user: number;
+  }[];
+  recentUsers: {
+    display_name: string;
+    created_at: string;
+    source?: string;
+    avatar_url?: string | null;
+  }[];
+  recentCheckins: {
+    user_name: string;
+    activity_name: string;
+    checkin_date: string;
+    status: string;
+  }[];
+  sourceChannels: {
+    channel: string;
+    count: number;
+  }[];
+  topCheckinUsers: {
+    id: number;
+    display_name: string;
+    child_name?: string | null;
+    avatar_url?: string | null;
+    checkin_count: number;
+  }[];
 }
 
-export interface OrderWithCustomer extends Order {
-  customer_name: string;
+export interface OrderWithWxUser extends Order {
+  wx_user_name: string;
   product_name: string;
 }
+
+/** @deprecated Use OrderWithWxUser instead */
+export type OrderWithCustomer = OrderWithWxUser;
 
 export const IMPORTANCE_LABELS: Record<Importance, string> = {
   vip: '⭐重点',
@@ -354,11 +421,52 @@ export const TODO_PRIORITY_COLORS: Record<TodoPriority, string> = {
   low: 'border-l-slate-300 bg-white',
 };
 
+/**
+ * 年级存储值。初中按课标名称（七/八/九年级）存储，界面上用 GRADE_LABELS 补出「初一」别名。
+ * 高中三档不是目标客群，与无法归类的学段一起走「其他（非目标学段）」。
+ */
 export const GRADES = [
+  '未入园', '小班', '中班', '大班', '幼小衔接',
   '一年级', '二年级', '三年级', '四年级', '五年级', '六年级',
-  '初一', '初二', '初三',
-  '高一', '高二', '高三',
+  '七年级', '八年级', '九年级',
+  '其他（非目标学段）',
 ];
+
+export const GRADE_LABELS: Record<string, string> = {
+  七年级: '七年级（初一）',
+  八年级: '八年级（初二）',
+  九年级: '九年级（初三）',
+};
+
+/** 存量数据可能带着已下线或手打的年级文本，原样显示而不是显示空白 */
+export function gradeLabel(grade: string | null | undefined): string {
+  if (!grade) return '—';
+  return GRADE_LABELS[grade] || grade;
+}
+
+/** 学年按 9/1 开学：2025-09-01 到 2026-08-31 属 2025 学年 */
+export function schoolYearStart(dateText: string): number {
+  const year = Number(dateText.slice(0, 4));
+  const month = Number(dateText.slice(5, 7));
+  return month >= 9 ? year : year - 1;
+}
+
+export function currentSchoolYearStart(now: Date = new Date()): number {
+  return now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+}
+
+export function schoolYearLabel(startYear: number): string {
+  return `${startYear}/${startYear + 1} 学年`;
+}
+
+/**
+ * 年级是会过期的数据：孩子每年升一级，但没人改档案时库里仍是旧年级。
+ * 确认日期落在更早的学年（或从没记过日期）就需要重新确认——只提示，不自动改库。
+ */
+export function isGradeStale(gradeAsOf: string | null | undefined, now: Date = new Date()): boolean {
+  if (!gradeAsOf) return true;
+  return schoolYearStart(gradeAsOf) < currentSchoolYearStart(now);
+}
 
 export const GENDERS: Record<'boy' | 'girl', string> = {
   boy: '男孩',
@@ -397,7 +505,7 @@ export interface WechatGroupMember {
   nickname: string | null;
   role: GroupMemberRole;
   tags: string[];
-  customer_id: number | null;
+  wx_user_id: number | null;
   activity_score: number;
   remark: string | null;
   created_at: string;
@@ -465,7 +573,6 @@ export interface CheckinParticipant {
   id: number;
   event_id: number;
   member_id: number | null;
-  customer_id: number | null;
   wx_user_id: number | null;
   nickname: string;
   child_name: string | null;
@@ -555,23 +662,6 @@ export const MATERIAL_CATEGORY_COLORS: Record<MaterialCategory, string> = {
 };
 
 export const MATERIAL_COMMON_TAGS = ['PDF', '话术', '家长沟通', '试卷', '讲义', '视频', '图片', '规划表', 'SOP', '培训'];
-
-export interface WxUser {
-  id: number;
-  openid: string;
-  nickname: string | null;
-  avatar_url: string | null;
-  child_name: string | null;
-  customer_id: number | null;
-  points: number;
-  last_login_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface WxUserWithPoints extends WxUser {
-  customer_name?: string | null;
-}
 
 export type PointsType = 'checkin' | 'order' | 'adjust';
 

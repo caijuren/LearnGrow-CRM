@@ -4,15 +4,17 @@ import {
   ArrowLeft, Edit2, Trash2, X, Phone, MessageCircle,
   FileText, ShoppingBag, Lightbulb, Copy, Check, Clock,
   Tag, Radio, Users, Calendar, Loader2, ChevronRight,
-  ShoppingCart, User, Plus, Baby, AlertTriangle,
+  ShoppingCart, User, Plus, Baby, AlertTriangle, Coins, Smartphone,
 } from 'lucide-react';
 import { useStore } from '@/store';
+import { wxDisplayName as displayName } from '@/lib/utils';
 import Loading from '@/components/ui/Loading';
 import {
   SOURCE_LABELS, IMPORTANCE_LABELS, COMMON_TAGS,
   ORDER_TYPE_LABELS, FOLLOW_UP_METHOD_LABELS, FOLLOW_UP_RESULT_LABELS,
   STAGE_LABELS, WECHAT_ACCOUNT_LABELS,
   GRADES, GENDERS, SUBJECTS,
+  gradeLabel, isGradeStale, schoolYearStart, currentSchoolYearStart, schoolYearLabel,
   type Importance, type CustomerSource, type FollowUpMethod, type FollowUpResult,
   type OrderType, type Child, type CustomerStage, type WechatAccount,
 } from '../../shared/types';
@@ -102,29 +104,29 @@ const emptyChildForm: ChildForm = {
   custom_subject: '',
 };
 
-export default function CustomerDetail() {
+export default function WxUserDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
-    selectedCustomer: customer,
+    selectedWxUser: user,
     loading,
     allProducts,
     textbooks,
     textbookRegions,
-    loadCustomer,
+    loadWxUser,
     loadProducts,
     loadTextbooks,
     loadTextbookRegions,
-    editCustomer,
-    removeCustomer,
+    editWxUser,
+    removeWxUser,
     addFollowUp,
     removeFollowUp,
     addOrder,
     removeOrder,
     addChild,
     editChild,
-    clearSelectedCustomer,
+    clearSelectedWxUser,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'followups'>(
@@ -146,52 +148,53 @@ export default function CustomerDetail() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showAddChild, setShowAddChild] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [childForm, setChildForm] = useState<ChildForm>(emptyChildForm);
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'order' | 'followup'; id: number } | null>(null);
 
   useEffect(() => {
     if (id) {
-      loadCustomer(Number(id));
+      loadWxUser(Number(id));
       loadProducts({ limit: 100 });
     }
-    return () => clearSelectedCustomer();
-  }, [id, loadCustomer, loadProducts, clearSelectedCustomer]);
+    return () => clearSelectedWxUser();
+  }, [id, loadWxUser, loadProducts, clearSelectedWxUser]);
 
   useEffect(() => {
-    if (customer) {
+    if (user) {
       setEditForm({
-        name: customer.name,
-        nickname: customer.nickname || '',
-        phone: customer.phone || '',
-        wechat_id: customer.wechat_id || '',
-        wechat_remark: customer.wechat_remark || '',
-        wechat_add_date: customer.wechat_add_date || '',
-        wechat_account: customer.wechat_account || 'main',
-        douyin_nickname: customer.douyin_nickname || '',
-        source: customer.source || '',
-        importance: customer.importance,
-        stage: customer.stage || 'new_friend',
-        tags: customer.tags || [],
-        remark: customer.remark || '',
-        next_talk_topic: customer.next_talk_topic || '',
+        name: user.name || '',
+        nickname: user.nickname || '',
+        phone: user.phone || '',
+        wechat_id: user.wechat_id || '',
+        wechat_remark: user.wechat_remark || '',
+        wechat_add_date: user.wechat_add_date || '',
+        wechat_account: user.wechat_account || 'main',
+        douyin_nickname: user.douyin_nickname || '',
+        source: user.source || '',
+        importance: user.importance,
+        stage: user.stage || 'new_friend',
+        tags: user.tags || [],
+        remark: user.remark || '',
+        next_talk_topic: user.next_talk_topic || '',
       });
     }
-  }, [customer]);
+  }, [user]);
 
-  const customerOrderCount = customer?.order_count ?? 0;
+  const userOrderCount = user?.order_count ?? 0;
   useEffect(() => {
     if (orderForm.product_id && allProducts.length > 0) {
       const product = allProducts.find(p => p.id === Number(orderForm.product_id));
       if (product) {
         setOrderForm(f => ({ ...f, amount: String(product.price) }));
         if (!orderForm.order_type) {
-          const orderType: OrderType = customerOrderCount === 0 ? 'first' : 'repurchase';
+          const orderType: OrderType = userOrderCount === 0 ? 'first' : 'repurchase';
           setOrderForm(f => ({ ...f, order_type: orderType }));
         }
       }
     }
-  }, [orderForm.product_id, allProducts, customerOrderCount, orderForm.order_type]);
+  }, [orderForm.product_id, allProducts, userOrderCount, orderForm.order_type]);
 
   useEffect(() => {
     loadTextbookRegions();
@@ -259,7 +262,7 @@ export default function CustomerDetail() {
       await addOrder(Number(id), {
         product_id: Number(orderForm.product_id),
         amount: Number(orderForm.amount),
-        order_type: orderForm.order_type || (customer?.order_count === 0 ? 'first' : 'repurchase'),
+        order_type: orderForm.order_type || (user?.order_count === 0 ? 'first' : 'repurchase'),
         remark: orderForm.remark || null,
         child_id: orderForm.child_id ? Number(orderForm.child_id) : null,
       });
@@ -276,7 +279,7 @@ export default function CustomerDetail() {
     if (!editForm.name.trim() || !id) return;
     setSubmitting(true);
     try {
-      await editCustomer(Number(id), {
+      await editWxUser(Number(id), {
         name: editForm.name,
         nickname: editForm.nickname || null,
         phone: editForm.phone || null,
@@ -304,8 +307,8 @@ export default function CustomerDetail() {
     if (!id) return;
     setSubmitting(true);
     try {
-      await removeCustomer(Number(id));
-      navigate('/customers');
+      await removeWxUser(Number(id));
+      navigate('/wx-users');
     } catch (e) {
       console.error('删除客户失败:', e);
     } finally {
@@ -371,7 +374,7 @@ export default function CustomerDetail() {
       if (editingChild) {
         await editChild(editingChild.id, data);
       } else {
-        await addChild({ ...data, customer_id: Number(id) });
+        await addChild({ ...data, wx_user_id: Number(id) });
       }
       setShowAddChild(false);
       setChildForm(emptyChildForm);
@@ -388,7 +391,7 @@ export default function CustomerDetail() {
     return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  if (loading && !customer) {
+  if (loading && !user) {
     return (
       <div className="min-h-screen bg-bg-page flex items-center justify-center">
         <Loading />
@@ -396,26 +399,26 @@ export default function CustomerDetail() {
     );
   }
 
-  if (!customer) {
+  if (!user) {
     return (
       <div className="page-shell page-enter">
         <div className="max-w-4xl mx-auto">
           <button
-            onClick={() => navigate('/customers')}
+            onClick={() => navigate('/wx-users')}
             className="w-10 h-10 rounded-xl bg-bg-surface shadow-sm hover:shadow-md flex items-center justify-center mb-6 transition-all"
           >
             <ArrowLeft className="w-5 h-5 text-text-secondary" />
           </button>
           <Empty
             icon={<User className="w-10 h-10 text-primary/30" />}
-            title="客户不存在"
-            description="该客户可能已被删除"
+            title="用户不存在"
+            description="该用户可能已被删除"
             action={
               <button
-                onClick={() => navigate('/customers')}
+                onClick={() => navigate('/wx-users')}
                 className="btn btn-primary"
               >
-                返回客户列表
+                返回用户列表
               </button>
             }
           />
@@ -424,10 +427,10 @@ export default function CustomerDetail() {
     );
   }
 
-  const sortedFollowUps = [...(customer.follow_ups || [])].sort(
+  const sortedFollowUps = [...(user.follow_ups || [])].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
-  const sortedOrders = [...(customer.orders || [])].sort(
+  const sortedOrders = [...(user.orders || [])].sort(
     (a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime()
   );
 
@@ -436,108 +439,143 @@ export default function CustomerDetail() {
       <div className="max-w-5xl mx-auto">
         {/* 面包屑导航 */}
         <div className="flex items-center gap-1.5 mb-4 t-caption">
-          <button onClick={() => navigate('/customers')} className="hover:text-primary transition-colors">
-            客户管理
+          <button onClick={() => navigate('/wx-users')} className="hover:text-primary transition-colors">
+            微信用户
           </button>
           <ChevronRight size={13} strokeWidth={1.8} className="text-text-tertiary" />
-          <span className="t-body-strong text-text-primary">客户详情</span>
+          <span className="t-body-strong text-text-primary">用户详情</span>
         </div>
 
         {/* 客户信息卡 */}
         <div className="panel mb-4">
           <div className="px-5 py-4">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary-soft text-primary">
-                <span className="text-lg font-semibold">{customer.name[0]}</span>
-              </div>
+              {user.avatar_url && !avatarFailed ? (
+                <img
+                  src={user.avatar_url}
+                  alt={displayName(user)}
+                  onError={() => setAvatarFailed(true)}
+                  className="w-12 h-12 rounded-xl object-cover shrink-0 ring-1 ring-border-default"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary-soft text-primary">
+                  <span className="text-lg font-semibold">{displayName(user).charAt(0)}</span>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h2 className="t-title">{customer.name}</h2>
+                  <h2 className="t-title">{displayName(user)}</h2>
                   <span className={`badge ${
-                    customer.stage === 'purchased' || customer.stage === 'repurchased' ? 'badge-success' :
-                    customer.stage === 'interested' ? 'badge-warning' :
-                    customer.stage === 'in_group' ? 'badge-primary' : 'badge-neutral'
+                    user.stage === 'purchased' || user.stage === 'repurchased' ? 'badge-success' :
+                    user.stage === 'interested' ? 'badge-warning' :
+                    user.stage === 'in_group' ? 'badge-primary' : 'badge-neutral'
                   }`}>
-                    {STAGE_LABELS[customer.stage]}
+                    {STAGE_LABELS[user.stage]}
                   </span>
                   <span className={`badge ${
-                    customer.importance === 'vip' ? 'badge-warning' :
-                    customer.importance === 'watch' ? 'badge-neutral' : 'badge-success'
+                    user.importance === 'vip' ? 'badge-warning' :
+                    user.importance === 'watch' ? 'badge-neutral' : 'badge-success'
                   }`}>
-                    {IMPORTANCE_LABELS[customer.importance]}
+                    {IMPORTANCE_LABELS[user.importance]}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 flex-wrap t-small text-text-secondary">
-                  {customer.wechat_id && (
+                  {user.wechat_id && (
                     <span className="flex items-center gap-1.5">
                       <MessageCircle size={13} strokeWidth={1.8} className="text-text-tertiary" />
-                      <span className="text-text-primary">{customer.wechat_id}</span>
-                      {customer.wechat_remark && <span className="text-text-tertiary">({customer.wechat_remark})</span>}
+                      <span className="text-text-primary">{user.wechat_id}</span>
+                      {user.wechat_remark && <span className="text-text-tertiary">({user.wechat_remark})</span>}
                     </span>
                   )}
-                  {customer.phone && (
+                  {user.phone && (
                     <span className="flex items-center gap-1.5">
                       <Phone size={13} strokeWidth={1.8} className="text-text-tertiary" />
-                      <span className="text-text-primary">{customer.phone}</span>
+                      <span className="text-text-primary">{user.phone}</span>
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">
                     <Users size={13} strokeWidth={1.8} className="text-text-tertiary" />
-                    {WECHAT_ACCOUNT_LABELS[customer.wechat_account]}
+                    {WECHAT_ACCOUNT_LABELS[user.wechat_account]}
                   </span>
-                  {customer.source && (
+                  {user.source && (
                     <span className="flex items-center gap-1.5">
                       <Tag size={13} strokeWidth={1.8} className="text-text-tertiary" />
-                      {SOURCE_LABELS[customer.source]}
+                      {SOURCE_LABELS[user.source]}
                     </span>
                   )}
-                  {customer.wechat_add_date && (
+                  {user.wechat_add_date && (
                     <span className="flex items-center gap-1.5">
                       <Calendar size={13} strokeWidth={1.8} className="text-text-tertiary" />
-                      {customer.wechat_add_date} 添加
+                      {user.wechat_add_date} 添加
                     </span>
                   )}
+                  {user.nickname && (
+                    <span className="flex items-center gap-1.5">
+                      <MessageCircle size={13} strokeWidth={1.8} className="text-text-tertiary" />
+                      微信昵称：<span className="text-text-primary">{user.nickname}</span>
+                    </span>
+                  )}
+                  {user.child_name && (
+                    <span className="flex items-center gap-1.5">
+                      <Baby size={13} strokeWidth={1.8} className="text-text-tertiary" />
+                      孩子：<span className="text-text-primary">{user.child_name}</span>
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <Smartphone size={13} strokeWidth={1.8} className="text-text-tertiary" />
+                    {user.last_login_at ? `小程序登录于 ${user.last_login_at.slice(0, 16).replace('T', ' ')}` : '未登录过小程序'}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-text-tertiary" title={user.openid}>
+                    openid：{user.openid.length > 18 ? `${user.openid.slice(0, 10)}…${user.openid.slice(-6)}` : user.openid}
+                  </span>
                 </div>
               </div>
               {/* 关键指标 */}
               <div className="hidden sm:flex items-center gap-6 shrink-0 pl-5 border-l border-border-subtle">
                 <div className="text-center">
-                  <div className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</div>
+                  <div className="t-kpi">¥{user.total_spent?.toLocaleString() || 0}</div>
                   <div className="t-caption mt-0.5 text-text-tertiary">累计消费</div>
                 </div>
                 <div className="text-center">
-                  <div className="t-kpi">{customer.order_count || 0}</div>
+                  <div className="t-kpi">{user.order_count || 0}</div>
                   <div className="t-caption mt-0.5 text-text-tertiary">订单数</div>
+                </div>
+                <div className="text-center">
+                  <div className="t-kpi flex items-center justify-center gap-1" style={{ color: 'rgb(180 83 9)' }}>
+                    <Coins size={15} strokeWidth={2} />
+                    {user.points || 0}
+                  </div>
+                  <div className="t-caption mt-0.5 text-text-tertiary">积分</div>
                 </div>
               </div>
             </div>
 
             {/* 标签 & 备注 */}
-            {(customer.tags?.length > 0 || customer.remark || customer.next_talk_topic) && (
+            {(user.tags?.length > 0 || user.remark || user.next_talk_topic) && (
               <div className="mt-4 pt-4 space-y-2.5 border-t border-border-subtle">
-                {customer.next_talk_topic && (
+                {user.next_talk_topic && (
                   <div className="flex items-start gap-2">
                     <Lightbulb size={14} strokeWidth={1.8} className="shrink-0 text-warning mt-0.5" />
                     <div className="t-small">
                       <span className="t-body-strong">下次跟进话题：</span>
-                      <span className="text-text-secondary">{customer.next_talk_topic}</span>
+                      <span className="text-text-secondary">{user.next_talk_topic}</span>
                     </div>
                   </div>
                 )}
-                {customer.tags && customer.tags.length > 0 && (
+                {user.tags && user.tags.length > 0 && (
                   <div className="flex items-start gap-2">
                     <Tag size={14} strokeWidth={1.8} className="shrink-0 text-text-tertiary mt-0.5" />
                     <div className="flex flex-wrap gap-1.5">
-                      {customer.tags.map(tag => (
+                      {user.tags.map(tag => (
                         <span key={tag} className="chip chip-neutral">{tag}</span>
                       ))}
                     </div>
                   </div>
                 )}
-                {customer.remark && (
+                {user.remark && (
                   <div className="flex items-start gap-2">
                     <FileText size={14} strokeWidth={1.8} className="shrink-0 text-text-tertiary mt-0.5" />
-                    <p className="t-small flex-1 text-text-secondary">{customer.remark}</p>
+                    <p className="t-small flex-1 text-text-secondary">{user.remark}</p>
                   </div>
                 )}
               </div>
@@ -561,7 +599,7 @@ export default function CustomerDetail() {
               </button>
               <button
                 onClick={() => {
-                  setEditForm(f => ({ ...f, stage: customer.stage }));
+                  setEditForm(f => ({ ...f, stage: user.stage }));
                   setShowEdit(true);
                 }}
                 className="btn btn-tertiary btn-sm"
@@ -584,11 +622,11 @@ export default function CustomerDetail() {
         <div className="sm:hidden grid grid-cols-2 gap-3 mb-4">
           <div className="panel py-3 px-4 text-center">
             <p className="t-caption mb-1 text-text-tertiary">累计消费</p>
-            <p className="t-kpi">¥{customer.total_spent?.toLocaleString() || 0}</p>
+            <p className="t-kpi">¥{user.total_spent?.toLocaleString() || 0}</p>
           </div>
           <div className="panel py-3 px-4 text-center">
             <p className="t-caption mb-1 text-text-tertiary">订单数</p>
-            <p className="t-kpi">{customer.order_count || 0}</p>
+            <p className="t-kpi">{user.order_count || 0}</p>
           </div>
         </div>
 
@@ -607,15 +645,15 @@ export default function CustomerDetail() {
             </button>
           </div>
           <div className="px-5 py-4">
-          {customer.children && customer.children.length > 0 ? (
+          {user.children && user.children.length > 0 ? (
             <div className="space-y-3">
-              {customer.children.map(child => {
+              {user.children.map(child => {
                 const childEmoji = child.gender === 'boy' ? '👦' : child.gender === 'girl' ? '👧' : '🧒';
                 return (
                   <div
                     key={child.id}
                     className="clean-card-mini flex items-center gap-3 p-3 cursor-pointer group"
-                    onClick={() => navigate(`/customers/${customer.id}/children/${child.id}`)}
+                    onClick={() => navigate(`/wx-users/${user.id}/children/${child.id}`)}
                   >
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 relative bg-primary-soft">
                       <span className="text-xl">{childEmoji}</span>
@@ -626,9 +664,12 @@ export default function CustomerDetail() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="t-body-strong">{child.nickname}</span>
-                        <span className="badge badge-success">
-                          {child.grade}
+                        <span className="badge badge-success" title={child.grade_as_of ? `${schoolYearLabel(schoolYearStart(child.grade_as_of))}确认` : undefined}>
+                          {gradeLabel(child.grade)}
                         </span>
+                        {isGradeStale(child.grade_as_of) && (
+                          <span className="badge badge-warning">年级待确认</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap t-caption text-text-tertiary">
                         {child.region && <span>{child.region}</span>}
@@ -663,14 +704,14 @@ export default function CustomerDetail() {
           </div>
         </div>
 
-        {customer.suggestions && customer.suggestions.length > 0 && (
+        {user.suggestions && user.suggestions.length > 0 && (
           <div className="mb-4">
             <h3 className="panel-title mb-3 flex items-center gap-2">
               <Lightbulb size={15} strokeWidth={1.8} className="text-warning" />
               可以推什么
             </h3>
             <div className="space-y-3">
-              {customer.suggestions.map((suggestion, index) => {
+              {user.suggestions.map((suggestion, index) => {
                 const accents = [
                   { gradient: 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)', iconBg: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
                   { gradient: 'linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%)', iconBg: 'var(--color-warning-soft)', iconColor: 'var(--color-warning)' },
@@ -939,7 +980,7 @@ export default function CustomerDetail() {
                 />
               </div>
             </div>
-            {customer.children && customer.children.length > 0 && (
+            {user.children && user.children.length > 0 && (
               <div>
                 <label className="form-label">关联孩子</label>
                 <select
@@ -948,7 +989,7 @@ export default function CustomerDetail() {
                   onChange={e => setFollowUpForm(f => ({ ...f, child_id: e.target.value }))}
                 >
                   <option value="">不关联</option>
-                  {customer.children.map(child => (
+                  {user.children.map(child => (
                     <option key={child.id} value={child.id}>{child.nickname}（{child.grade}）</option>
                   ))}
                 </select>
@@ -1024,7 +1065,7 @@ export default function CustomerDetail() {
                 onChange={e => setOrderForm(f => ({ ...f, remark: e.target.value }))}
               />
             </div>
-            {customer.children && customer.children.length > 0 && (
+            {user.children && user.children.length > 0 && (
               <div>
                 <label className="form-label">为哪个孩子购买</label>
                 <select
@@ -1033,7 +1074,7 @@ export default function CustomerDetail() {
                   onChange={e => setOrderForm(f => ({ ...f, child_id: e.target.value }))}
                 >
                   <option value="">不指定</option>
-                  {customer.children.map(child => (
+                  {user.children.map(child => (
                     <option key={child.id} value={child.id}>{child.nickname}（{child.grade}）</option>
                   ))}
                 </select>
@@ -1045,7 +1086,7 @@ export default function CustomerDetail() {
 
       {showEdit && (
         <Modal
-          title="编辑客户信息"
+          title="编辑用户信息"
           onClose={() => setShowEdit(false)}
           footer={
             <>
@@ -1075,7 +1116,7 @@ export default function CustomerDetail() {
                     className="input"
                     value={editForm.wechat_id}
                     onChange={e => setEditForm(f => ({ ...f, wechat_id: e.target.value }))}
-                    placeholder="客户微信号"
+                    placeholder="对方微信号"
                   />
                 </div>
                 <div>
@@ -1115,7 +1156,7 @@ export default function CustomerDetail() {
             <div className="p-3 rounded-xl border border-primary/15 bg-primary-soft/40">
               <div className="flex items-center gap-1.5 mb-3 text-primary">
                 <ChevronRight size={14} strokeWidth={2} />
-                <span className="text-xs font-semibold">客户阶段管理</span>
+                <span className="text-xs font-semibold">用户阶段管理</span>
               </div>
               <div className="grid grid-cols-4 gap-2 mb-3">
                 {Object.entries(STAGE_LABELS).map(([k, v]) => {
@@ -1152,7 +1193,7 @@ export default function CustomerDetail() {
 
             {/* 基础信息 */}
             <div>
-              <label className="form-label">客户称呼 *</label>
+              <label className="form-label">用户称呼 *</label>
               <input
                 className="input"
                 value={editForm.name}
@@ -1279,7 +1320,7 @@ export default function CustomerDetail() {
 
       {showDelete && (
         <Modal
-          title="确认删除客户"
+          title="确认删除用户"
           onClose={() => !submitting && setShowDelete(false)}
           footer={
             <>
@@ -1296,7 +1337,7 @@ export default function CustomerDetail() {
               <Trash2 size={24} strokeWidth={1.8} className="text-danger" />
             </div>
             <p className="text-sm text-text-secondary">
-              即将删除客户 <span className="font-semibold text-text-primary">{customer.name}</span>
+              即将删除用户 <span className="font-semibold text-text-primary">{displayName(user)}</span>
             </p>
             <p className="text-xs mt-1 text-danger">此操作不可撤销</p>
           </div>
@@ -1312,15 +1353,15 @@ export default function CustomerDetail() {
               <button onClick={() => setDeleteConfirm(null)} disabled={submitting} className="btn-secondary flex-1">取消</button>
               <button
                 onClick={async () => {
-                  if (!deleteConfirm || !customer || !id) return;
+                  if (!deleteConfirm || !user || !id) return;
                   setSubmitting(true);
                   try {
                     if (deleteConfirm.type === 'order') {
                       await removeOrder(deleteConfirm.id);
                     } else {
-                      await removeFollowUp(deleteConfirm.id, customer.id);
+                      await removeFollowUp(deleteConfirm.id, user.id);
                     }
-                    await loadCustomer(Number(id));
+                    await loadWxUser(Number(id));
                     setDeleteConfirm(null);
                   } catch (e) {
                     console.error('删除失败:', e);
@@ -1415,9 +1456,10 @@ export default function CustomerDetail() {
                 >
                   <option value="">请选择</option>
                   {GRADES.map(g => (
-                    <option key={g} value={g}>{g}</option>
+                    <option key={g} value={g}>{gradeLabel(g)}</option>
                   ))}
                 </select>
+                <p className="t-caption text-text-tertiary mt-1">按孩子现在在读的年级填（{schoolYearLabel(currentSchoolYearStart())}），新学年开学后系统会提示重新确认</p>
               </div>
               <div>
                 <label className="form-label">出生日期</label>

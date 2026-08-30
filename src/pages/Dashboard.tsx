@@ -1,67 +1,13 @@
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { LineChart } from '@tremor/react';
 import {
-  useEffect, useState } from 'react';
-
-import {
-  motion } from 'framer-motion';
-import {
-  LineChart,
-} from '@tremor/react';
-import {
-  Download,
-  Users, Wallet, Clock, UserPlus,
-  ChevronRight, MoreHorizontal, ArrowUpRight, ArrowDownRight,
-  Sparkles, Star, Store, Boxes, Truck,
-  BookOpen, Calculator, Languages, FlaskConical, GraduationCap,
+  Users, CheckCircle, TrendingUp, Target,
+  MoreHorizontal, ArrowUpRight, ArrowDownRight,
+  Award, Bell, RefreshCw, UserPlus, Calendar,
 } from 'lucide-react';
-import {
-  useStore } from '@/store';
-import {
-  type OrderWithCustomer } from '../../shared/types';
-import type { LucideIcon } from 'lucide-react';
-
-const profitData = [
-  { date: '1 Jan', profit: 4200, last: 3800 },
-  { date: '5 Jan', profit: 5100, last: 4500 },
-  { date: '8 Jan', profit: 4800, last: 4700 },
-  { date: '12 Jan', profit: 6200, last: 5000 },
-  { date: '15 Jan', profit: 5900, last: 5200 },
-  { date: '19 Jan', profit: 7800, last: 5600 },
-  { date: '22 Jan', profit: 8200, last: 6100 },
-  { date: '26 Jan', profit: 8900, last: 6400 },
-  { date: '29 Jan', profit: 9400, last: 6800 },
-];
-
-const weeklyData = [
-  { day: 'Sun', active: 120 },
-  { day: 'Mon', active: 180 },
-  { day: 'Tue', active: 240 },
-  { day: 'Wed', active: 160 },
-  { day: 'Thu', active: 200 },
-  { day: 'Fri', active: 280 },
-  { day: 'Sat', active: 150 },
-];
-
-const productIcons: Record<string, LucideIcon> = {
-  '语文·作文提升营': BookOpen,
-  '数学·思维训练课': Calculator,
-  '英语·自然拼读': Languages,
-  '科学·实验探索': FlaskConical,
-  '小升初衔接班': GraduationCap,
-};
-
-const products = [
-  { id: '#83009', name: '语文·作文提升营', sold: 2310, revenue: 245000, rating: 4.9, icon: '语文·作文提升营' },
-  { id: '#83001', name: '数学·思维训练课', sold: 1230, revenue: 189000, rating: 4.8, icon: '数学·思维训练课' },
-  { id: '#83004', name: '英语·自然拼读', sold: 812, revenue: 156000, rating: 4.7, icon: '英语·自然拼读' },
-  { id: '#83002', name: '科学·实验探索', sold: 645, revenue: 98000, rating: 4.5, icon: '科学·实验探索' },
-  { id: '#83012', name: '小升初衔接班', sold: 572, revenue: 86000, rating: 4.6, icon: '小升初衔接班' },
-];
-
-const customerSegments = [
-  { name: '零售客户', value: 2884, color: '#2563EB', icon: Store },
-  { name: '分销客户', value: 1432, color: '#22C55E', icon: Boxes },
-  { name: '批发客户', value: 562, color: '#F59E0B', icon: Truck },
-];
+import { useStore } from '@/store';
+import { useNavigate } from 'react-router-dom';
 
 const container = {
   hidden: { opacity: 0 },
@@ -73,130 +19,206 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } },
 };
 
-function SegmentedGauge({ value }: { value: number }) {
-  const totalBars = 40;
-  const activeBars = Math.round((value / 100) * totalBars);
-  return (
-    <div className="flex items-end justify-center gap-[3px] h-[70px]">
-      {Array.from({ length: totalBars }).map((_, i) => {
-        const isActive = i < activeBars;
-        const angle = (i / (totalBars - 1)) * 180;
-        return (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, scaleY: 0 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            transition={{ duration: 0.3, delay: i * 0.01, ease: [0.16, 1, 0.3, 1] }}
-            className="w-[4px] rounded-full origin-bottom"
-            style={{
-              height: `${10 + Math.sin((angle * Math.PI) / 180) * 45}px`,
-              backgroundColor: isActive ? '#22C55E' : '#E4E7EC',
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 function TrendPill({ value, up }: { value: string; up: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${up ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#DC2626]'}`}>
-      {up ? <ArrowUpRight size={12} strokeWidth={2} /> : <ArrowDownRight size={12} strokeWidth={2} />}
+    <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${up ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#DC2626]'}`}>
+      {up ? <ArrowUpRight size={11} strokeWidth={2.5} /> : <ArrowDownRight size={11} strokeWidth={2.5} />}
       {value}
     </span>
   );
 }
 
+function AvatarPlaceholder({ name, avatarUrl, size = 'md' }: { name: string; avatarUrl?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+  const sizeClasses = { sm: 'w-8 h-8 text-[11px]', md: 'w-9 h-9 text-xs', lg: 'w-11 h-11 text-sm' };
+  const firstChar = name?.trim()?.[0]?.toUpperCase() || '?';
+  
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className={`${sizeClasses[size]} rounded-full object-cover border border-border-subtle bg-gray-50`}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+        }}
+      />
+    );
+  }
+  
+  // 根据名字首字母生成背景色（柔和色系）
+  const colors = [
+    'bg-blue-50 text-blue-600',
+    'bg-emerald-50 text-emerald-600',
+    'bg-violet-50 text-violet-600',
+    'bg-amber-50 text-amber-600',
+    'bg-rose-50 text-rose-600',
+    'bg-cyan-50 text-cyan-600',
+  ];
+  const colorIndex = firstChar.charCodeAt(0) % colors.length;
+  
+  return (
+    <div className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-semibold ${colors[colorIndex]}`}>
+      {firstChar}
+    </div>
+  );
+}
+
+function KPICard({
+  title,
+  value,
+  subtext,
+  trend,
+  up,
+  icon: Icon,
+  iconColor,
+  iconBg,
+  onClick,
+}: {
+  title: string;
+  value: string | number;
+  subtext?: string;
+  trend?: string;
+  up?: boolean;
+  icon: React.ElementType;
+  iconColor: string;
+  iconBg: string;
+  onClick?: () => void;
+}) {
+  return (
+    <motion.div
+      variants={fadeUp}
+      onClick={onClick}
+      className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all cursor-pointer ${onClick ? 'hover:-translate-y-0.5' : ''}`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <span className="text-[13px] font-medium text-gray-500">{title}</span>
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ backgroundColor: iconBg, color: iconColor }}
+        >
+          <Icon size={18} strokeWidth={1.8} />
+        </div>
+      </div>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-[32px] font-bold text-gray-900 tracking-tight leading-none">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </span>
+        {trend && <TrendPill value={trend} up={up || false} />}
+      </div>
+      {subtext && <p className="text-[12px] text-gray-400 mt-0.5">{subtext}</p>}
+    </motion.div>
+  );
+}
+
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { dashboard, loadDashboard } = useStore();
+  const [trendDays, setTrendDays] = useState<7 | 30 | 90>(30);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date>();
 
   useEffect(() => {
     loadDashboard();
+    setLastRefreshTime(new Date());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stats = dashboard?.stats || {
-    total_customers: 0, today_new_customers: 0, need_follow_count: 0, today_revenue: 0,
-  };
-  const recentOrders = dashboard?.recentOrders || [];
-  const monthTotal = recentOrders.reduce((s, o: OrderWithCustomer) => s + (o.amount || 0), 0);
-  const maxDay = Math.max(...weeklyData.map(d => d.active));
-
-  const [aiInput, setAiInput] = useState('');
-  const [aiMessages, setAiMessages] = useState<{ role: string; text: string }[]>([]);
-
-  const handleSend = () => {
-    const text = aiInput.trim();
-    if (!text) return;
-    setAiMessages((prev) => [...prev, { role: 'user', text }]);
-    setAiInput('');
-    setTimeout(() => {
-      setAiMessages((prev) => [...prev, { role: 'ai', text: '收到：' + text + '。AI 正在处理中...' }]);
-    }, 600);
+    total_wx_users: 0,
+    today_new_wx_users: 0,
+    yesterday_new_wx_users: 0,
+    total_checkins: 0,
+    today_checkins: 0,
+    week_checkins: 0,
+    active_users_7d: 0,
+    checkin_rate: 0,
+    total_participants: 0,
   };
 
-  const exportToCSV = () => {
-    const headers = ['编号', '产品名称', '销量', '营收', '评分'];
-    const rows = products.map((p) => [p.id, p.name, p.sold, p.revenue, p.rating]);
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = '热销产品_' + new Date().toISOString().slice(0, 10) + '.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // 计算趋势
+  const userTrendValue = stats.yesterday_new_wx_users > 0
+    ? Math.round(((stats.today_new_wx_users - stats.yesterday_new_wx_users) / stats.yesterday_new_wx_users) * 100)
+    : 0;
+  const userTrendUp = userTrendValue >= 0;
 
   const kpis = [
-    { label: '客户总数', value: stats.total_customers, trend: '5.0%', up: true, icon: Users, iconColor: '#2563EB', iconBg: '#EFF6FF' },
-    { label: '本月成交', value: monthTotal, trend: '18.0%', up: true, prefix: '¥', icon: Wallet, iconColor: '#1D4ED8', iconBg: '#DBEAFE' },
-    { label: '待跟进', value: stats.need_follow_count, trend: '12.0%', up: false, icon: Clock, iconColor: '#F59E0B', iconBg: '#FFFBEB' },
-    { label: '今日新增', value: stats.today_new_customers, trend: '8.0%', up: true, icon: UserPlus, iconColor: '#22C55E', iconBg: '#F0FDF4' },
+    {
+      title: '微信用户总数',
+      value: stats.total_wx_users,
+      subtext: `今日新增 +${stats.today_new_wx_users}`,
+      trend: `${Math.abs(userTrendValue)}%`,
+      up: userTrendUp,
+      icon: Users,
+      iconColor: '#2563EB',
+      iconBg: '#EFF6FF',
+      onClick: () => navigate('/wx-users'),
+    },
+    {
+      title: '累计打卡人次',
+      value: stats.total_checkins,
+      subtext: `今日 ${stats.today_checkins} · 本周 ${stats.week_checkins}`,
+      icon: CheckCircle,
+      iconColor: '#22C55E',
+      iconBg: '#F0FDF4',
+      onClick: () => navigate('/checkin'),
+    },
+    {
+      title: '活跃用户数',
+      value: stats.active_users_7d,
+      subtext: stats.total_wx_users > 0
+        ? `占总用户 ${Math.round((stats.active_users_7d / stats.total_wx_users) * 100)}%`
+        : '近 7 天有打卡',
+      icon: TrendingUp,
+      iconColor: '#8B5CF6',
+      iconBg: '#F5F3FF',
+    },
+    {
+      title: '打卡率',
+      value: `${stats.checkin_rate}%`,
+      subtext: stats.total_participants > 0
+        ? `目标 80% · 差距 ${(80 - stats.checkin_rate).toFixed(1)}%`
+        : '今日打卡人数 / 已报名用户数',
+      icon: Target,
+      iconColor: '#F59E0B',
+      iconBg: '#FFFBEB',
+    },
   ];
 
-  const segmentTotal = customerSegments.reduce((s, x) => s + x.value, 0);
+  // 准备趋势图表数据
+  const combinedTrendData = dashboard?.newUserTrend.map((item, i) => ({
+    date: item.date,
+    newUsers: item.count,
+    checkins: dashboard.checkinTrend[i]?.count || 0,
+  })) || [];
 
   return (
-    <div className="min-h-full bg-bg-page p-6 md:p-8">
-      <div className="max-w-[1440px] mx-auto">
+    <div className="min-h-full bg-gray-50/80 p-6 md:p-8">
+      <div className="max-w-[1400px] mx-auto">
         {/* Header */}
         <motion.div
           variants={container}
           initial="hidden"
           animate="show"
-          className="flex items-center justify-between mb-8"
+          className="flex items-center justify-between mb-6"
         >
           <motion.div variants={fadeUp}>
-            <h1 className="text-[28px] font-bold text-text-primary tracking-tight">驾驶舱</h1>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">驾驶舱</h1>
+            {lastRefreshTime && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                最后更新：{lastRefreshTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+            )}
           </motion.div>
           <motion.div variants={fadeUp} className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-2 px-3 h-9 rounded-lg bg-bg-surface border border-border-default text-sm text-text-secondary">
-              <span>2025年1月1日 - 2月1日</span>
-            </div>
             <button
-              onClick={() => alert('日期范围选择功能开发中')}
-              className="hidden md:flex btn btn-secondary"
+              onClick={() => {
+                loadDashboard();
+                setLastRefreshTime(new Date());
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 h-9 rounded-xl bg-white border border-gray-200 text-[13px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
             >
-              近30天 <ChevronRight size={14} className="-rotate-90" />
-            </button>
-            <button
-              onClick={() => alert('打开添加组件面板')}
-              className="hidden md:flex btn btn-secondary"
-            >
-              <span className="text-text-tertiary">⊞</span> 添加组件
-            </button>
-            <button
-              onClick={exportToCSV}
-              className="btn btn-primary"
-            >
-              <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
-                <Download size={13} strokeWidth={2.5} />
-              </span>
-              导出
+              <RefreshCw size={14} strokeWidth={2} />
+              刷新
             </button>
           </motion.div>
         </motion.div>
@@ -206,121 +228,143 @@ export default function Dashboard() {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
           {kpis.map((kpi) => (
-            <motion.div
-              key={kpi.label}
-              variants={fadeUp}
-              className="bg-bg-surface border border-border-default rounded-[20px] p-5 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <span className="text-sm font-medium text-text-secondary">{kpi.label}</span>
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: kpi.iconBg, color: kpi.iconColor }}
-                >
-                  <kpi.icon size={18} strokeWidth={1.5} />
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 mb-1">
-                <span className="text-[28px] font-bold text-text-primary tracking-tight">
-                  {kpi.prefix || ''}{kpi.value.toLocaleString()}
-                </span>
-                <TrendPill value={kpi.trend} up={kpi.up} />
-              </div>
-              <p className="text-xs text-text-tertiary">较上期 {(kpi.value * 0.9).toLocaleString()}</p>
-            </motion.div>
+            <KPICard key={kpi.title} {...kpi} />
           ))}
         </motion.div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6 mb-6">
-          {/* Left */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1.8fr_1fr] gap-5">
+          {/* Left Panel */}
           <motion.div
             variants={container}
             initial="hidden"
             animate="show"
-            className="space-y-6"
+            className="space-y-5"
           >
-            {/* 本月成交 */}
-            <motion.div variants={fadeUp} className="bg-bg-surface border border-border-default rounded-[20px] p-6 shadow-sm">
-              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-                <div>
-                  <p className="text-sm font-medium text-text-secondary mb-2">本月成交</p>
-                  <div className="text-[40px] font-bold text-text-primary tracking-tight mb-2">
-                    ¥{monthTotal.toLocaleString()}
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <TrendPill value="24.4%" up={true} />
-                    <span className="text-xs text-text-tertiary">vs. 上月同期</span>
-                  </div>
-                </div>
-                <div className="min-h-[240px]">
-                  <LineChart
-                    data={profitData}
-                    categories={['profit', 'last']}
-                    index="date"
-                    colors={['blue', 'gray']}
-                    className="h-64 w-full"
-                    showLegend={false}
-                    showGridLines={false}
-                    showYAxis={true}
-                    showXAxis={true}
-                    autoMinValue={true}
-                    curveType="monotone"
-                  />
+            {/* 近 N 天增长&打卡趋势 */}
+            <motion.div variants={fadeUp} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[15px] font-semibold text-gray-900">用户增长 & 打卡趋势</h3>
+                <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg p-0.5">
+                  {([7, 30, 90] as const).map((days) => (
+                    <button
+                      key={days}
+                      onClick={() => setTrendDays(days)}
+                      className={`px-3 py-1 text-[12px] font-medium rounded-md transition-all ${
+                        trendDays === days
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {days}天
+                    </button>
+                  ))}
                 </div>
               </div>
-
-              {/* 客户结构 Sub-card */}
-              <div className="mt-6 pt-6 border-t border-border-subtle">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-text-primary">客户结构</h3>
-                  <button
-                    onClick={() => alert(`客户结构 - 更多操作`)}
-                    className="text-text-tertiary hover:text-text-secondary transition-colors"
-                  >
-                    <MoreHorizontal size={18} strokeWidth={1.8} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {customerSegments.map((seg) => (
-                    <div key={seg.name} className="flex items-center gap-2.5">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center border"
-                        style={{ backgroundColor: '#FFFFFF', borderColor: `${seg.color}30`, color: seg.color }}
-                      >
-                        <seg.icon size={18} strokeWidth={1.8} />
-                      </div>
-                      <div>
-                        <div className="text-base font-bold text-text-primary">{seg.value.toLocaleString()}</div>
-                        <div className="text-[11px] text-text-tertiary">{seg.name}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="h-2 rounded-full overflow-hidden flex">
-                  {customerSegments.map((seg) => (
-                    <motion.div
-                      key={seg.name}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(seg.value / segmentTotal) * 100}%` }}
-                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                      className="h-full first:rounded-l-full last:rounded-r-full"
-                      style={{ backgroundColor: seg.color }}
-                    />
-                  ))}
+              <div className="min-h-[280px]">
+                <LineChart
+                  data={combinedTrendData.slice(-trendDays)}
+                  categories={['newUsers', 'checkins']}
+                  index="date"
+                  colors={['blue', 'green']}
+                  className="h-72 w-full"
+                  showLegend={false}
+                  showGridLines={false}
+                  curveType="monotone"
+                />
+                {/* 自定义图例 */}
+                <div className="flex items-center justify-end gap-4 mt-2 text-xs text-text-secondary">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span>新增用户</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <span>打卡人次</span>
+                  </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* 热销产品 */}
+            {/* 用户阶段分布 */}
+            <motion.div variants={fadeUp} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[15px] font-semibold text-gray-900">用户阶段分布</h3>
+                <button
+                  onClick={() => navigate('/wx-users')}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <MoreHorizontal size={16} strokeWidth={2} />
+                </button>
+              </div>
+              <div className="space-y-3.5">
+                {dashboard?.stageStats.map((stage) => {
+                  const total = dashboard.stageStats.reduce((sum, s) => sum + s.count, 0);
+                  const percentage = total > 0 ? Math.round((stage.count / total) * 100) : 0;
+                  const stageLabels: Record<string, string> = {
+                    new_friend: '新朋友',
+                    initial_chat: '初步沟通',
+                    interested: '感兴趣',
+                    purchased: '已购买',
+                    in_group: '在群里',
+                    repurchased: '复购',
+                    silent: '沉默用户',
+                  };
+                  const stageColors: Record<string, string> = {
+                    new_friend: '#2563EB',
+                    initial_chat: '#3B82F6',
+                    interested: '#22C55E',
+                    purchased: '#10B981',
+                    in_group: '#F59E0B',
+                    repurchased: '#8B5CF6',
+                    silent: '#6B7280',
+                  };
+                  
+                  if (stage.count === 0) return null; // 隐藏人数为 0 的阶段
+                  
+                  return (
+                    <div
+                      key={stage.stage}
+                      className="group cursor-pointer hover:bg-gray-50 rounded-xl p-2.5 -mx-2.5 transition-colors"
+                      onClick={() => navigate(`/wx-users?stage=${stage.stage}`)}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: stageColors[stage.stage] || '#2563EB' }}
+                          />
+                          <span className="text-[13px] font-medium text-gray-700">{stageLabels[stage.stage] || stage.stage}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[13px] font-bold text-gray-900">{stage.count}</span>
+                          <span className="text-[11px] text-gray-400">({percentage}%)</span>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percentage}%` }}
+                          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                          className="h-full rounded-full"
+                          style={{ backgroundColor: stageColors[stage.stage] || '#2563EB' }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+
+            {/* 热门打卡活动排行 */}
             <motion.div variants={fadeUp} className="bg-bg-surface border border-border-default rounded-[20px] overflow-hidden shadow-sm">
               <div className="px-6 py-5 border-b border-border-subtle flex items-center justify-between">
-                <h3 className="text-base font-semibold text-text-primary">热销产品</h3>
+                <h3 className="text-base font-semibold text-text-primary">热门打卡活动排行</h3>
                 <button
-                  onClick={() => alert('更多操作')}
+                  onClick={() => alert('查看更多')}
                   className="text-text-tertiary hover:text-text-secondary transition-colors"
                 >
                   <MoreHorizontal size={18} strokeWidth={1.8} />
@@ -330,37 +374,30 @@ export default function Dashboard() {
                 <table className="w-full">
                   <thead>
                     <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-text-tertiary border-b border-border-subtle">
-                      <th className="px-6 py-3">编号</th>
-                      <th className="px-6 py-3">产品名称</th>
-                      <th className="px-6 py-3 text-right">销量</th>
-                      <th className="px-6 py-3 text-right">营收</th>
-                      <th className="px-6 py-3 text-right">评分</th>
+                      <th className="px-6 py-3">排名</th>
+                      <th className="px-6 py-3">活动名称</th>
+                      <th className="px-6 py-3 text-right">参与人数</th>
+                      <th className="px-6 py-3 text-right">累计打卡</th>
+                      <th className="px-6 py-3 text-right">人均打卡</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map((p) => (
-                      <tr key={p.id} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover/30 transition-colors">
-                        <td className="px-6 py-4 text-sm text-text-tertiary">{p.id}</td>
+                    {dashboard?.popularActivities.map((activity, index) => (
+                      <tr key={index} className="border-b border-border-subtle last:border-b-0 hover:bg-bg-hover/30 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            {(() => {
-                              const Icon = productIcons[p.icon];
-                              return (
-                                <div className="w-9 h-9 rounded-lg bg-bg-subtle flex items-center justify-center text-primary">
-                                  <Icon size={18} strokeWidth={1.5} />
-                                </div>
-                              );
-                            })()}
-                            <span className="text-sm font-medium text-text-primary">{p.name}</span>
-                          </div>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : <span className="text-text-tertiary">{index + 1}</span>}
                         </td>
-                        <td className="px-6 py-4 text-sm text-text-secondary text-right">{p.sold.toLocaleString()} 单</td>
-                        <td className="px-6 py-4 text-sm font-semibold text-success text-right">¥{p.revenue.toLocaleString()}</td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-medium text-text-primary">{activity.name}</span>
+                        </td>
                         <td className="px-6 py-4 text-sm text-text-secondary text-right">
-                          <span className="inline-flex items-center gap-1">
-                            <Star size={12} strokeWidth={2} className="text-warning fill-warning" />
-                            {p.rating}
-                          </span>
+                          {activity.participant_count}人
+                        </td>
+                        <td className="px-6 py-4 text-sm font-semibold text-success text-right">
+                          {activity.checkin_count}次
+                        </td>
+                        <td className="px-6 py-4 text-sm text-text-secondary text-right">
+                          {activity.avg_checkins_per_user}次
                         </td>
                       </tr>
                     ))}
@@ -370,127 +407,144 @@ export default function Dashboard() {
             </motion.div>
           </motion.div>
 
-          {/* Right */}
+          {/* Right Panel */}
           <motion.div
             variants={container}
             initial="hidden"
             animate="show"
-            className="space-y-6"
+            className="space-y-5"
           >
-            {/* 周活跃 */}
-            <motion.div variants={fadeUp} className="bg-bg-surface border border-border-default rounded-[20px] p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-base font-semibold text-text-primary">周活跃</h3>
-                <button
-                  onClick={() => alert('更多操作')}
-                  className="text-text-tertiary hover:text-text-secondary transition-colors"
-                >
-                  <MoreHorizontal size={18} strokeWidth={1.8} />
-                </button>
-              </div>
-              <div className="flex items-end justify-between h-44 gap-3 mb-2">
-                {weeklyData.map((d, i) => {
-                  const height = (d.active / maxDay) * 100;
-                  const isMax = d.active === maxDay;
-                  return (
-                    <div key={d.day} className="flex flex-col items-center flex-1 relative">
-                      {isMax && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 4 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.6 }}
-                          className="absolute -top-6 text-sm font-bold text-text-primary"
-                        >
-                          {d.active.toLocaleString()}
-                        </motion.div>
-                      )}
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${height}%` }}
-                        transition={{ duration: 0.5, delay: 0.2 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
-                        className={`w-full max-w-[36px] rounded-full ${isMax ? 'bg-primary' : 'bg-bg-subtle'}`}
-                      />
-                      <span className={`text-[11px] mt-3 ${isMax ? 'text-primary font-semibold' : 'text-text-tertiary'}`}>{d.day}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            {/* 复购率 */}
-            <motion.div variants={fadeUp} className="bg-bg-surface border border-border-default rounded-[20px] p-6 shadow-sm">
+            {/* 今日实时动态 */}
+            <motion.div variants={fadeUp} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-text-primary">复购率</h3>
-                <button
-                  onClick={() => alert('更多操作')}
-                  className="text-text-tertiary hover:text-text-secondary transition-colors"
-                >
-                  <MoreHorizontal size={18} strokeWidth={1.8} />
-                </button>
+                <h3 className="text-[15px] font-semibold text-gray-900">今日实时动态</h3>
+                <Bell size={16} strokeWidth={2} className="text-gray-400" />
               </div>
-              <SegmentedGauge value={68} />
-              <div className="text-center mt-2">
-                <div className="text-4xl font-bold text-text-primary">68%</div>
-                <p className="text-xs text-text-tertiary mt-1">目标 80%</p>
-              </div>
-              <button
-                onClick={() => alert('查看复购率详情')}
-                className="w-full mt-5 py-2 text-xs font-semibold text-text-primary bg-bg-subtle rounded-lg hover:bg-bg-hover transition-colors border border-border-default"
-              >
-                查看详情
-              </button>
-            </motion.div>
-
-            {/* AI 助手 */}
-            <motion.div variants={fadeUp} className="bg-bg-surface border border-border-default rounded-[20px] p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-text-primary">AI 助手</h3>
-                <button
-                  onClick={() => alert('展开 AI 助手')}
-                  className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary hover:bg-primary hover:text-white hover:border-primary transition-colors"
-                >
-                  <ArrowUpRight size={14} strokeWidth={2} />
-                </button>
-              </div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3B82F6] via-[#2563EB] to-[#1D4ED8] flex items-center justify-center shadow-lg shadow-blue-500/25">
-                  <Sparkles size={22} strokeWidth={1.5} className="text-white" />
-                </div>
+              <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin">
+                {/* 最新用户 */}
                 <div>
-                  <p className="text-sm font-medium text-text-primary">AI 助手</p>
-                  <p className="text-xs text-text-tertiary">有问题随时问我</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {aiMessages.length > 0 && (
-                  <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
-                    {aiMessages.map((m, i) => (
-                      <div
-                        key={i}
-                        className={`text-xs p-2 rounded-lg ${m.role === 'user' ? 'bg-bg-subtle text-text-primary ml-6' : 'bg-primary/10 text-primary mr-6'}`}
-                      >
-                        {m.text}
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <UserPlus size={11} strokeWidth={2.5} />
+                    最新加入
+                  </p>
+                  <div className="space-y-2">
+                    {dashboard?.recentUsers.map((user, i) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <AvatarPlaceholder name={user.display_name} avatarUrl={user.avatar_url} size="sm" />
+                        <span className="text-[13px] text-gray-700 truncate flex-1">{user.display_name}</span>
+                        <span className="text-[11px] text-gray-400 flex-shrink-0">
+                          {new Date(user.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
                     ))}
                   </div>
-                )}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="问我任何问题..."
-                    className="w-full h-10 pl-4 pr-10 rounded-full bg-bg-subtle text-sm text-text-primary placeholder:text-text-tertiary border border-transparent focus:outline-none focus:border-border-strong transition-colors"
-                  />
+                </div>
+
+                {/* 最新打卡 */}
+                <div className="pt-3.5 border-t border-gray-100">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <Calendar size={11} strokeWidth={2.5} />
+                    最新打卡
+                  </p>
+                  <div className="space-y-2">
+                    {dashboard?.recentCheckins.slice(0, 5).map((record, i) => (
+                      <div key={i} className="flex items-center justify-between">
+                        <div className="flex-1 truncate pr-2">
+                          <span className="text-[13px] text-gray-700">{record.user_name}</span>
+                          <span className="text-[11px] text-gray-400 ml-1.5">{record.activity_name}</span>
+                        </div>
+                        <span className="text-[11px] text-gray-400 flex-shrink-0">
+                          {new Date(record.checkin_date).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* 用户来源渠道分析 */}
+            {dashboard?.sourceChannels && dashboard.sourceChannels.length > 0 && (
+              <motion.div variants={fadeUp} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[15px] font-semibold text-gray-900">用户来源渠道</h3>
                   <button
-                    onClick={handleSend}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary-hover transition-colors disabled:opacity-50"
-                    disabled={!aiInput.trim()}
+                    onClick={() => navigate('/wx-users')}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    <ChevronRight size={14} strokeWidth={2} />
+                    <MoreHorizontal size={16} strokeWidth={2} />
                   </button>
                 </div>
+                <div className="space-y-3">
+                  {dashboard.sourceChannels.slice(0, 5).map((channel, i) => {
+                    const total = dashboard.sourceChannels.reduce((sum, c) => sum + c.count, 0);
+                    const percentage = total > 0 ? Math.round((channel.count / total) * 100) : 0;
+                    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+                    return (
+                      <div key={i}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[13px] text-gray-600">{channel.channel}</span>
+                          <span className="text-[13px] font-bold text-gray-900">
+                            {channel.count}<span className="text-[11px] font-normal text-gray-400 ml-0.5">({percentage}%)</span>
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden bg-gray-100">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${percentage}%` }}
+                            transition={{ duration: 0.6, delay: i * 0.1 }}
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: colors[i % colors.length] }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {/* 打卡达人榜 */}
+            <motion.div variants={fadeUp} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[15px] font-semibold text-gray-900">打卡达人榜</h3>
+                <Award size={16} strokeWidth={2} className="text-amber-500" />
+              </div>
+              <div className="space-y-2.5">
+                {dashboard?.topCheckinUsers.slice(0, 10).map((user, index) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-xl p-2.5 transition-colors"
+                    onClick={() => navigate(`/wx-users/${user.id}`)}
+                  >
+                    {/* 序号 */}
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                      style={{
+                        backgroundColor: index === 0 ? '#FEF3C7' : index === 1 ? '#E5E7EB' : index === 2 ? '#FED7AA' : 'transparent',
+                        color: index < 3 ? '#92400E' : '#9CA3AF',
+                      }}
+                    >
+                      {index + 1}
+                    </div>
+                    
+                    {/* 头像 */}
+                    <AvatarPlaceholder name={user.display_name || user.child_name || '?'} avatarUrl={user.avatar_url} size="sm" />
+                    
+                    {/* 名字信息 */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-gray-900 truncate leading-tight">{user.display_name}</p>
+                      {user.child_name && (
+                        <p className="text-[11px] text-gray-400 truncate leading-tight mt-0.5">{user.child_name}</p>
+                      )}
+                    </div>
+                    
+                    {/* 打卡次数 */}
+                    <div className="text-[13px] font-bold text-primary flex-shrink-0">
+                      {user.checkin_count}次
+                    </div>
+                  </div>
+                ))}
               </div>
             </motion.div>
           </motion.div>

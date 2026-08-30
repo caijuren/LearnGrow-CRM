@@ -48,8 +48,9 @@ export function grantPoints(p: GrantPointsParams): { ledgerId: number } | null {
     try {
       const r = insertLedger.run(wxUserId, amount, type, refType, refId, note, operatorId);
       ledgerId = r.lastInsertRowid as number;
-    } catch (err: any) {
-      if (!strict && err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') return null;
+    } catch (err: unknown) {
+      const isUniqueViolation = err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE';
+      if (!strict && isUniqueViolation) return null;
       throw err;
     }
     updateBalance.run(amount, wxUserId);

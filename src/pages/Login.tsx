@@ -63,16 +63,16 @@ export default function Login() {
             <h2 className="mt-6 text-4xl font-semibold tracking-tight leading-tight text-text-primary">
               教育私域运营
               <br />
-              <span className="text-gradient">从客户跟进开始</span>
+              <span className="text-gradient">从用户跟进开始</span>
             </h2>
             <p className="mt-5 text-sm leading-7 text-text-secondary max-w-sm">
-              管理微信客户、跟进记录、订单转化和学习路径，让销售和教务协作有清晰的数据底座。
+              管理微信用户、跟进记录、订单转化和学习路径，让销售和教务协作有清晰的数据底座。
             </p>
           </div>
 
           <div className="mt-12 grid grid-cols-2 gap-3">
             {[
-              { icon: Users, label: '客户管理', desc: '全生命周期追踪' },
+              { icon: Users, label: '微信用户', desc: '全生命周期追踪' },
               { icon: TrendingUp, label: '转化分析', desc: '销售数据可视' },
               { icon: BarChart3, label: '学习分析', desc: '数据驱动决策' },
               { icon: ShieldCheck, label: '权限安全', desc: '账号角色隔离' },
@@ -104,7 +104,7 @@ export default function Login() {
         >
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-text-primary tracking-tight">欢迎回来</h2>
-            <p className="text-sm text-text-secondary mt-2">登录您的账户，进入客户管理工作台</p>
+            <p className="text-sm text-text-secondary mt-2">登录您的账户，进入用户运营工作台</p>
           </div>
 
           <div className="glass p-6 rounded-xl">

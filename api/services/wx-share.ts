@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // 明文 URL Scheme：无需调微信接口，按官方格式拼接即可
 // 前提：小程序为非个人主体、已发布，并在 MP 后台「账号设置-基本设置-隐私与安全-明文Scheme拉起此小程序」声明开通
 export function getEventShareLink(eventId: number, envVersion: string = 'release'): { scheme: string; expire_at: string | null } {

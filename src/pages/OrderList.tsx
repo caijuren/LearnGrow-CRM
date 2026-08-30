@@ -112,7 +112,7 @@ export default function OrderList() {
                 borderBottom: '1px solid var(--color-border-default)',
               }}
             >
-              <span>客户</span>
+              <span>用户</span>
               <span>商品</span>
               <span>日期</span>
               <span className="text-right">金额</span>
@@ -140,7 +140,7 @@ export default function OrderList() {
                 >
                   <div className="min-w-0">
                     <button
-                      onClick={() => navigate(`/customers/${order.customer_id}`)}
+                      onClick={() => navigate(`/wx-users/${order.wx_user_id}`)}
                       className="flex items-center gap-1 transition-colors"
                       style={{
                         fontSize: '0.8125rem',
@@ -151,7 +151,7 @@ export default function OrderList() {
                       onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                     >
                       <User size={12} strokeWidth={1.8} style={{ color: 'var(--color-text-tertiary)' }} />
-                      {order.customer_name}
+                      {order.wx_user_name}
                     </button>
                     <span
                       className="inline-flex items-center mt-1 px-1.5 py-0.5 rounded-sm"
@@ -237,7 +237,7 @@ export default function OrderList() {
           <Empty
             icon={<ShoppingCart size={32} strokeWidth={1.8} style={{ color: 'var(--color-text-quaternary)' }} />}
             title="暂无订单记录"
-            description="在客户详情页可以记录订单，所有订单都会在这里显示"
+            description="在用户详情页可以记录订单，所有订单都会在这里显示"
           />
         )}
       </div>

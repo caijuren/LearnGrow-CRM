@@ -720,6 +720,28 @@
   .table-card tbody tr:hover {
     background-color: var(--color-bg-hover);
   }
+  .table-card.dense thead th {
+    @apply px-3.5 py-2.5;
+  }
+  .table-card.dense tbody td {
+    @apply px-3.5 py-2;
+  }
+  /* 排序按钮占满整格：内边距移到按钮上，点击区域才是可见的那个格子 */
+  .table-card thead th.sortable {
+    @apply p-0;
+  }
+  .table-card thead th.sortable > button {
+    @apply inline-flex w-full items-center gap-1 px-3.5 py-2.5 text-left transition-colors duration-150;
+    color: var(--color-text-secondary);
+  }
+  .table-card thead th.sortable > button:hover {
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+  }
+  .table-card thead th.sortable.is-active > button {
+    @apply font-semibold;
+    color: var(--color-primary);
+  }
   .table-card tbody tr.selected {
     background-color: var(--color-primary-soft);
   }

@@ -147,7 +147,7 @@ export default function LiveDesk() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="输入微信名/抖音名/备注，快速找到客户"
+            placeholder="输入微信名/抖音名/备注，快速找到用户"
             className="w-full"
             style={{
               paddingLeft: '2.75rem',
@@ -227,7 +227,7 @@ export default function LiveDesk() {
                 marginBottom: '4px',
               }}
             >
-              输入客户信息开始搜索
+              输入用户信息开始搜索
             </p>
             <p
               style={{
@@ -267,7 +267,7 @@ export default function LiveDesk() {
                 marginBottom: '4px',
               }}
             >
-              没找到匹配的客户
+              没找到匹配的用户
             </p>
             <p
               style={{

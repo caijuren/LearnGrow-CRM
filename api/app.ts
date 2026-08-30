@@ -15,7 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { randomUUID, createHash } from 'crypto';
-import type { Customer, Product, FollowUp, TodoItem, CustomerSuggestion, Customer360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithCustomer, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinParticipant, CheckinRecord, CheckinParticipantStats, CheckinEventDetail, CustomerStage, Material, MaterialCategory } from '../shared/types.js';
+import type { WxUser, Product, FollowUp, TodoItem, CustomerSuggestion, WxUser360, LiveCustomerCard, DashboardData, OrderWithProduct, OrderWithWxUser, WechatGroup, WechatGroupMember, Child, ChildWithProgress, ChildLearningProgress, LearningPath, LearningStage, Textbook, CheckinEvent, CheckinParticipant, CheckinRecord, CheckinParticipantStats, CheckinEventDetail, CustomerStage, Material, MaterialCategory } from '../shared/types.js';
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -93,7 +93,7 @@ function detectMedia(buffer: Buffer): { type: MediaType; ext: MediaExt } | null 
   return null;
 }
 
-function mapCustomer(c: any): Customer {
+function mapWxUser(c: any): WxUser {
   return {
     ...c,
     tags: parseJson(c.tags, [] as string[]),
@@ -117,20 +117,25 @@ function generateOrderNo(): string {
   return `ORD${dateStr}${random}`;
 }
 
-function getParentName(name: string): string {
-  return name.split('-')[0];
+function displayName(u: { display_name?: string | null; name?: string | null; nickname?: string | null; child_name?: string | null }): string {
+  return u.display_name || u.name || u.nickname || (u.child_name ? `${u.child_name}家长` : '') || '微信用户';
 }
 
-function getCustomerSuggestions(customerId: number, customer: Customer): CustomerSuggestion[] {
+function getParentName(name: string | null | undefined): string {
+  return (name || '家长').split('-')[0];
+}
+
+function getWxUserSuggestions(wxUserId: number, user: WxUser): CustomerSuggestion[] {
   const suggestions: CustomerSuggestion[] = [];
-  const orders = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier, p.related_product_ids FROM orders o JOIN products p ON o.product_id = p.id WHERE o.customer_id = ? ORDER BY o.purchase_date DESC`).all(customerId) as any[];
+  const pname = getParentName(displayName(user));
+  const orders = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier, p.related_product_ids FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC`).all(wxUserId) as any[];
   const allProducts = (db.prepare('SELECT * FROM products WHERE is_on_sale = 1').all() as any[]).map(mapProduct);
 
   if (orders.length === 0) {
     const trafficProducts = allProducts.filter(p => p.tier === 'traffic');
     if (trafficProducts.length > 0) {
       const p = trafficProducts[0];
-      suggestions.push({ type: 'new_customer', title: '新家长，推引流款', reason: '还没买过资料，先从低价福利款建立信任', product: p, script: `${getParentName(customer.name)}你好呀~我是直播间的XX老师，感谢你加我！给你准备了个新人福利，${p.name}只要${p.price}元，特别适合孩子打基础，要不要带一份？` });
+      suggestions.push({ type: 'new_customer', title: '新家长，推引流款', reason: '还没买过资料，先从低价福利款建立信任', product: p, script: `${pname}你好呀~我是直播间的XX老师，感谢你加我！给你准备了个新人福利，${p.name}只要${p.price}元，特别适合孩子打基础，要不要带一份？` });
     }
   } else {
     const lastOrder = orders[0];
@@ -139,25 +144,25 @@ function getCustomerSuggestions(customerId: number, customer: Customer): Custome
       for (const rid of lastProduct.related_product_ids) {
         const related = allProducts.find(p => p.id === rid);
         if (related && !orders.some(o => o.product_id === rid)) {
-          suggestions.push({ type: 'related', title: `搭配${related.name}效果更好`, reason: `买过${lastProduct.name}的家长经常一起买${related.name}`, product: related, script: `对了${getParentName(customer.name)}，你上次拿的${lastProduct.name}搭配${related.name}效果特别好！${related.selling_points}，孩子学起来更系统，要不要一起带一份？` });
+          suggestions.push({ type: 'related', title: `搭配${related.name}效果更好`, reason: `买过${lastProduct.name}的家长经常一起买${related.name}`, product: related, script: `对了${pname}，你上次拿的${lastProduct.name}搭配${related.name}效果特别好！${related.selling_points}，孩子学起来更系统，要不要一起带一份？` });
           break;
         }
       }
     }
     const mainBought = orders.some(o => o.product_tier === 'main');
     const premiumBought = orders.some(o => o.product_tier === 'premium');
-    if (customer.importance === 'vip' && mainBought && !premiumBought) {
+    if (user.importance === 'vip' && mainBought && !premiumBought) {
       const premium = allProducts.find(p => p.tier === 'premium' && !orders.some(o => o.product_id === p.id));
-      if (premium) suggestions.push({ type: 'upsell', title: '推荐VIP专属服务', reason: '是重点家长，已经买过主力资料，可以推荐1对1规划服务', product: premium, script: `${getParentName(customer.name)}，跟你说个特别好的服务，我们这个${premium.name}反馈特别好，${premium.selling_points}，我第一时间想到你家孩子，给你留个名额？` });
+      if (premium) suggestions.push({ type: 'upsell', title: '推荐VIP专属服务', reason: '是重点家长，已经买过主力资料，可以推荐1对1规划服务', product: premium, script: `${pname}，跟你说个特别好的服务，我们这个${premium.name}反馈特别好，${premium.selling_points}，我第一时间想到你家孩子，给你留个名额？` });
     }
-    if (customer.last_follow_date) {
-      const daysSinceFollow = Math.floor((Date.now() - new Date(customer.last_follow_date).getTime()) / 86400000);
-      if (daysSinceFollow >= 15) suggestions.push({ type: 'reconnect', title: '好久没聊了，打个招呼', reason: `已经${Math.floor(daysSinceFollow)}天没联系了，问问孩子最近学习情况`, script: `${getParentName(customer.name)}好久没聊啦~孩子最近学习咋样？有没有遇到什么问题？我这边新到了点好资料，有空来直播间看看呀！` });
+    if (user.last_follow_date) {
+      const daysSinceFollow = Math.floor((Date.now() - new Date(user.last_follow_date).getTime()) / 86400000);
+      if (daysSinceFollow >= 15) suggestions.push({ type: 'reconnect', title: '好久没聊了，打个招呼', reason: `已经${Math.floor(daysSinceFollow)}天没联系了，问问孩子最近学习情况`, script: `${pname}好久没聊啦~孩子最近学习咋样？有没有遇到什么问题？我这边新到了点好资料，有空来直播间看看呀！` });
     }
-    const consideringFollowUp = db.prepare(`SELECT * FROM follow_ups WHERE customer_id = ? AND result = 'considering' AND date >= date('now', '-7 days') ORDER BY date DESC LIMIT 1`).get(customerId) as any;
+    const consideringFollowUp = db.prepare(`SELECT * FROM follow_ups WHERE wx_user_id = ? AND result = 'considering' AND date >= date('now', '-7 days') ORDER BY date DESC LIMIT 1`).get(wxUserId) as any;
     if (consideringFollowUp) {
       const daysSince = Math.floor((Date.now() - new Date(consideringFollowUp.date).getTime()) / 86400000);
-      if (daysSince >= 3) suggestions.push({ type: 'considering', title: '上次说考虑的，回访一下', reason: `${Math.floor(daysSince)}天前说"考虑一下"，该回访了`, script: `${getParentName(customer.name)}，上次你说考虑的那个资料，现在想得咋样啦？孩子学习不等人，有啥疑问随时问我哈~` });
+      if (daysSince >= 3) suggestions.push({ type: 'considering', title: '上次说考虑的，回访一下', reason: `${Math.floor(daysSince)}天前说"考虑一下"，该回访了`, script: `${pname}，上次你说考虑的那个资料，现在想得咋样啦？孩子学习不等人，有啥疑问随时问我哈~` });
     }
   }
   return suggestions;
@@ -175,30 +180,46 @@ function bjtDaysAgo(n: number): string {
   return bjtDateStr(Date.now() + BJT_MS - n * 86400000);
 }
 
+/**
+ * 「需跟进」= 加了好友却一次没跟过（给 3 天缓冲），或上次跟进距今满 7 天。
+ * 用括号包住两个条件，否则 SQL 里 OR 的优先级会把它们拆成三条独立条件。
+ */
+function needFollowClause(): { sql: string; params: string[] } {
+  return {
+    sql: `(
+      (last_follow_date IS NULL AND COALESCE(wechat_add_date, substr(created_at, 1, 10)) <= ?)
+      OR (last_follow_date IS NOT NULL AND last_follow_date <= ?)
+    )`,
+    params: [bjtDaysAgo(3), bjtDaysAgo(7)],
+  };
+}
+
 function getTodos(): TodoItem[] {
   const todos: TodoItem[] = [];
   const today = bjtToday();
-  const customers = (db.prepare('SELECT * FROM customers').all() as any[]).map(mapCustomer);
+  const users = (db.prepare('SELECT * FROM wx_users').all() as any[]).map(mapWxUser);
 
-  for (const c of customers) {
-    if (c.importance === 'vip') {
-      const daysSinceFollow = c.last_follow_date ? Math.floor((Date.now() - new Date(c.last_follow_date).getTime()) / 86400000) : 999;
-      if (daysSinceFollow >= 7) todos.push({ id: `vip_${c.id}`, type: 'vip_follow', priority: 'high', customer_id: c.id, customer_name: c.name, title: `${c.name} - 重点家长跟进`, description: `已经${Math.floor(daysSinceFollow)}天没联系了，重点家长要常维护`, suggested_script: `${getParentName(c.name)}最近咋样呀？上次给孩子拿的资料用得还好不？` });
+  for (const u of users) {
+    if (u.importance === 'vip') {
+      const uname = displayName(u);
+      const daysSinceFollow = u.last_follow_date ? Math.floor((Date.now() - new Date(u.last_follow_date).getTime()) / 86400000) : 999;
+      if (daysSinceFollow >= 7) todos.push({ id: `vip_${u.id}`, type: 'vip_follow', priority: 'high', wx_user_id: u.id, wx_user_name: uname, title: `${uname} - 重点家长跟进`, description: `已经${Math.floor(daysSinceFollow)}天没联系了，重点家长要常维护`, suggested_script: `${getParentName(uname)}最近咋样呀？上次给孩子拿的资料用得还好不？` });
     }
   }
 
-  const reminders = db.prepare(`SELECT f.*, c.name as customer_name FROM follow_ups f JOIN customers c ON f.customer_id = c.id WHERE f.next_follow_date IS NOT NULL AND date(f.next_follow_date) <= date(?) ORDER BY f.next_follow_date ASC`).all(today) as any[];
-  for (const r of reminders) todos.push({ id: `reminder_${r.id}`, type: 'reminder', priority: 'high', customer_id: r.customer_id, customer_name: r.customer_name, title: `${r.customer_name} - 跟进提醒`, description: r.content, due_date: r.next_follow_date, follow_up_id: r.id });
+  const reminders = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE f.next_follow_date IS NOT NULL AND date(f.next_follow_date) <= date(?) ORDER BY f.next_follow_date ASC`).all(today) as any[];
+  for (const r of reminders) todos.push({ id: `reminder_${r.id}`, type: 'reminder', priority: 'high', wx_user_id: r.wx_user_id, wx_user_name: r.user_name, title: `${r.user_name} - 跟进提醒`, description: r.content, due_date: r.next_follow_date, follow_up_id: r.id });
 
-  const considering = db.prepare(`SELECT f.*, c.name as customer_name FROM follow_ups f JOIN customers c ON f.customer_id = c.id WHERE f.result = 'considering' AND julianday('now') - julianday(f.date) >= 3 AND NOT EXISTS (SELECT 1 FROM follow_ups f2 WHERE f2.customer_id = f.customer_id AND f2.date > f.date)`).all() as any[];
+  const considering = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE f.result = 'considering' AND julianday('now') - julianday(f.date) >= 3 AND NOT EXISTS (SELECT 1 FROM follow_ups f2 WHERE f2.wx_user_id = f.wx_user_id AND f2.date > f.date)`).all() as any[];
   for (const r of considering) {
-    if (!todos.some(t => t.customer_id === r.customer_id && t.type === 'considering')) todos.push({ id: `considering_${r.id}`, type: 'considering', priority: 'medium', customer_id: r.customer_id, customer_name: r.customer_name, title: `${r.customer_name} - 说考虑中，该回访了`, description: r.content, follow_up_id: r.id, suggested_script: `${getParentName(r.customer_name)}，上次你说考虑的那个资料，现在想得咋样啦？` });
+    if (!todos.some(t => t.wx_user_id === r.wx_user_id && t.type === 'considering')) todos.push({ id: `considering_${r.id}`, type: 'considering', priority: 'medium', wx_user_id: r.wx_user_id, wx_user_name: r.user_name, title: `${r.user_name} - 说考虑中，该回访了`, description: r.content, follow_up_id: r.id, suggested_script: `${getParentName(r.user_name)}，上次你说考虑的那个资料，现在想得咋样啦？` });
   }
 
-  for (const c of customers) {
-    const daysSinceFollow = c.last_follow_date ? Math.floor((Date.now() - new Date(c.last_follow_date).getTime()) / 86400000) : 999;
-    if (c.order_count === 0 && daysSinceFollow >= 15 && !todos.some(t => t.customer_id === c.id)) {
-      todos.push({ id: `silent_${c.id}`, type: 'long_time_no_talk', priority: 'low', customer_id: c.id, customer_name: c.name, title: `${c.name} - 好久没联系了`, description: `${Math.floor(daysSinceFollow)}天没互动了，打个招呼问问孩子情况吧`, suggested_script: `${getParentName(c.name)}好久没聊啦~孩子最近学习咋样？` });
+  for (const u of users) {
+    const daysSinceFollow = u.last_follow_date ? Math.floor((Date.now() - new Date(u.last_follow_date).getTime()) / 86400000) : 999;
+    if (u.order_count === 0 && daysSinceFollow >= 15 && !todos.some(t => t.wx_user_id === u.id)) {
+      const uname = displayName(u);
+      todos.push({ id: `silent_${u.id}`, type: 'long_time_no_talk', priority: 'low', wx_user_id: u.id, wx_user_name: uname, title: `${uname} - 好久没联系了`, description: `${Math.floor(daysSinceFollow)}天没互动了，打个招呼问问孩子情况吧`, suggested_script: `${getParentName(uname)}好久没聊啦~孩子最近学习咋样？` });
     }
   }
 
@@ -206,10 +227,10 @@ function getTodos(): TodoItem[] {
   return todos;
 }
 
-function updateCustomerStats(customerId: number) {
-  const orders = db.prepare("SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt, MAX(purchase_date) as last_date FROM orders WHERE customer_id = ?").get(customerId) as any;
-  const lastFollow = db.prepare("SELECT MAX(date) as last_date FROM follow_ups WHERE customer_id = ?").get(customerId) as any;
-  db.prepare("UPDATE customers SET total_spent = ?, order_count = ?, last_order_date = ?, last_follow_date = ?, updated_at = datetime('now') WHERE id = ?").run(orders.total || 0, orders.cnt || 0, orders.last_date || null, lastFollow.last_date || null, customerId);
+function updateWxUserStats(wxUserId: number) {
+  const orders = db.prepare("SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt, MAX(purchase_date) as last_date FROM orders WHERE wx_user_id = ?").get(wxUserId) as any;
+  const lastFollow = db.prepare("SELECT MAX(date) as last_date FROM follow_ups WHERE wx_user_id = ?").get(wxUserId) as any;
+  db.prepare("UPDATE wx_users SET total_spent = ?, order_count = ?, last_order_date = ?, last_follow_date = ?, updated_at = datetime('now') WHERE id = ?").run(orders.total || 0, orders.cnt || 0, orders.last_date || null, lastFollow.last_date || null, wxUserId);
 }
 
 function updateProductSales(productId: number) {
@@ -279,103 +300,269 @@ app.get('/api/auth/me', { preHandler: [authMiddleware] }, async (request, reply)
 
 app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const today = bjtToday();
-  const threeDaysAgo = bjtDaysAgo(3);
+  const yesterday = bjtDaysAgo(1);
   const sevenDaysAgo = bjtDaysAgo(7);
   const thirtyDaysAgo = bjtDaysAgo(30);
-  const thisMonth = today.slice(0, 7);
-  const todayRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE date(purchase_date) = ?").get(today) as any).s;
-  const monthRevenue = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE substr(purchase_date, 1, 7) = ?").get(thisMonth) as any).s;
-  const totalCustomers = (db.prepare('SELECT COUNT(*) as c FROM customers').get() as any).c;
-  const todayNewCustomers = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE date(created_at) = ?").get(today) as any).c;
-  const newFriendsCount = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE wechat_add_date >= ?").get(threeDaysAgo) as any).c;
-  const silentCount = (db.prepare("SELECT COUNT(*) as c FROM customers WHERE (last_follow_date IS NULL OR last_follow_date < ?) AND (last_order_date IS NULL OR last_order_date < ?) AND stage != 'purchased' AND stage != 'repurchased'").get(thirtyDaysAgo, thirtyDaysAgo) as any).c;
-  const todos = getTodos();
-  const last7Days = [];
-  for (let i = 6; i >= 0; i--) {
-    const dateStr = bjtDaysAgo(i);
-    const rev = (db.prepare("SELECT COALESCE(SUM(amount), 0) as s FROM orders WHERE date(purchase_date) = ?").get(dateStr) as any).s;
-    last7Days.push({ date: dateStr.slice(5), revenue: rev || 0 });
-  }
-  const recentOrdersRaw = db.prepare(`SELECT o.*, c.name as customer_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN customers c ON o.customer_id = c.id JOIN products p ON o.product_id = p.id ORDER BY o.created_at DESC LIMIT 10`).all() as any[];
 
-  const stageStatsRaw = db.prepare("SELECT stage, COUNT(*) as count FROM customers GROUP BY stage").all() as any[];
+  // 核心指标
+  const totalWxUsers = (db.prepare('SELECT COUNT(*) as c FROM wx_users').get() as any).c;
+  const todayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(today) as any).c;
+  const yesterdayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(yesterday) as any).c;
+  
+  // 打卡统计
+  const totalCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved'").get() as any).c;
+  const todayCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(today) as any).c;
+  const weekCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND checkin_date >= ?").get(sevenDaysAgo) as any).c;
+  
+  // 活跃用户数（近 7 天有打卡的去重用户）
+  const activeUsers7d = (db.prepare(`
+    SELECT COUNT(DISTINCT p.wx_user_id) as c 
+    FROM checkin_participants p
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    WHERE r.checkin_date >= ?
+  `).get(sevenDaysAgo) as any).c;
+  
+  // 打卡率 = 今日打卡人数 / 已报名活动用户数
+  const todayCheckers = (db.prepare(`
+    SELECT COUNT(DISTINCT p.wx_user_id) as c
+    FROM checkin_participants p
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    WHERE date(r.checkin_date) = ?
+  `).get(today) as any).c;
+  const totalParticipants = (db.prepare("SELECT COUNT(DISTINCT wx_user_id) as c FROM checkin_participants").get() as any).c;
+  const checkinRate = totalParticipants > 0 ? Math.round((todayCheckers / totalParticipants) * 100 * 100) / 100 : 0;
+
+  // 近 30 天趋势数据
+  const newUserTrend = [];
+  const checkinTrend = [];
+  for (let i = 29; i >= 0; i--) {
+    const dateStr = bjtDaysAgo(i);
+    const newCount = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(dateStr) as any).c;
+    const checkinCount = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(dateStr) as any).c;
+    newUserTrend.push({ date: dateStr.slice(5), count: newCount || 0 });
+    checkinTrend.push({ date: dateStr.slice(5), count: checkinCount || 0 });
+  }
+
+  // 用户阶段分布
+  const stageStatsRaw = db.prepare("SELECT stage, COUNT(*) as count FROM wx_users GROUP BY stage").all() as any[];
   const allStages: CustomerStage[] = ['new_friend', 'initial_chat', 'interested', 'purchased', 'in_group', 'repurchased', 'silent'];
   const stageStats = allStages.map(s => {
     const found = stageStatsRaw.find(r => r.stage === s);
     return { stage: s, count: found ? found.count : 0 };
   });
 
+  // 需跟进用户
+  const needFollowWhere = needFollowClause();
   const needFollowRaw = db.prepare(`
-    SELECT id, name, stage, wechat_id, wechat_account, importance, last_follow_date, next_talk_topic
-    FROM customers
-    WHERE next_talk_topic IS NOT NULL AND next_talk_topic != ''
-       OR last_follow_date IS NULL
-       OR last_follow_date < ?
-       OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?))
+    SELECT id, COALESCE(NULLIF(name, ''), nickname, child_name, '') as name, stage, wechat_id, wechat_account, importance, last_follow_date, next_talk_topic
+    FROM wx_users
+    WHERE ${needFollowWhere.sql}
     ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
              last_follow_date IS NULL DESC,
              last_follow_date ASC
-    LIMIT 20
-  `).all(sevenDaysAgo, today) as any[];
+    LIMIT 5
+  `).all(...needFollowWhere.params) as any[];
+
+  // 热门打卡活动排行
+  const popularActivities = db.prepare(`
+    SELECT a.name, 
+           COUNT(DISTINCT p.wx_user_id) as participant_count,
+           COUNT(r.id) as checkin_count,
+           ROUND(CAST(COUNT(r.id) AS FLOAT) / MAX(COUNT(DISTINCT p.wx_user_id), 1), 1) as avg_checkins_per_user
+    FROM checkin_events a
+    JOIN checkin_participants p ON p.event_id = a.id
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    GROUP BY a.id
+    ORDER BY checkin_count DESC
+    LIMIT 10
+  `).all() as any[];
+
+  // 最新加入的用户
+  const recentUsersRaw = db.prepare(`
+    SELECT COALESCE(NULLIF(name, ''), nickname, child_name, '') as display_name,
+           created_at, source, avatar_url
+    FROM wx_users
+    ORDER BY created_at DESC
+    LIMIT 5
+  `).all() as any[];
+  
+  const recentUsers = recentUsersRaw.map((u: any) => {
+    let validAvatarUrl = null;
+    if (u.avatar_url) {
+      const fileName = u.avatar_url.replace('/uploads/', '');
+      const filePath = path.join(uploadsDir, fileName);
+      if (fs.existsSync(filePath)) {
+        validAvatarUrl = u.avatar_url.replace(/^\/uploads\//, '/api/uploads/');
+      }
+    }
+    return {
+      ...u,
+      avatar_url: validAvatarUrl,
+    };
+  });
+
+  // 今日最新打卡记录
+  const recentCheckins = db.prepare(`
+    SELECT COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') as user_name,
+           a.name as activity_name,
+           r.checkin_date,
+           r.status
+    FROM checkin_records r
+    JOIN checkin_participants p ON r.participant_id = p.id
+    JOIN wx_users u ON p.wx_user_id = u.id
+    JOIN checkin_events a ON p.event_id = a.id
+    WHERE date(r.checkin_date) = ?
+    ORDER BY r.checkin_date DESC
+    LIMIT 10
+  `).all(today) as any[];
+
+  // 用户来源渠道分析
+  const sourceChannels = db.prepare(`
+    SELECT source as channel, COUNT(*) as count
+    FROM wx_users
+    WHERE source IS NOT NULL AND source != ''
+    GROUP BY source
+    ORDER BY count DESC
+  `).all() as any[];
+
+  // 打卡达人榜
+  const topCheckinUsersRaw = db.prepare(`
+    SELECT u.id, 
+           COALESCE(NULLIF(u.name, ''), u.nickname, '') as display_name,
+           u.child_name,
+           u.avatar_url,
+           COUNT(r.id) as checkin_count
+    FROM wx_users u
+    JOIN checkin_participants p ON p.wx_user_id = u.id
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    GROUP BY u.id
+    ORDER BY checkin_count DESC
+    LIMIT 10
+  `).all() as any[];
+  
+  const topCheckinUsers = topCheckinUsersRaw.map((u: any) => {
+    // 检查头像文件是否真实存在
+    let validAvatarUrl = null;
+    if (u.avatar_url) {
+      const fileName = u.avatar_url.replace('/uploads/', '');
+      const filePath = path.join(uploadsDir, fileName);
+      if (fs.existsSync(filePath)) {
+        validAvatarUrl = u.avatar_url.replace(/^\/uploads\//, '/api/uploads/');
+      }
+    }
+    return {
+      ...u,
+      avatar_url: validAvatarUrl,
+    };
+  });
 
   return ok({
     stats: {
-      today_revenue: todayRevenue || 0,
-      month_revenue: monthRevenue || 0,
-      total_customers: totalCustomers,
-      today_new_customers: todayNewCustomers,
-      pending_todos: todos.length,
-      need_follow_count: needFollowRaw.length,
-      new_friends_count: newFriendsCount,
-      silent_count: silentCount,
+      total_wx_users: totalWxUsers,
+      today_new_wx_users: todayNewWxUsers,
+      yesterday_new_wx_users: yesterdayNewWxUsers,
+      total_checkins: totalCheckins,
+      today_checkins: todayCheckins,
+      week_checkins: weekCheckins,
+      active_users_7d: activeUsers7d,
+      checkin_rate: checkinRate,
+      total_participants: totalParticipants,
     },
     stageStats,
-    needFollowCustomers: needFollowRaw.map(c => ({
+    needFollowUsers: needFollowRaw.map(c => ({
       ...c,
       stage: c.stage || 'new_friend',
       wechat_account: c.wechat_account || 'main',
     })),
-    revenueTrend: last7Days,
-    todos: todos.slice(0, 20),
-    recentOrders: recentOrdersRaw as OrderWithCustomer[]
+    newUserTrend,
+    checkinTrend,
+    popularActivities,
+    recentUsers,
+    recentCheckins,
+    sourceChannels,
+    topCheckinUsers,
   } satisfies DashboardData);
 });
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
 
+  const DISPLAY_NAME = "COALESCE(NULLIF(name, ''), nickname, child_name, '')";
+
+  const SEARCH_COLS = '(name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR child_name LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)';
+  /** 占位符个数跟着 SEARCH_COLS 走，增删可搜字段不用再改第二处 */
+  const SEARCH_PLACEHOLDERS = (SEARCH_COLS.match(/\?/g) || []).length;
+
+  interface WxUserQuery { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; page?: string; limit?: string; sort?: string; dir?: string }
+
+  /** 每人报名过几次活动、打过几次卡（只算审核通过的）、最近一次打卡在哪天 */
+  const ACTIVITY_JOIN = `
+    LEFT JOIN (
+      SELECT p.wx_user_id AS uid,
+             COUNT(DISTINCT p.id) AS signup_count,
+             COUNT(r.id) AS checkin_count,
+             MAX(r.checkin_date) AS last_checkin_date
+      FROM checkin_participants p
+      LEFT JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+      WHERE p.wx_user_id IS NOT NULL
+      GROUP BY p.wx_user_id
+    ) act ON act.uid = u.id`;
+
+  /** 列头可点的排序：键名 -> 排序表达式、默认方向、次级排序键 */
+  const SORTS: Record<string, { by: string; dir: 'ASC' | 'DESC'; then: string }> = {
+    activity: { by: 'MAX(COALESCE(substr(u.last_login_at, 1, 10), \'\'), COALESCE(act.last_checkin_date, \'\'))', dir: 'DESC', then: 'COALESCE(act.checkin_count, 0) DESC' },
+    joined: { by: 'u.created_at', dir: 'DESC', then: 'u.id DESC' },
+    points: { by: 'u.points', dir: 'DESC', then: 'u.id DESC' },
+  };
+
+  function buildWhere(f: WxUserQuery): { sql: string; params: any[] } {
+    let sql = ' WHERE 1=1';
+    const params: any[] = [];
+    if (f.search) { sql += ` AND ${SEARCH_COLS}`; params.push(...Array(SEARCH_PLACEHOLDERS).fill(`%${f.search}%`)); }
+    if (f.importance) { sql += ' AND importance = ?'; params.push(f.importance); }
+    if (f.stage) { sql += ' AND stage = ?'; params.push(f.stage); }
+    if (f.need_follow === 'true') { const nf = needFollowClause(); sql += ` AND ${nf.sql}`; params.push(...nf.params); }
+    if (f.tag) { sql += ' AND tags LIKE ?'; params.push(`%"${f.tag}"%`); }
+    return { sql, params };
+  }
+
   router.get('/', async (request: any) => {
-    const { search, importance, stage, need_follow, tag, page = '1', limit = '20' } = request.query as any;
-    const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
-    const today = bjtToday();
-    const sevenDaysAgo = bjtDaysAgo(7);
-    let sql = 'SELECT * FROM customers WHERE 1=1', params: any[] = [];
-    if (search) { sql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
-    if (importance) { sql += ' AND importance = ?'; params.push(importance); }
-    if (stage) { sql += ' AND stage = ?'; params.push(stage); }
-    if (need_follow === 'true') {
-      sql += " AND (next_talk_topic IS NOT NULL AND next_talk_topic != '' OR last_follow_date IS NULL OR last_follow_date < ? OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?)))";
-      params.push(sevenDaysAgo, today);
-    }
-    if (tag) { sql += ' AND tags LIKE ?'; params.push(`%"${tag}"%`); }
-    sql += " ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, last_follow_date IS NULL, last_follow_date DESC LIMIT ? OFFSET ?";
-    params.push(limitNum, offset);
-    const customers = (db.prepare(sql).all(...params) as any[]).map(mapCustomer);
-    let countSql = 'SELECT COUNT(*) as total FROM customers WHERE 1=1', cparams: any[] = [];
-    if (search) { countSql += ' AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR wechat_id LIKE ? OR wechat_remark LIKE ? OR douyin_nickname LIKE ? OR remark LIKE ? OR next_talk_topic LIKE ?)'; cparams.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
-    if (importance) { countSql += ' AND importance = ?'; cparams.push(importance); }
-    if (stage) { countSql += ' AND stage = ?'; cparams.push(stage); }
-    if (need_follow === 'true') {
-      countSql += " AND (next_talk_topic IS NOT NULL AND next_talk_topic != '' OR last_follow_date IS NULL OR last_follow_date < ? OR (stage = 'new_friend' AND (wechat_add_date IS NULL OR wechat_add_date <= ?)))";
-      cparams.push(sevenDaysAgo, today);
-    }
-    if (tag) { countSql += ' AND tags LIKE ?'; cparams.push(`%"${tag}"%`); }
-    const total = (db.prepare(countSql).get(...cparams) as any).total;
-    return ok({ customers, total });
+    const active = (request.query || {}) as WxUserQuery;
+    const pageNum = parseInt(active.page || '1'), limitNum = parseInt(active.limit || '20'), offset = (pageNum - 1) * limitNum;
+    const { sql: where, params } = buildWhere(active);
+    const total = (db.prepare(`SELECT COUNT(*) as total FROM wx_users${where}`).get(...params) as any).total;
+    const sort = SORTS[active.sort || 'activity'] || SORTS.activity;
+    const dir = active.dir === 'asc' ? 'ASC' : active.dir === 'desc' ? 'DESC' : sort.dir;
+    const rows = (db.prepare(
+      `SELECT u.*, ${DISPLAY_NAME} AS display_name,
+              COALESCE(act.signup_count, 0) AS signup_count,
+              COALESCE(act.checkin_count, 0) AS checkin_count,
+              act.last_checkin_date AS last_checkin_date
+       FROM wx_users u${ACTIVITY_JOIN}${where}
+       ORDER BY ${sort.by} ${dir}, ${sort.then}, u.id DESC
+       LIMIT ? OFFSET ?`
+    ).all(...params, limitNum, offset) as any[]).map(mapWxUser);
+
+    // 每个选项的命中人数：应用其他条件、忽略该选项自身的限制，这样计数随筛选联动
+    const groupCount = (col: 'importance' | 'stage') => {
+      const q = buildWhere({ ...active, [col]: undefined });
+      const grouped = db.prepare(`SELECT ${col} AS k, COUNT(*) AS c FROM wx_users${q.sql} GROUP BY ${col}`).all(...q.params) as { k: string | null; c: number }[];
+      const out: Record<string, number> = {};
+      for (const g of grouped) if (g.k) out[g.k] = g.c;
+      return out;
+    };
+    const nfQuery = buildWhere({ ...active, need_follow: 'true' });
+    const needFollowCount = (db.prepare(`SELECT COUNT(*) AS c FROM wx_users${nfQuery.sql}`).get(...nfQuery.params) as any).c;
+
+    return ok({
+      users: rows,
+      total,
+      facets: { importance: groupCount('importance'), stage: groupCount('stage'), need_follow: needFollowCount },
+    });
   });
 
   router.get('/all-tags', async () => {
-    const all = db.prepare('SELECT tags FROM customers').all() as any[];
+    const all = db.prepare('SELECT tags FROM wx_users').all() as any[];
     const tagSet = new Set<string>();
     all.forEach(c => parseJson(c.tags, [] as string[]).forEach((t: string) => tagSet.add(t)));
     return ok(Array.from(tagSet).sort());
@@ -383,60 +570,52 @@ app.register(async function (router) {
 
   router.get('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(id) as any;
-    if (!c) return reply.code(404).send({ success: false, error: '客户不存在' });
-    const customer = mapCustomer(c);
-    const ordersRaw = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier FROM orders o JOIN products p ON o.product_id = p.id WHERE o.customer_id = ? ORDER BY o.purchase_date DESC`).all(id) as any[];
-    const followUps = (db.prepare('SELECT * FROM follow_ups WHERE customer_id = ? ORDER BY date DESC, created_at DESC').all(id) as any[]).map(mapFollowUp);
-    const children = (db.prepare('SELECT * FROM children WHERE customer_id = ? ORDER BY created_at DESC').all(id) as any[]).map((ch: any) => ({
+    const row = db.prepare(`SELECT *, ${DISPLAY_NAME} AS display_name FROM wx_users WHERE id = ?`).get(id) as any;
+    if (!row) return reply.code(404).send({ success: false, error: '用户不存在' });
+    const user = mapWxUser(row);
+    const ordersRaw = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC`).all(id) as any[];
+    const followUps = (db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(id) as any[]).map(mapFollowUp);
+    const children = (db.prepare('SELECT * FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(id) as any[]).map((ch: any) => ({
       ...ch,
       weak_subjects: parseJson<string[]>(ch.weak_subjects, []),
     }));
-    return ok({ ...customer, children, orders: ordersRaw as OrderWithProduct[], follow_ups: followUps, suggestions: getCustomerSuggestions(id, customer) } satisfies Customer360);
+    return ok({ ...user, children, orders: ordersRaw as OrderWithProduct[], follow_ups: followUps, suggestions: getWxUserSuggestions(id, user) } satisfies WxUser360);
   });
 
   router.post('/', async (request: any, reply: any) => {
     const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account = 'main', douyin_nickname, source, importance = 'normal', stage = 'new_friend', tags = [], remark, next_talk_topic } = request.body;
     if (!name) return reply.code(400).send({ success: false, error: '备注名不能为空' });
-    const r = db.prepare('INSERT INTO customers (name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-      name, nickname || null, phone || null, wechat_id || null, wechat_remark || null, wechat_add_date || null, wechat_account, douyin_nickname || null, source || 'other', importance, stage, JSON.stringify(tags), remark || null, next_talk_topic || null
+    const r = db.prepare(`INSERT INTO wx_users (openid, name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      `manual_${randomUUID()}`, name, nickname || null, phone || null, wechat_id || null, wechat_remark || null, wechat_add_date || null, wechat_account, douyin_nickname || null, source || 'other', importance, stage, JSON.stringify(tags), remark || null, next_talk_topic || null
     );
-    return reply.code(201).send(ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(r.lastInsertRowid))));
+    return reply.code(201).send(ok(mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM wx_users WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '用户不存在' });
     const { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, tags, remark, next_talk_topic } = request.body;
     const fields: string[] = [], params: any[] = [];
-    if (name !== undefined) { fields.push('name = ?'); params.push(name); }
-    if (nickname !== undefined) { fields.push('nickname = ?'); params.push(nickname); }
-    if (phone !== undefined) { fields.push('phone = ?'); params.push(phone); }
-    if (wechat_id !== undefined) { fields.push('wechat_id = ?'); params.push(wechat_id); }
-    if (wechat_remark !== undefined) { fields.push('wechat_remark = ?'); params.push(wechat_remark); }
-    if (wechat_add_date !== undefined) { fields.push('wechat_add_date = ?'); params.push(wechat_add_date); }
-    if (wechat_account !== undefined) { fields.push('wechat_account = ?'); params.push(wechat_account); }
-    if (douyin_nickname !== undefined) { fields.push('douyin_nickname = ?'); params.push(douyin_nickname); }
-    if (source !== undefined) { fields.push('source = ?'); params.push(source); }
-    if (importance !== undefined) { fields.push('importance = ?'); params.push(importance); }
-    if (stage !== undefined) { fields.push('stage = ?'); params.push(stage); }
+    const editable = { name, nickname, phone, wechat_id, wechat_remark, wechat_add_date, wechat_account, douyin_nickname, source, importance, stage, remark, next_talk_topic };
+    for (const [key, value] of Object.entries(editable)) {
+      if (value !== undefined) { fields.push(`${key} = ?`); params.push(value); }
+    }
     if (tags !== undefined) { fields.push('tags = ?'); params.push(JSON.stringify(tags)); }
-    if (remark !== undefined) { fields.push('remark = ?'); params.push(remark); }
-    if (next_talk_topic !== undefined) { fields.push('next_talk_topic = ?'); params.push(next_talk_topic); }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    db.prepare(`UPDATE customers SET ${fields.join(', ')} WHERE id = ?`).run(...params);
-    return ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id)));
+    db.prepare(`UPDATE wx_users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+    return ok(mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id', async (request: any) => { db.prepare('DELETE FROM customers WHERE id = ?').run(parseInt(request.params.id)); return ok({ deleted: true }); });
+  router.delete('/:id', async (request: any) => { db.prepare('DELETE FROM wx_users WHERE id = ?').run(parseInt(request.params.id)); return ok({ deleted: true }); });
 
   router.post('/:id/follow-ups', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const { method, content, result, next_follow_date, is_live_note = false, child_id } = request.body;
     if (!method || !content) return reply.code(400).send({ success: false, error: '方式和内容不能为空' });
-    const r = db.prepare('INSERT INTO follow_ups (customer_id, child_id, method, content, result, next_follow_date, is_live_note) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, child_id || null, method, content, result || null, next_follow_date || null, is_live_note ? 1 : 0);
-    updateCustomerStats(id);
+    const r = db.prepare('INSERT INTO follow_ups (wx_user_id, child_id, method, content, result, next_follow_date, is_live_note) VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, child_id || null, method, content, result || null, next_follow_date || null, is_live_note ? 1 : 0);
+    updateWxUserStats(id);
     return reply.code(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
   });
 
@@ -447,41 +626,38 @@ app.register(async function (router) {
     const product = db.prepare('SELECT * FROM products WHERE id = ?').get(product_id) as any;
     if (!product) return reply.code(400).send({ success: false, error: '产品不存在' });
     const finalAmount = amount || product.price;
-    const existingCount = (db.prepare('SELECT COUNT(*) as c FROM orders WHERE customer_id = ?').get(id) as any).c;
+    const existingCount = (db.prepare('SELECT COUNT(*) as c FROM orders WHERE wx_user_id = ?').get(id) as any).c;
     const finalType = order_type || (existingCount === 0 ? 'first' : 'repurchase');
-    const r = db.prepare("INSERT INTO orders (order_no, customer_id, child_id, product_id, amount, order_type, remark, shipping_note, purchase_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))").run(generateOrderNo(), id, child_id || null, product_id, finalAmount, finalType, remark || null, shipping_note || null);
-    const wxUser = db.prepare('SELECT id FROM wx_users WHERE customer_id = ?').get(id) as any;
-    if (wxUser) {
-      const earned = Math.floor(finalAmount * getIntSetting('points_order_rate'));
-      if (earned > 0) grantOrderPoints(wxUser.id, r.lastInsertRowid as number, earned);
-    }
-    updateCustomerStats(id);
+    const r = db.prepare("INSERT INTO orders (order_no, wx_user_id, child_id, product_id, amount, order_type, remark, shipping_note, purchase_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, date('now'))").run(generateOrderNo(), id, child_id || null, product_id, finalAmount, finalType, remark || null, shipping_note || null);
+    const earned = Math.floor(finalAmount * getIntSetting('points_order_rate'));
+    if (earned > 0) grantOrderPoints(id, r.lastInsertRowid as number, earned);
+    updateWxUserStats(id);
     updateProductSales(product_id);
     return reply.code(201).send(ok(db.prepare('SELECT * FROM orders WHERE id = ?').get(r.lastInsertRowid)));
   });
 
   router.get('/:id/suggestions', async (request: any) => {
     const id = parseInt(request.params.id);
-    return ok(getCustomerSuggestions(id, mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id))));
+    return ok(getWxUserSuggestions(id, mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id))));
   });
 
   router.put('/:id/tags', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM wx_users WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '用户不存在' });
     const { tags } = request.body;
-    db.prepare("UPDATE customers SET tags = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(tags || []), id);
-    return ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id)));
+    db.prepare("UPDATE wx_users SET tags = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(tags || []), id);
+    return ok(mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id)));
   });
 
   router.put('/:id/importance', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '客户不存在' });
+    if (!db.prepare('SELECT id FROM wx_users WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '用户不存在' });
     const { importance } = request.body;
     if (!['vip', 'normal', 'watch'].includes(importance)) return reply.code(400).send({ success: false, error: '重要性值无效' });
-    db.prepare("UPDATE customers SET importance = ?, updated_at = datetime('now') WHERE id = ?").run(importance, id);
-    return ok(mapCustomer(db.prepare('SELECT * FROM customers WHERE id = ?').get(id)));
+    db.prepare("UPDATE wx_users SET importance = ?, updated_at = datetime('now') WHERE id = ?").run(importance, id);
+    return ok(mapWxUser(db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id)));
   });
-}, { prefix: '/api/customers' });
+}, { prefix: '/api/wx-users' });
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
@@ -535,10 +711,11 @@ app.register(async function (router) {
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
   router.get('/', async (request: any) => {
-    const { customer_id, page = '1', limit = '20' } = request.query as any;
+    const { wx_user_id, customer_id, page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
-    let sql = `SELECT o.*, c.name as customer_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN customers c ON o.customer_id = c.id JOIN products p ON o.product_id = p.id WHERE 1=1`, params: any[] = [];
-    if (customer_id) { sql += ' AND o.customer_id = ?'; params.push(customer_id); }
+    let sql = `SELECT o.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN wx_users c ON o.wx_user_id = c.id JOIN products p ON o.product_id = p.id WHERE 1=1`, params: any[] = [];
+    const owner = wx_user_id || customer_id;
+    if (owner) { sql += ' AND o.wx_user_id = ?'; params.push(owner); }
     sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?'; params.push(limitNum, offset);
     return ok({ orders: db.prepare(sql).all(...params), total: (db.prepare('SELECT COUNT(*) as total FROM orders').get() as any).total });
   });
@@ -547,9 +724,8 @@ app.register(async function (router) {
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM orders WHERE id = ?').run(id);
     if (order) {
-      const wxUser = db.prepare('SELECT id FROM wx_users WHERE customer_id = ?').get(order.customer_id) as any;
-      if (wxUser) revokeByRef(wxUser.id, 'order', id);
-      updateCustomerStats(order.customer_id);
+      revokeByRef(order.wx_user_id, 'order', id);
+      updateWxUserStats(order.wx_user_id);
       updateProductSales(order.product_id);
     }
     return ok(null);
@@ -558,11 +734,12 @@ app.register(async function (router) {
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
-  router.get('/customer/:cid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE customer_id = ? ORDER BY date DESC, created_at DESC').all(parseInt(request.params.cid)) as any[]).map(mapFollowUp)));
+  router.get('/customer/:cid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(parseInt(request.params.cid)) as any[]).map(mapFollowUp)));
+  router.get('/wx-user/:uid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(parseInt(request.params.uid)) as any[]).map(mapFollowUp)));
   router.get('/', async (request: any) => {
     const { page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
-    return ok({ follow_ups: (db.prepare(`SELECT f.*, c.name as customer_name FROM follow_ups f JOIN customers c ON f.customer_id = c.id ORDER BY f.date DESC, f.created_at DESC LIMIT ? OFFSET ?`).all(limitNum, offset) as any[]).map(mapFollowUp) });
+    return ok({ follow_ups: (db.prepare(`SELECT f.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name FROM follow_ups f JOIN wx_users c ON f.wx_user_id = c.id ORDER BY f.date DESC, f.created_at DESC LIMIT ? OFFSET ?`).all(limitNum, offset) as any[]).map(mapFollowUp) });
   });
   router.put('/:id', async (request: any) => {
     const id = parseInt(request.params.id);
@@ -579,9 +756,9 @@ app.register(async function (router) {
   });
   router.delete('/:id', async (request: any) => {
     const id = parseInt(request.params.id);
-    const f = db.prepare('SELECT customer_id FROM follow_ups WHERE id = ?').get(id) as any;
+    const f = db.prepare('SELECT wx_user_id FROM follow_ups WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM follow_ups WHERE id = ?').run(id);
-    if (f) updateCustomerStats(f.customer_id);
+    if (f) updateWxUserStats(f.wx_user_id);
     return ok(null);
   });
 }, { prefix: '/api/follow-ups' });
@@ -624,21 +801,22 @@ app.register(async function (router) {
   router.get('/search', async (request: any) => {
     const q = (request.query as any).q || '';
     if (!q || q.length < 1) return ok([]);
-    const customers = (db.prepare('SELECT * FROM customers WHERE name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ? LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as any[]).map(mapCustomer);
+    const users = (db.prepare('SELECT * FROM wx_users WHERE name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ? LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as any[]).map(mapWxUser);
     const results: LiveCustomerCard[] = [];
-    for (const c of customers) {
-      const recentOrders = db.prepare('SELECT p.name as product_name, o.purchase_date, o.amount FROM orders o JOIN products p ON o.product_id = p.id WHERE o.customer_id = ? ORDER BY o.purchase_date DESC LIMIT 3').all(c.id) as any[];
-      const recentFollowUp = db.prepare('SELECT content, date FROM follow_ups WHERE customer_id = ? ORDER BY date DESC LIMIT 1').get(c.id) as any;
-      const children = db.prepare('SELECT id, nickname, grade FROM children WHERE customer_id = ? ORDER BY created_at DESC').all(c.id) as any[];
-      results.push({ id: c.id, name: c.name, nickname: c.nickname, avatar: c.avatar, importance: c.importance, tags: c.tags, total_spent: c.total_spent, order_count: c.order_count, last_order_date: c.last_order_date, last_follow_date: c.last_follow_date, recent_orders: recentOrders, recent_follow_up: recentFollowUp ? { content: recentFollowUp.content, date: recentFollowUp.date } : null, suggestions: getCustomerSuggestions(c.id, c).slice(0, 2), children: children.length > 0 ? children : undefined });
+    for (const u of users) {
+      const recentOrders = db.prepare('SELECT p.name as product_name, o.purchase_date, o.amount FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC LIMIT 3').all(u.id) as any[];
+      const recentFollowUp = db.prepare('SELECT content, date FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC LIMIT 1').get(u.id) as any;
+      const children = db.prepare('SELECT id, nickname, grade FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(u.id) as any[];
+      results.push({ id: u.id, name: displayName(u), nickname: u.nickname, avatar: u.avatar_url, importance: u.importance, tags: u.tags, total_spent: u.total_spent, order_count: u.order_count, last_order_date: u.last_order_date, last_follow_date: u.last_follow_date, recent_orders: recentOrders, recent_follow_up: recentFollowUp ? { content: recentFollowUp.content, date: recentFollowUp.date } : null, suggestions: getWxUserSuggestions(u.id, u).slice(0, 2), children: children.length > 0 ? children : undefined });
     }
     return ok(results);
   });
   router.post('/quick-note', async (request: any, reply: any) => {
-    const { customer_id, content, child_id } = request.body;
-    if (!customer_id || !content) return reply.code(400).send({ success: false, error: '客户和内容不能为空' });
-    const r = db.prepare("INSERT INTO follow_ups (customer_id, child_id, method, content, is_live_note) VALUES (?, ?, 'live', ?, 1)").run(customer_id, child_id || null, content);
-    updateCustomerStats(customer_id);
+    const { wx_user_id, customer_id, content, child_id } = request.body;
+    const owner = wx_user_id || customer_id;
+    if (!owner || !content) return reply.code(400).send({ success: false, error: '用户和内容不能为空' });
+    const r = db.prepare("INSERT INTO follow_ups (wx_user_id, child_id, method, content, is_live_note) VALUES (?, ?, 'live', ?, 1)").run(owner, child_id || null, content);
+    updateWxUserStats(owner);
     return reply.code(201).send(ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(r.lastInsertRowid))));
   });
 }, { prefix: '/api/live' });
@@ -746,12 +924,12 @@ app.register(async function (router) {
   router.post('/:id/members', async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.code(404).send({ success: false, error: '群不存在' });
-    const { wechat_name, nickname, role = 'active', tags = [], customer_id, activity_score = 50, remark } = request.body;
+    const { wechat_name, nickname, role = 'active', tags = [], wx_user_id, activity_score = 50, remark } = request.body;
     if (!wechat_name) return reply.code(400).send({ success: false, error: '微信昵称不能为空' });
     const r = db.prepare(`
-      INSERT INTO wechat_group_members (group_id, wechat_name, nickname, role, tags, customer_id, activity_score, remark)
+      INSERT INTO wechat_group_members (group_id, wechat_name, nickname, role, tags, wx_user_id, activity_score, remark)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(groupId, wechat_name, nickname || null, role, JSON.stringify(tags), customer_id || null, activity_score || 50, remark || null);
+    `).run(groupId, wechat_name, nickname || null, role, JSON.stringify(tags), wx_user_id || null, activity_score || 50, remark || null);
     db.prepare("UPDATE wechat_groups SET updated_at = datetime('now'), member_count = (SELECT COUNT(*) FROM wechat_group_members WHERE group_id = ?) WHERE id = ?").run(groupId, groupId);
     return reply.code(201).send(ok(mapGroupMember(db.prepare('SELECT * FROM wechat_group_members WHERE id = ?').get(r.lastInsertRowid))));
   });
@@ -761,13 +939,13 @@ app.register(async function (router) {
     const memberId = parseInt(request.params.memberId);
     if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(groupId)) return reply.code(404).send({ success: false, error: '群不存在' });
     if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.code(404).send({ success: false, error: '成员不存在' });
-    const { wechat_name, nickname, role, tags, customer_id, activity_score, remark } = request.body;
+    const { wechat_name, nickname, role, tags, wx_user_id, activity_score, remark } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (wechat_name !== undefined) { fields.push('wechat_name = ?'); params.push(wechat_name); }
     if (nickname !== undefined) { fields.push('nickname = ?'); params.push(nickname); }
     if (role !== undefined) { fields.push('role = ?'); params.push(role); }
     if (tags !== undefined) { fields.push('tags = ?'); params.push(JSON.stringify(tags)); }
-    if (customer_id !== undefined) { fields.push('customer_id = ?'); params.push(customer_id); }
+    if (wx_user_id !== undefined) { fields.push('wx_user_id = ?'); params.push(wx_user_id); }
     if (activity_score !== undefined) { fields.push('activity_score = ?'); params.push(activity_score); }
     if (remark !== undefined) { fields.push('remark = ?'); params.push(remark); }
     params.push(memberId);
@@ -784,6 +962,12 @@ app.register(async function (router) {
     return ok(null);
   });
 }, { prefix: '/api/wechat-groups' });
+
+/** 本地时区的 YYYY-MM-DD：toISOString 会把深夜的北京时间算到前一天，日期字段不能用它 */
+function localDateText(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function mapChild(ch: any): Child {
   return { ...ch, weak_subjects: parseJson<string[]>(ch.weak_subjects, []) };
@@ -817,9 +1001,10 @@ app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
 
   router.get('/', async (request: any) => {
-    const { customer_id } = request.query as any;
-    if (!customer_id) return ok([]);
-    return ok((db.prepare('SELECT * FROM children WHERE customer_id = ? ORDER BY created_at DESC').all(parseInt(customer_id)) as any[]).map(mapChild));
+    const { wx_user_id, customer_id } = request.query as any;
+    const owner = wx_user_id || customer_id;
+    if (!owner) return ok([]);
+    return ok((db.prepare('SELECT * FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(parseInt(owner)) as any[]).map(mapChild));
   });
 
   router.get('/:id', async (request: any, reply: any) => {
@@ -833,7 +1018,7 @@ app.register(async function (router) {
       JOIN learning_paths lp ON cp.path_id = lp.id
       LEFT JOIN learning_stages ls ON cp.current_stage_id = ls.id
       WHERE cp.child_id = ?
-      ORDER BY cp.created_at DESC
+      ORDER BY cp.updated_at DESC
     `).all(id) as any[];
     const progress = progressRaw.map(mapProgress);
     const ordersRaw = db.prepare(`
@@ -852,26 +1037,34 @@ app.register(async function (router) {
   });
 
   router.post('/', async (request: any, reply: any) => {
-    const { customer_id, nickname, gender, birth_date, grade, region, textbook_version, weak_subjects = [], notes } = request.body;
-    if (!customer_id || !nickname || !grade) return reply.code(400).send({ success: false, error: '家长ID、昵称和年级不能为空' });
-    if (!db.prepare('SELECT id FROM customers WHERE id = ?').get(customer_id)) return reply.code(404).send({ success: false, error: '客户不存在' });
+    const { wx_user_id, customer_id, nickname, gender, birth_date, grade, region, textbook_version, weak_subjects = [], notes } = request.body;
+    const owner = wx_user_id || customer_id;
+    if (!owner || !nickname || !grade) return reply.code(400).send({ success: false, error: '家长ID、昵称和年级不能为空' });
+    if (!db.prepare('SELECT id FROM wx_users WHERE id = ?').get(owner)) return reply.code(404).send({ success: false, error: '用户不存在' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const r = db.prepare(`
-      INSERT INTO children (customer_id, nickname, gender, birth_date, grade, region, textbook_version, weak_subjects, notes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(customer_id, nickname, gender || null, birth_date || null, grade, region || null, textbook_version || null, JSON.stringify(weak_subjects), notes || null, now, now);
+      INSERT INTO children (wx_user_id, nickname, gender, birth_date, grade, grade_as_of, region, textbook_version, weak_subjects, notes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(owner, nickname, gender || null, birth_date || null, grade, localDateText(), region || null, textbook_version || null, JSON.stringify(weak_subjects), notes || null, now, now);
     return reply.code(201).send(ok(mapChild(db.prepare('SELECT * FROM children WHERE id = ?').get(r.lastInsertRowid))));
   });
 
   router.put('/:id', async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
-    if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '孩子不存在' });
-    const { nickname, gender, birth_date, grade, region, textbook_version, weak_subjects, notes } = request.body;
+    const stored = db.prepare('SELECT id, grade FROM children WHERE id = ?').get(id) as any;
+    if (!stored) return reply.code(404).send({ success: false, error: '孩子不存在' });
+    const { nickname, gender, birth_date, grade, region, textbook_version, weak_subjects, notes, confirm_grade } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (nickname !== undefined) { fields.push('nickname = ?'); params.push(nickname); }
     if (gender !== undefined) { fields.push('gender = ?'); params.push(gender); }
     if (birth_date !== undefined) { fields.push('birth_date = ?'); params.push(birth_date); }
-    if (grade !== undefined) { fields.push('grade = ?'); params.push(grade); }
+    // 只在年级真的换过时续确认日期；否则改个备注就会把「待确认」提示悄悄抹掉
+    if (grade !== undefined && grade !== stored.grade) {
+      fields.push('grade = ?'); params.push(grade);
+      fields.push('grade_as_of = ?'); params.push(localDateText());
+    } else if (confirm_grade) {
+      fields.push('grade_as_of = ?'); params.push(localDateText());
+    }
     if (region !== undefined) { fields.push('region = ?'); params.push(region); }
     if (textbook_version !== undefined) { fields.push('textbook_version = ?'); params.push(textbook_version); }
     if (weak_subjects !== undefined) { fields.push('weak_subjects = ?'); params.push(JSON.stringify(weak_subjects)); }
@@ -1253,14 +1446,18 @@ app.register(async function (router) {
     
     const autoImportMembers = normalizeBoolean(request.body.auto_import_members);
     if (group_id && autoImportMembers) {
-      const members = db.prepare('SELECT id, wechat_name, nickname, customer_id FROM wechat_group_members WHERE group_id = ?').all(group_id) as any[];
+      const members = db.prepare(`
+        SELECT gm.id, gm.wechat_name, gm.nickname, gm.wx_user_id, u.child_name
+        FROM wechat_group_members gm LEFT JOIN wx_users u ON gm.wx_user_id = u.id
+        WHERE gm.group_id = ?
+      `).all(group_id) as any[];
       const insertParticipant = db.prepare(`
-        INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
+        INSERT INTO checkin_participants (event_id, member_id, wx_user_id, nickname, child_name)
         VALUES (?, ?, ?, ?, ?)
       `);
       const insertMembers = db.transaction((mems: any[]) => {
         for (const m of mems) {
-          insertParticipant.run(r.lastInsertRowid, m.id, m.customer_id || null, m.nickname || m.wechat_name, null);
+          insertParticipant.run(r.lastInsertRowid, m.id, m.wx_user_id || null, m.nickname || m.wechat_name, m.child_name || null);
         }
       });
       insertMembers(members);
@@ -1344,12 +1541,12 @@ app.register(async function (router) {
   router.post('/:id/participants', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
-    const { member_id, customer_id, nickname, child_name } = request.body;
+    const { member_id, wx_user_id, nickname, child_name } = request.body;
     if (!nickname) return reply.code(400).send({ success: false, error: '昵称不能为空' });
     const r = db.prepare(`
-      INSERT INTO checkin_participants (event_id, member_id, customer_id, nickname, child_name)
+      INSERT INTO checkin_participants (event_id, member_id, wx_user_id, nickname, child_name)
       VALUES (?, ?, ?, ?, ?)
-    `).run(eventId, member_id || null, customer_id || null, nickname, child_name || null);
+    `).run(eventId, member_id || null, wx_user_id || null, nickname, child_name || null);
     return reply.code(201).send(ok(mapCheckinParticipant(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid))));
   });
 
@@ -2753,50 +2950,6 @@ app.register(async function (router) {
 // ---- 微信用户与积分管理 ----
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
-
-  router.get('/', async (request: any) => {
-    const { search, unlinked } = request.query as any;
-    let sql = `
-      SELECT wu.*, c.name AS customer_name
-      FROM wx_users wu
-      LEFT JOIN customers c ON wu.customer_id = c.id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
-    if (search) {
-      sql += ' AND (wu.nickname LIKE ? OR wu.child_name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    if (unlinked === 'true' || unlinked === '1') {
-      sql += ' AND wu.customer_id IS NULL';
-    }
-    sql += ' ORDER BY wu.last_login_at DESC, wu.id DESC';
-    const users = db.prepare(sql).all(...params);
-    const total = (db.prepare('SELECT COUNT(*) as total FROM wx_users').get() as any).total;
-    return ok({ users, total });
-  });
-
-  router.put('/:id/link', async (request: any, reply: any) => {
-    const id = parseInt(request.params.id);
-    const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(id) as any;
-    if (!user) return reply.code(404).send({ success: false, error: '微信用户不存在' });
-    const { customer_id } = request.body;
-    if (customer_id != null) {
-      const customer = db.prepare('SELECT id FROM customers WHERE id = ?').get(parseInt(customer_id, 10) || 0);
-      if (!customer) return reply.code(400).send({ success: false, error: '客户不存在' });
-      // 保持客户↔微信用户 1:1，避免订单积分归属歧义
-      db.prepare('UPDATE wx_users SET customer_id = NULL WHERE customer_id = ?').run(parseInt(customer_id, 10));
-    }
-    db.prepare("UPDATE wx_users SET customer_id = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(customer_id != null ? parseInt(customer_id, 10) : null, id);
-    const updated = db.prepare(`
-      SELECT wu.*, c.name AS customer_name
-      FROM wx_users wu
-      LEFT JOIN customers c ON wu.customer_id = c.id
-      WHERE wu.id = ?
-    `).get(id);
-    return ok(updated);
-  });
 
   router.post('/:id/points', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Customer, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, Customer360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress, CheckinEvent, CheckinEventDetail, CheckinParticipant, CheckinRecord, Material, WxUserWithPoints, PointsLedgerItem, PointsConfig } from '../../shared/types';
+import type { WxUser, WxUserFacets, Product, Order, FollowUp, DashboardData, TodoItem, LiveCustomerCard, WxUser360, CustomerSuggestion, WechatGroup, WechatGroupMember, Child, ChildPatch, ChildWithProgress, Textbook, LearningPath, LearningStage, ChildLearningProgress, CheckinEvent, CheckinEventDetail, CheckinParticipant, CheckinRecord, Material, PointsLedgerItem, PointsConfig } from '../../shared/types';
 
 const API_BASE = '/api';
 
@@ -42,56 +42,58 @@ export async function fetchTodos() {
   return request<TodoItem[]>('/actions/todos');
 }
 
-export async function fetchCustomers(params: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; page?: number; limit?: number } = {}) {
+export async function fetchWxUsers(params: { search?: string; importance?: string; stage?: string; need_follow?: string; tag?: string; sort?: string; dir?: string; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
   if (params.search) qs.set('search', params.search);
   if (params.importance) qs.set('importance', params.importance);
   if (params.stage) qs.set('stage', params.stage);
   if (params.need_follow) qs.set('need_follow', params.need_follow);
   if (params.tag) qs.set('tag', params.tag);
+  if (params.sort) qs.set('sort', params.sort);
+  if (params.dir) qs.set('dir', params.dir);
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
-  return request<{ customers: Customer[]; total: number }>(`/customers?${qs.toString()}`);
+  return request<{ users: WxUser[]; total: number; facets: WxUserFacets }>(`/wx-users?${qs.toString()}`);
 }
 
 export async function fetchAllTags() {
-  return request<string[]>('/customers/all-tags');
+  return request<string[]>('/wx-users/all-tags');
 }
 
-export async function fetchCustomer(id: number) {
-  return request<Customer360>(`/customers/${id}`);
+export async function fetchWxUser(id: number) {
+  return request<WxUser360>(`/wx-users/${id}`);
 }
 
-export async function createCustomer(data: Partial<Customer>) {
-  return request<Customer>('/customers', { method: 'POST', body: JSON.stringify(data) });
+export async function createWxUser(data: Partial<WxUser>) {
+  return request<WxUser>('/wx-users', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function updateCustomer(id: number, data: Partial<Customer>) {
-  return request<Customer>(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export async function updateWxUser(id: number, data: Partial<WxUser>) {
+  return request<WxUser>(`/wx-users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
-export async function deleteCustomer(id: number) {
-  return request<null>(`/customers/${id}`, { method: 'DELETE' });
+export async function deleteWxUser(id: number) {
+  return request<null>(`/wx-users/${id}`, { method: 'DELETE' });
 }
 
-export async function updateCustomerTags(id: number, tags: string[]) {
-  return request<Customer>(`/customers/${id}/tags`, { method: 'PUT', body: JSON.stringify({ tags }) });
+export async function updateWxUserTags(id: number, tags: string[]) {
+  return request<WxUser>(`/wx-users/${id}/tags`, { method: 'PUT', body: JSON.stringify({ tags }) });
 }
 
-export async function updateCustomerImportance(id: number, importance: string) {
-  return request<Customer>(`/customers/${id}/importance`, { method: 'PUT', body: JSON.stringify({ importance }) });
+export async function updateWxUserImportance(id: number, importance: string) {
+  return request<WxUser>(`/wx-users/${id}/importance`, { method: 'PUT', body: JSON.stringify({ importance }) });
 }
 
-export async function createFollowUp(customerId: number, data: Partial<FollowUp>) {
-  return request<FollowUp>(`/customers/${customerId}/follow-ups`, { method: 'POST', body: JSON.stringify(data) });
+export async function createFollowUp(wxUserId: number, data: Partial<FollowUp>) {
+  return request<FollowUp>(`/wx-users/${wxUserId}/follow-ups`, { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function createOrder(customerId: number, data: Partial<Order>) {
-  return request<Order>(`/customers/${customerId}/orders`, { method: 'POST', body: JSON.stringify(data) });
+export async function createOrder(wxUserId: number, data: Partial<Order>) {
+  return request<Order>(`/wx-users/${wxUserId}/orders`, { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function fetchCustomerSuggestions(id: number) {
-  return request<CustomerSuggestion[]>(`/customers/${id}/suggestions`);
+export async function fetchWxUserSuggestions(id: number) {
+  return request<CustomerSuggestion[]>(`/wx-users/${id}/suggestions`);
 }
 
 export async function fetchProducts(params: { tier?: string; page?: number; limit?: number } = {}) {
@@ -118,20 +120,20 @@ export async function deleteProduct(id: number) {
   return request<null>(`/products/${id}`, { method: 'DELETE' });
 }
 
-export async function fetchOrders(params: { customer_id?: number; page?: number; limit?: number } = {}) {
+export async function fetchOrders(params: { wx_user_id?: number; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
-  if (params.customer_id) qs.set('customer_id', String(params.customer_id));
+  if (params.wx_user_id) qs.set('wx_user_id', String(params.wx_user_id));
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
-  return request<{ orders: (Order & { customer_name: string; product_name: string; product_tier: string; child_name?: string | null })[]; total: number }>(`/orders?${qs.toString()}`);
+  return request<{ orders: (Order & { wx_user_name: string; product_name: string; product_tier: string; child_name?: string | null })[]; total: number }>(`/orders?${qs.toString()}`);
 }
 
 export async function deleteOrder(id: number) {
   return request<null>(`/orders/${id}`, { method: 'DELETE' });
 }
 
-export async function fetchFollowUps(customerId: number) {
-  return request<FollowUp[]>(`/follow-ups/customer/${customerId}`);
+export async function fetchFollowUps(wxUserId: number) {
+  return request<FollowUp[]>(`/follow-ups/wx-user/${wxUserId}`);
 }
 
 export async function updateFollowUp(id: number, data: Partial<FollowUp>) {
@@ -162,8 +164,8 @@ export async function liveSearch(q: string) {
   return request<LiveCustomerCard[]>(`/live/search?q=${encodeURIComponent(q)}`);
 }
 
-export async function liveQuickNote(customer_id: number, content: string, child_id?: number | null) {
-  return request<FollowUp>('/live/quick-note', { method: 'POST', body: JSON.stringify({ customer_id, content, child_id: child_id || null }) });
+export async function liveQuickNote(wx_user_id: number, content: string, child_id?: number | null) {
+  return request<FollowUp>('/live/quick-note', { method: 'POST', body: JSON.stringify({ wx_user_id, content, child_id: child_id || null }) });
 }
 
 export async function fetchGroups(params: { status?: string; search?: string } = {}) {
@@ -208,19 +210,19 @@ export async function batchAddGroupMembers(groupId: number, names: string[], rol
   });
 }
 
-export async function fetchChildren(customerId: number) {
-  return request<Child[]>(`/children?customer_id=${customerId}`);
+export async function fetchChildren(wxUserId: number) {
+  return request<Child[]>(`/children?wx_user_id=${wxUserId}`);
 }
 
 export async function fetchChild(id: number) {
   return request<ChildWithProgress>(`/children/${id}`);
 }
 
-export async function createChild(data: Partial<Child> & { customer_id: number }) {
+export async function createChild(data: Partial<Child> & { wx_user_id: number }) {
   return request<Child>('/children', { method: 'POST', body: JSON.stringify(data) });
 }
 
-export async function updateChild(id: number, data: Partial<Child>) {
+export async function updateChild(id: number, data: ChildPatch) {
   return request<Child>(`/children/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
@@ -467,17 +469,6 @@ export async function downloadBackup(name: string) {
 }
 
 // ========== 微信用户与积分 ==========
-
-export async function fetchWxUsers(params: { search?: string; unlinked?: boolean } = {}) {
-  const qs = new URLSearchParams();
-  if (params.search) qs.set('search', params.search);
-  if (params.unlinked) qs.set('unlinked', 'true');
-  return request<{ users: WxUserWithPoints[]; total: number }>(`/wx-users?${qs.toString()}`);
-}
-
-export async function linkWxUser(id: number, customer_id: number | null) {
-  return request<WxUserWithPoints>(`/wx-users/${id}/link`, { method: 'PUT', body: JSON.stringify({ customer_id }) });
-}
 
 export async function adjustWxUserPoints(id: number, amount: number, note?: string) {
   return request<{ new_balance: number }>(`/wx-users/${id}/points`, { method: 'POST', body: JSON.stringify({ amount, note }) });

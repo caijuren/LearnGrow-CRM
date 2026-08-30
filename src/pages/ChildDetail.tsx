@@ -10,6 +10,7 @@ import { useStore } from '@/store';
 import {
   ORDER_TYPE_LABELS, ORDER_TYPE_COLORS, FOLLOW_UP_METHOD_LABELS, FOLLOW_UP_RESULT_LABELS,
   GRADES, GENDERS, SUBJECTS,
+  gradeLabel, isGradeStale, schoolYearStart, schoolYearLabel, currentSchoolYearStart,
   type FollowUpMethod, type ProgressStatus, type ChildLearningProgress,
 } from '../../shared/types';
 import Empty from '@/components/Empty';
@@ -228,12 +229,25 @@ export default function ChildDetail() {
     }
   };
 
+  /** 年级值没变、只是确认它仍然有效：刷新确认日期，让「待确认」提示消失 */
+  const handleConfirmGrade = async () => {
+    if (!childId || !child) return;
+    setSubmitting(true);
+    try {
+      await editChild(Number(childId), { confirm_grade: true });
+    } catch (e) {
+      console.error('确认年级失败:', e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDeleteChild = async () => {
     if (!childId || !child) return;
     setDeleteSubmitting(true);
     try {
-      await removeChild(Number(childId), child.customer_id);
-      navigate(`/customers/${child.customer_id}`);
+      await removeChild(Number(childId), child.wx_user_id);
+      navigate(`/wx-users/${child.wx_user_id}`);
     } catch (e) {
       console.error('删除孩子失败:', e);
     } finally {
@@ -273,7 +287,7 @@ export default function ChildDetail() {
       <div className="page-shell page-enter">
         <div className="max-w-4xl mx-auto">
           <button
-            onClick={() => navigate('/customers')}
+            onClick={() => navigate('/wx-users')}
             className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md flex items-center justify-center mb-6 transition-all"
           >
             <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -284,10 +298,10 @@ export default function ChildDetail() {
             description="该孩子信息可能已被删除"
             action={
               <button
-                onClick={() => navigate('/customers')}
+                onClick={() => navigate('/wx-users')}
                 className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-5 py-2.5 rounded-xl font-medium text-sm"
               >
-                返回客户列表
+                返回用户列表
               </button>
             }
           />
@@ -312,7 +326,7 @@ export default function ChildDetail() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(`/customers/${child.customer_id}`)}
+              onClick={() => navigate(`/wx-users/${child.wx_user_id}`)}
               className="w-10 h-10 rounded-xl bg-white shadow-sm hover:shadow-md flex items-center justify-center transition-all"
             >
               <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -355,9 +369,20 @@ export default function ChildDetail() {
                   {genderLabel}
                 </span>
                 {child.grade && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"
+                    title={child.grade_as_of ? `${schoolYearLabel(schoolYearStart(child.grade_as_of))}确认` : '尚未记录确认学年'}
+                  >
                     <BookOpen className="w-3 h-3" />
-                    {child.grade}
+                    {gradeLabel(child.grade)}
+                  </span>
+                )}
+                {child.grade && isGradeStale(child.grade_as_of) && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                    年级待确认
+                    <button onClick={handleConfirmGrade} className="font-semibold underline underline-offset-2">
+                      仍读{gradeLabel(child.grade)}
+                    </button>
                   </span>
                 )}
               </div>
@@ -575,7 +600,7 @@ export default function ChildDetail() {
                             )}
                             {hasUnpurchasedProducts(progress) && (
                               <button
-                                onClick={() => navigate(`/customers/${child.customer_id}?tab=orders`)}
+                                onClick={() => navigate(`/wx-users/${child.wx_user_id}?tab=orders`)}
                                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-medium shadow-sm/30 transition-all"
                               >
                                 <ShoppingCart className="w-4 h-4" />
@@ -825,9 +850,10 @@ export default function ChildDetail() {
                   >
                     <option value="">请选择</option>
                     {GRADES.map(g => (
-                      <option key={g} value={g}>{g}</option>
+                      <option key={g} value={g}>{gradeLabel(g)}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-slate-400 mt-1">按孩子现在在读的年级填（{schoolYearLabel(currentSchoolYearStart())}），新学年开学后系统会提示重新确认</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1.5 block">出生日期</label>

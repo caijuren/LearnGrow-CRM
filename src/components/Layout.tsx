@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, MessageCircle, BarChart3, Package,
-  FileText, GraduationCap, Library, Video, Bell, Search,
+  GraduationCap, Library, Bell, Search,
   ChevronDown, Settings, LogOut, User, Sparkles, Sun, Moon,
 } from 'lucide-react';
 import { useStore } from '@/store';
@@ -28,10 +28,9 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    label: '客户运营',
+    label: '用户运营',
     items: [
-      { to: '/customers', label: '客户管理', icon: <Users size={16} strokeWidth={1.8} />, badge: '5' },
-      { to: '/wx-users', label: '微信用户', icon: <User size={16} strokeWidth={1.8} /> },
+      { to: '/wx-users', label: '微信用户', icon: <Users size={16} strokeWidth={1.8} /> },
       { to: '/groups', label: '微信群管理', icon: <MessageCircle size={16} strokeWidth={1.8} /> },
       { to: '/checkin', label: '打卡统计', icon: <BarChart3 size={16} strokeWidth={1.8} /> },
     ],
@@ -40,7 +39,6 @@ const navSections: NavSection[] = [
     label: '交易管理',
     items: [
       { to: '/products', label: '商品管理', icon: <Package size={16} strokeWidth={1.8} /> },
-      { to: '/orders', label: '订单记录', icon: <FileText size={16} strokeWidth={1.8} /> },
     ],
   },
   {
@@ -48,12 +46,6 @@ const navSections: NavSection[] = [
     items: [
       { to: '/learning-paths', label: '学习路径', icon: <GraduationCap size={16} strokeWidth={1.8} /> },
       { to: '/materials', label: '资料库', icon: <Library size={16} strokeWidth={1.8} /> },
-    ],
-  },
-  {
-    label: '运营工具',
-    items: [
-      { to: '/live', label: '直播工作台', icon: <Video size={16} strokeWidth={1.8} /> },
     ],
   },
   {
@@ -154,7 +146,7 @@ export const Layout: React.FC = () => {
               </div>
               <input
                 type="text"
-                placeholder="搜索客户、商品、订单..."
+                placeholder="搜索用户、商品、订单..."
                 className="w-full h-10 pl-10 pr-3 rounded-xl bg-bg-subtle text-sm text-text-primary
                            placeholder:text-text-tertiary border border-transparent
                            focus:outline-none focus:bg-bg-surface focus:border-border-default focus:ring-2 focus:ring-primary/10

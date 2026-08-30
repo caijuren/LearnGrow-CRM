@@ -12,6 +12,7 @@
     "check": "tsc --noEmit",
     "preflight:prod": "tsx scripts/preflight-prod.ts",
     "data:clear-demo": "tsx scripts/clear-demo-data.ts",
+    "data:clear-demo-customers": "tsx scripts/clear-demo-customers.ts",
     "admin:reset": "tsx scripts/reset-admin-password.ts",
     "backup": "tsx scripts/backup.ts",
     "backup:restore": "tsx scripts/restore-backup.ts",

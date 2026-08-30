@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Users, Calendar, CheckCircle2, Circle, Award,
   Plus, UserPlus, Check, Search, ChevronLeft, ChevronRight,
-  Trash2, Flame, Trophy, Target, FileText, Gift, BookOpen,
+  Trash2, Flame, Trophy, Target, FileText, Gift,
   Download, Eye, ThumbsUp, ThumbsDown, Edit2,
 } from 'lucide-react';
 import { useStore } from '@/store';
@@ -14,18 +14,16 @@ import { CHECKIN_STATUS_LABELS } from '../../shared/types';
 import {
   fetchCheckinRecords, reviewCheckinRecord,
   fetchEventBadges, createEventBadge, updateEventBadge, deleteEventBadge,
-  fetchEventMaterials, createEventMaterial, updateEventMaterial, deleteEventMaterial,
   fetchEventRewards, distributeReward, getExportUrl,
 } from '@/lib/api';
 import Modal from '@/components/Modal';
 
-type TabKey = 'checkin' | 'review' | 'badges' | 'materials' | 'rewards';
+type TabKey = 'checkin' | 'review' | 'badges' | 'rewards';
 
 const TABS: { key: TabKey; label: string; icon: any }[] = [
   { key: 'checkin', label: '打卡管理', icon: Calendar },
   { key: 'review', label: '打卡审核', icon: Eye },
   { key: 'badges', label: '徽章管理', icon: Award },
-  { key: 'materials', label: '资料管理', icon: BookOpen },
   { key: 'rewards', label: '奖励发放', icon: Gift },
 ];
 
@@ -84,6 +82,7 @@ export default function CheckinDetail() {
   const [newParticipantName, setNewParticipantName] = useState('');
   const [newParticipantChild, setNewParticipantChild] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [participantFilter, setParticipantFilter] = useState<'all' | 'checked' | 'unchecked'>('all');
   const [batchMode, setBatchMode] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<Set<number>>(new Set());
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -107,18 +106,13 @@ export default function CheckinDetail() {
   const [editingBadge, setEditingBadge] = useState<any>(null);
   const [badgeForm, setBadgeForm] = useState({ name: '', description: '', icon: '🏅', type: 'streak', target_days: 7 });
 
-  // 资料相关
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [showMaterialForm, setShowMaterialForm] = useState(false);
-  const [editingMaterial, setEditingMaterial] = useState<any>(null);
-  const [materialForm, setMaterialForm] = useState({ title: '', description: '', file_url: '', file_type: 'pdf', sort_order: 0, is_active: true });
-
   // 奖励相关
   const [rewards, setRewards] = useState<any[]>([]);
   const [rewardStatus, setRewardStatus] = useState<string>('');
   const [rewardSearch, setRewardSearch] = useState('');
   const [showRewardModal, setShowRewardModal] = useState<any>(null);
   const [rewardNote, setRewardNote] = useState('');
+  const [showCheckinConfirm, setShowCheckinConfirm] = useState<{ participantId: number; action: 'checkin' | 'uncheckin'; date: string } | null>(null);
 
   const loadReviewRecords = useCallback(async () => {
     setLoadingReview(true);
@@ -137,15 +131,6 @@ export default function CheckinDetail() {
     try {
       const data = await fetchEventBadges(eventId);
       setBadges(data);
-    } catch (e: any) {
-      console.error(e);
-    }
-  }, [eventId]);
-
-  const loadMaterials = useCallback(async () => {
-    try {
-      const data = await fetchEventMaterials(eventId);
-      setMaterials(data);
     } catch (e: any) {
       console.error(e);
     }
@@ -187,12 +172,6 @@ export default function CheckinDetail() {
       loadBadges();
     }
   }, [activeTab, eventId, loadBadges]);
-
-  useEffect(() => {
-    if (activeTab === 'materials' && eventId) {
-      loadMaterials();
-    }
-  }, [activeTab, eventId, loadMaterials]);
 
   useEffect(() => {
     if (activeTab === 'rewards' && eventId) {
@@ -239,33 +218,6 @@ export default function CheckinDetail() {
     }
   };
 
-  const handleSaveMaterial = async () => {
-    if (!materialForm.title) return;
-    try {
-      if (editingMaterial) {
-        await updateEventMaterial(eventId, editingMaterial.id, materialForm);
-      } else {
-        await createEventMaterial(eventId, materialForm);
-      }
-      setShowMaterialForm(false);
-      setEditingMaterial(null);
-      setMaterialForm({ title: '', description: '', file_url: '', file_type: 'pdf', sort_order: 0, is_active: true });
-      loadMaterials();
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
-
-  const handleDeleteMaterial = async (id: number) => {
-    if (!confirm('确定删除这个资料吗？')) return;
-    try {
-      await deleteEventMaterial(eventId, id);
-      loadMaterials();
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
-
   const handleDistributeReward = async () => {
     if (!showRewardModal) return;
     try {
@@ -295,11 +247,22 @@ export default function CheckinDetail() {
     : 0;
 
   const topParticipants = [...event.participants].sort((a: any, b: any) => b.checkin_days - a.checkin_days).slice(0, 5);
-  const filteredParticipants = event.participants.filter((p: any) =>
-    !searchQuery ||
-    p.participant.nickname.includes(searchQuery) ||
-    (p.participant.child_name && p.participant.child_name.includes(searchQuery))
-  );
+  const filteredParticipants = event.participants.filter((p: any) => {
+    // Search filter
+    const matchesSearch = !searchQuery ||
+      p.participant.nickname.includes(searchQuery) ||
+      (p.participant.child_name && p.participant.child_name.includes(searchQuery));
+    
+    // Status filter
+    let matchesFilter = true;
+    if (participantFilter === 'checked') {
+      matchesFilter = !!getParticipantCheckedOnDate(p.participant.id, selectedDate);
+    } else if (participantFilter === 'unchecked') {
+      matchesFilter = !getParticipantCheckedOnDate(p.participant.id, selectedDate);
+    }
+    
+    return matchesSearch && matchesFilter;
+  });
 
   const getParticipantCheckedOnDate = (participantId: number, date: string): number | null => {
     const p = event.participants.find((x: any) => x.participant.id === participantId);
@@ -316,10 +279,25 @@ export default function CheckinDetail() {
 
   const handleToggleCheckin = async (participantId: number) => {
     const recordId = getParticipantCheckedOnDate(participantId, selectedDate);
-    if (recordId) {
-      await doUncheckin(eventId, recordId);
-    } else {
-      await doCheckin(eventId, participantId, selectedDate);
+    const action = recordId ? 'uncheckin' : 'checkin';
+    setShowCheckinConfirm({ participantId, action, date: selectedDate });
+  };
+
+  const confirmToggleCheckin = async () => {
+    if (!showCheckinConfirm) return;
+    try {
+      if (showCheckinConfirm.action === 'uncheckin') {
+        const recordId = getParticipantCheckedOnDate(showCheckinConfirm.participantId, showCheckinConfirm.date);
+        if (recordId) {
+          await doUncheckin(eventId, recordId);
+        }
+      } else {
+        await doCheckin(eventId, showCheckinConfirm.participantId, showCheckinConfirm.date);
+      }
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setShowCheckinConfirm(null);
     }
   };
 
@@ -418,7 +396,7 @@ export default function CheckinDetail() {
         <motion.div variants={fadeUp} className="mb-6">
           <button
             onClick={() => navigate('/checkin')}
-            className="inline-flex items-center gap-1.5 text-sm mb-3 text-text-secondary hover:text-text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 text-[13px] mb-3 text-gray-500 hover:text-gray-700 transition-colors"
           >
             <ArrowLeft size={15} strokeWidth={1.8} />
             返回活动列表
@@ -426,16 +404,16 @@ export default function CheckinDetail() {
 
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-[28px] font-bold text-text-primary tracking-tight mb-2">{event.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-2">{event.name}</h1>
               <div className="flex flex-wrap items-center gap-4">
                 {event.group_name && (
-                  <span className="t-caption flex items-center gap-1.5">
+                  <span className="text-[13px] text-gray-500 flex items-center gap-1.5">
                     <Users size={13} strokeWidth={1.8} style={{ color: '#8B5CF6' }} />
                     {event.group_name}
                   </span>
                 )}
-                <span className="t-caption flex items-center gap-1.5">
-                  <Calendar size={13} strokeWidth={1.8} className="text-primary" />
+                <span className="text-[13px] text-gray-500 flex items-center gap-1.5">
+                  <Calendar size={13} strokeWidth={1.8} className="text-blue-600" />
                   {formatDate(event.start_date)} — {formatDate(event.end_date)}
                 </span>
                 <span className={`badge ${
@@ -460,44 +438,66 @@ export default function CheckinDetail() {
         </motion.div>
 
         {/* KPI Overview */}
-        <motion.div variants={fadeUp} className="clean-card mb-6 overflow-hidden">
-          <div className="grid grid-cols-2 md:grid-cols-4">
-            {[
-              { label: '参与人数', value: event.participant_count, icon: Users, iconBg: '#EEF0FF', iconColor: '#5B5CE2' },
-              { label: '活动天数', value: event.total_days, icon: Calendar, iconBg: '#EFF6FF', iconColor: '#2563EB' },
-              { label: '今日打卡', value: todayCount, icon: CheckCircle2, iconBg: '#ECFDF3', iconColor: '#22C55E' },
-              { label: '平均打卡率', value: `${avgCheckinRate}%`, icon: Target, iconBg: '#FFFBEB', iconColor: '#F59E0B' },
-            ].map((stat, idx) => (
-              <div
-                key={stat.label}
-                className={`px-5 py-5
-                           ${idx < 3 ? 'md:border-r border-border-subtle' : ''}
-                           ${idx < 2 ? 'border-b md:border-b-0 border-border-subtle' : ''}`}
-              >
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                       style={{ backgroundColor: stat.iconBg, color: stat.iconColor }}>
-                    <stat.icon size={16} strokeWidth={1.8} />
-                  </div>
-                  <span className="t-caption">{stat.label}</span>
+        <motion.div variants={fadeUp} className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          {[
+            { 
+              label: '参与人数', 
+              value: event.participant_count, 
+              subtext: `共${event.total_days}天`,
+              icon: Users, 
+              iconBg: '#EEF0FF', 
+              iconColor: '#5B5CE2' 
+            },
+            { 
+              label: '活动天数', 
+              value: event.total_days, 
+              subtext: `${formatDate(event.start_date)}起`,
+              icon: Calendar, 
+              iconBg: '#EFF6FF', 
+              iconColor: '#2563EB' 
+            },
+            { 
+              label: '今日打卡', 
+              value: todayCount, 
+              subtext: event.participant_count ? `${Math.round((todayCount / event.participant_count) * 100)}%` : '-',
+              icon: CheckCircle2, 
+              iconBg: '#ECFDF3', 
+              iconColor: '#22C55E' 
+            },
+            { 
+              label: '平均打卡率', 
+              value: `${avgCheckinRate}%`, 
+              subtext: avgCheckinRate >= 80 ? '🎯 优秀' : avgCheckinRate >= 60 ? '👍 良好' : '⚠️ 待提升',
+              icon: Target, 
+              iconBg: '#FFFBEB', 
+              iconColor: '#F59E0B' 
+            },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 px-4 py-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                     style={{ backgroundColor: stat.iconBg, color: stat.iconColor }}>
+                  <stat.icon size={14} strokeWidth={1.8} />
                 </div>
-                <p className="t-kpi">{stat.value}</p>
+                <span className="text-[12px] text-gray-500">{stat.label}</span>
               </div>
-            ))}
-          </div>
+              <p className="text-[28px] font-bold text-gray-900 leading-none mb-0.5">{stat.value}</p>
+              <p className="text-[11px] text-gray-400">{stat.subtext}</p>
+            </div>
+          ))}
         </motion.div>
 
         {/* Reward Rules */}
         {event.reward_rules && (
-          <motion.div variants={fadeUp} className="clean-card overflow-hidden mb-6 relative">
-            <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[20px]" style={{ background: 'linear-gradient(90deg, #F59E0B 0%, #FCD34D 100%)' }} />
-            <div className="px-5 py-5 pt-[22px] flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFFBEB', color: '#F59E0B' }}>
-                <Trophy size={18} strokeWidth={1.8} />
+          <motion.div variants={fadeUp} className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 mb-5 overflow-hidden relative">
+            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #F59E0B 0%, #FCD34D 100%)' }} />
+            <div className="px-4 py-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: '#FFFBEB', color: '#F59E0B' }}>
+                <Trophy size={16} strokeWidth={1.8} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="t-body-strong mb-1">奖励规则</h3>
-                <p className="t-caption whitespace-pre-wrap text-text-secondary">
+                <h3 className="text-[14px] font-semibold text-gray-900 mb-0.5">奖励规则</h3>
+                <p className="text-[12px] whitespace-pre-wrap text-gray-500">
                   {event.reward_rules}
                 </p>
               </div>
@@ -506,8 +506,8 @@ export default function CheckinDetail() {
         )}
 
         {/* Tabs */}
-        <motion.div variants={fadeUp} className="mb-6">
-          <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
+        <motion.div variants={fadeUp} className="mb-5">
+          <div className="inline-flex items-center gap-1 p-1 bg-gray-50 rounded-xl border border-gray-200">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
@@ -515,10 +515,10 @@ export default function CheckinDetail() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 text-[13px] font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-bg-surface text-primary shadow-sm'
-                      : 'text-text-secondary hover:text-text-primary'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   <Icon size={14} strokeWidth={1.8} />
@@ -530,177 +530,220 @@ export default function CheckinDetail() {
         </motion.div>
 
       {activeTab === 'checkin' && (
-        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6">
-          {/* Left: Calendar + Leaderboard */}
-          <div className="space-y-6">
-            {/* Calendar */}
-            <div className="clean-card overflow-hidden">
-              <div className="px-5 py-3.5 flex items-center justify-between border-b border-border-subtle">
-                <h3 className="panel-title">
-                  <Calendar size={15} strokeWidth={1.8} className="text-primary" />
-                  打卡日历
-                </h3>
-                <div className="flex items-center gap-0.5">
-                  <button onClick={prevMonth} className="btn-icon-sm">
-                    <ChevronLeft size={15} strokeWidth={1.8} />
-                  </button>
-                  <span className="t-body-strong min-w-[80px] text-center">
-                    {calendarMonth.year}年{calendarMonth.month + 1}月
-                  </span>
-                  <button onClick={nextMonth} className="btn-icon-sm">
-                    <ChevronRight size={15} strokeWidth={1.8} />
-                  </button>
-                </div>
+        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-[400px_300px_minmax(0,1fr)] gap-4">
+          {/* Column 1: Calendar */}
+          <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
+            <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-100">
+              <h3 className="text-[13px] font-semibold text-gray-900 flex items-center gap-1.5">
+                <Calendar size={14} strokeWidth={1.8} className="text-blue-600" />
+                打卡日历
+              </h3>
+              <div className="flex items-center gap-0.5">
+                <button onClick={prevMonth} className="w-5 h-5 rounded flex items-center justify-center hover:bg-gray-50 transition-colors">
+                  <ChevronLeft size={13} strokeWidth={1.8} />
+                </button>
+                <span className="text-[12px] font-medium text-gray-900 min-w-[60px] text-center">
+                  {calendarMonth.year}.{calendarMonth.month + 1}
+                </span>
+                <button onClick={nextMonth} className="w-5 h-5 rounded flex items-center justify-center hover:bg-gray-50 transition-colors">
+                  <ChevronRight size={13} strokeWidth={1.8} />
+                </button>
               </div>
-              <div className="px-4 py-4">
-                <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                  {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-                    <div key={d} className="py-1 t-small">{d}</div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {getCalendarDays().map((day, i) => (
+            </div>
+            <div className="px-2.5 py-2.5">
+              <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                {['日', '一', '二', '三', '四', '五', '六'].map(d => (
+                  <div key={d} className="py-0.5 text-[10px] font-medium text-gray-400">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {getCalendarDays().map((day, i) => {
+                  const maxCount = Math.max(...event.calendar.map((c: any) => c.count || 0), 1);
+                  const intensity = day.count ? day.count / maxCount : 0;
+                  let bgColor = '';
+                  let textColor = '';
+                  
+                  if (day.isSelected && day.isEventDay) {
+                    bgColor = 'bg-blue-50';
+                    textColor = 'text-blue-600';
+                  } else if (!day.isEventDay) {
+                    textColor = 'text-gray-300';
+                  } else if (day.count && day.count > 0) {
+                    if (intensity > 0.7) {
+                      bgColor = 'bg-green-200 hover:bg-green-300';
+                      textColor = 'text-green-800';
+                    } else if (intensity > 0.4) {
+                      bgColor = 'bg-green-100 hover:bg-green-200';
+                      textColor = 'text-green-700';
+                    } else {
+                      bgColor = 'bg-green-50 hover:bg-green-100';
+                      textColor = 'text-green-600';
+                    }
+                  } else {
+                    textColor = 'text-gray-500';
+                  }
+                  
+                  return (
                     <div key={i} className="aspect-square">
                       {day.date ? (
                         <button
                           onClick={() => day.isEventDay && setSelectedDate(day.date)}
                           disabled={!day.isEventDay}
-                          className={`w-full h-full rounded-lg flex flex-col items-center justify-center transition-all duration-150
-                            ${!day.isEventDay ? 'cursor-default text-text-disabled' : 'cursor-pointer'}
-                            ${day.isSelected && day.isEventDay ? 'bg-primary-soft text-primary font-semibold' : ''}
-                            ${!day.isSelected && day.isEventDay && day.count && day.count > 0 ? 'bg-success-soft text-success hover:bg-bg-hover' : ''}
-                            ${!day.isSelected && day.isEventDay && (!day.count || day.count === 0) ? 'text-text-secondary hover:bg-bg-hover' : ''}
+                          className={`w-full h-full rounded flex flex-col items-center justify-center transition-all duration-150 ${bgColor} ${textColor}
+                            ${!day.isEventDay ? 'cursor-default' : 'cursor-pointer'}
+                            ${day.isSelected && day.isEventDay ? 'font-semibold ring-1 ring-blue-500' : ''}
                           `}
                         >
-                          <span className="text-xs leading-none">{new Date(day.date).getDate()}</span>
+                          <span className="text-[11px] leading-none">{new Date(day.date).getDate()}</span>
                           {day.isEventDay && day.count && day.count > 0 && (
-                            <span className="text-[10px] mt-0.5 leading-none font-medium">{day.count}人</span>
+                            <span className="text-[8px] mt-0.5 leading-none font-medium">{day.count}</span>
                           )}
                         </button>
                       ) : (
                         <div />
                       )}
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400">
+                <div className="flex items-center gap-0.5">
+                  <div className="w-2 h-2 rounded bg-green-50" />
+                  <span>少</span>
                 </div>
-                <div className="flex items-center gap-4 mt-3 t-small">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-success-soft" />
-                    <span>已打卡</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-primary-soft" />
-                    <span>选中</span>
-                  </div>
+                <div className="flex items-center gap-0.5">
+                  <div className="w-2 h-2 rounded bg-green-100" />
+                  <span>中</span>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <div className="w-2 h-2 rounded bg-green-200" />
+                  <span>密</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Leaderboard */}
-            {topParticipants.length > 0 && (
-              <div className="clean-card overflow-hidden">
-                <div className="px-5 py-3.5 flex items-center justify-between border-b border-border-subtle">
-                  <h3 className="panel-title">
-                    <Trophy size={15} strokeWidth={1.8} style={{ color: '#F59E0B' }} />
-                    打卡排行
-                  </h3>
-                </div>
-                <div className="py-1">
-                  {topParticipants.map((p: any, idx: number) => {
-                    const medalStyles = [
-                      { bg: '#FFFBEB', color: '#F59E0B' },
-                      { bg: '#F2F4F7', color: '#667085' },
-                      { bg: '#FFF7ED', color: '#C97B50' },
-                      { bg: 'transparent', color: 'var(--color-text-tertiary)' },
-                      { bg: 'transparent', color: 'var(--color-text-tertiary)' },
-                    ];
-                    const style = medalStyles[idx] || medalStyles[3];
-                    return (
-                      <div key={p.participant.id}
-                           className="flex items-center gap-3 px-5 py-2.5 hover:bg-bg-hover transition-colors duration-150"
-                      >
-                        <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0"
-                              style={{ backgroundColor: style.bg, color: style.color }}>
-                          {idx + 1}
-                        </span>
-                        {p.participant.avatar_url ? (
-                          <img src={p.participant.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                               style={{ backgroundColor: '#EEF0FF', color: '#5B5CE2' }}>
+          {/* Column 2: Leaderboard */}
+          {topParticipants.length > 0 && (
+            <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
+              <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-100">
+                <h3 className="text-[13px] font-semibold text-gray-900 flex items-center gap-1.5">
+                  <Trophy size={14} strokeWidth={1.8} style={{ color: '#F59E0B' }} />
+                  TOP 5
+                </h3>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {topParticipants.map((p: any, idx: number) => {
+                  const medalColors = [
+                    { bg: '#FFFBEB', color: '#F59E0B', label: '🥇' },
+                    { bg: '#F2F4F7', color: '#667085', label: '🥈' },
+                    { bg: '#FFF7ED', color: '#C97B50', label: '🥉' },
+                    { bg: '#F9FAFB', color: '#9CA3AF', label: '4' },
+                    { bg: '#F9FAFB', color: '#9CA3AF', label: '5' },
+                  ];
+                  const medal = medalColors[idx] || medalColors[3];
+                  
+                  return (
+                    <div key={p.participant.id} className="px-3 py-2 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-2">
+                        {/* Medal badge */}
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                             style={{ backgroundColor: medal.bg, color: medal.color }}>
+                          {medal.label}
+                        </div>
+                        
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                          {p.participant.avatar_url ? (
+                            <img 
+                              src={p.participant.avatar_url.startsWith('/uploads/') 
+                                ? p.participant.avatar_url.replace('/uploads/', '/api/uploads/') 
+                                : p.participant.avatar_url} 
+                              alt="" 
+                              className="w-7 h-7 rounded-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
+                                if (fallbackDiv) fallbackDiv.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold"
+                               style={{ 
+                                 backgroundColor: p.participant.avatar_url ? '#F3F4F6' : '#EEF0FF', 
+                                 color: p.participant.avatar_url ? '#9CA3AF' : '#5B5CE2',
+                                 display: p.participant.avatar_url ? 'none' : 'flex'
+                               }}>
                             {p.participant.nickname[0] || '?'}
                           </div>
-                        )}
+                        </div>
+                        
+                        {/* Name and stats */}
                         <div className="flex-1 min-w-0">
-                          <div className="t-body-strong truncate">
+                          <p className="text-[12px] font-medium text-gray-900 truncate">
                             {p.participant.nickname}
-                            {p.participant.child_name && (
-                              <span className="t-small ml-1">({p.participant.child_name})</span>
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-gray-500">{p.checkin_days}天</span>
+                            {p.current_streak > 1 && (
+                              <span className="flex items-center gap-0.5 text-[11px] text-orange-500">
+                                <Flame size={10} strokeWidth={2} />
+                                {p.current_streak}
+                              </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm kpi-value text-text-primary">
-                            {p.checkin_days}天
-                          </span>
-                          {p.current_streak > 1 && (
-                            <span className="flex items-center gap-0.5 text-warning">
-                              <Flame size={12} strokeWidth={2} />
-                              <span className="text-xs font-medium">{p.current_streak}</span>
-                            </span>
-                          )}
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Right: Participant List */}
-          <div className="clean-card overflow-hidden">
+          {/* Column 3: Participant List */}
+          <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
             {/* Header */}
-            <div className="px-5 py-4 border-b border-border-subtle">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <h3 className="panel-title">
-                    <Calendar size={15} strokeWidth={1.8} className="text-primary" />
+                  <h3 className="text-[14px] font-semibold text-gray-900 flex items-center gap-2">
+                    <Calendar size={15} strokeWidth={1.8} className="text-blue-600" />
                     {formatDate(selectedDate)} 周{getDayOfWeek(selectedDate)}
                     {isToday(selectedDate) && (
-                      <span className="badge badge-primary ml-2">今天</span>
+                      <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full ml-1">今天</span>
                     )}
                   </h3>
-                  <p className="t-caption mt-0.5 text-text-tertiary">
-                    点击人员可快速标记打卡
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    点击快速标记打卡
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {batchMode ? (
                     <>
-                      <button onClick={selectAllUnchecked} className="btn btn-secondary">
+                      <button onClick={selectAllUnchecked} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                         全选未打卡
                       </button>
                       <button
                         onClick={handleBatchCheckin}
                         disabled={selectedParticipants.size === 0}
-                        className="btn btn-primary"
+                        className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                       >
-                        <Check size={14} strokeWidth={1.8} />
-                        批量打卡 ({selectedParticipants.size})
+                        <Check size={13} strokeWidth={1.8} />
+                        批量 ({selectedParticipants.size})
                       </button>
-                      <button onClick={() => { setBatchMode(false); setSelectedParticipants(new Set()); }} className="btn btn-secondary">
+                      <button onClick={() => { setBatchMode(false); setSelectedParticipants(new Set()); }} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                         取消
                       </button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => setBatchMode(true)} className="btn btn-secondary">
+                      <button onClick={() => setBatchMode(true)} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                         批量操作
                       </button>
-                      <button onClick={() => setShowAddParticipant(true)} className="btn btn-primary">
-                        <UserPlus size={14} strokeWidth={1.8} />
-                        添加人员
+                      <button onClick={() => setShowAddParticipant(true)} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1">
+                        <UserPlus size={13} strokeWidth={1.8} />
+                        添加
                       </button>
                     </>
                   )}
@@ -708,111 +751,165 @@ export default function CheckinDetail() {
               </div>
             </div>
 
-            {/* Search */}
-            <div className="px-5 py-3 border-b border-border-subtle">
+            {/* Search and Filters */}
+            <div className="px-4 py-2.5 border-b border-gray-100 space-y-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[12px] text-gray-400">筛选：</span>
+                {[
+                  { key: 'all', label: '全部' },
+                  { key: 'checked', label: '已打卡' },
+                  { key: 'unchecked', label: '未打卡' },
+                ].map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setParticipantFilter(f.key as any)}
+                    className={`px-2.5 py-0.5 rounded text-[12px] font-medium transition-all ${
+                      participantFilter === f.key
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
               <div className="relative">
-                <Search size={15} strokeWidth={1.8} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                <Search size={14} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="搜索参与者..."
-                  className="input pl-9"
+                  placeholder="搜索..."
+                  className="w-full pl-8 pr-2.5 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             {/* List */}
-            <div className="max-h-[600px] overflow-y-auto scrollbar-thin">
+            <div className="max-h-[600px] overflow-y-auto">
               {filteredParticipants.length === 0 ? (
-                <div className="px-5 py-16 text-center">
-                  <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EEF0FF', color: '#5B5CE2' }}>
-                    <Users size={22} strokeWidth={1.5} />
+                <div className="px-5 py-20 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-gray-50">
+                    <Users size={32} strokeWidth={1.5} className="text-gray-300" />
                   </div>
-                  <p className="t-caption text-text-tertiary">
-                    暂无参与者，点击上方添加
+                  <p className="text-[14px] font-medium text-gray-900 mb-1">
+                    {searchQuery || participantFilter !== 'all' ? '没有找到匹配的参与者' : '暂无参与者'}
+                  </p>
+                  <p className="text-[13px] text-gray-400">
+                    {searchQuery || participantFilter !== 'all' 
+                      ? '试试调整筛选条件' 
+                      : '点击上方"添加人员"按钮开始吧'}
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-border-subtle">
+                <div className="divide-y divide-gray-100">
                   {filteredParticipants.map((p: any) => {
                     const isChecked = !!getParticipantCheckedOnDate(p.participant.id, selectedDate);
                     const record = getParticipantRecordOnDate(p.participant.id, selectedDate);
+                    
+                    // Avatar placeholder with first letter
+                    const avatarLetter = p.participant.nickname?.[0] || '?';
+                    const avatarColors = [
+                      { bg: '#EEF0FF', color: '#5B5CE2' },
+                      { bg: '#ECFDF3', color: '#22C55E' },
+                      { bg: '#FEF3C7', color: '#F59E0B' },
+                      { bg: '#FEE2E2', color: '#EF4444' },
+                      { bg: '#E0E7FF', color: '#6366F1' },
+                    ];
+                    const colorIndex = avatarLetter.charCodeAt(0) % avatarColors.length;
+                    const avatarStyle = avatarColors[colorIndex];
+                    
                     return (
                       <div
                         key={p.participant.id}
-                        className={`flex items-center gap-3 px-5 py-3 transition-colors duration-150 group hover:bg-bg-hover ${isChecked ? 'bg-success-soft/30' : ''}`}
+                        className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors duration-150 group hover:bg-gray-50 ${isChecked ? 'bg-green-50/50' : ''}`}
                       >
                         {batchMode && (
                           <button
                             onClick={() => toggleSelectParticipant(p.participant.id)}
-                            className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
                               selectedParticipants.has(p.participant.id)
-                                ? 'bg-primary border-primary text-white'
-                                : 'bg-transparent border-border-default'
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'bg-transparent border-gray-300'
                             }`}
                           >
-                            {selectedParticipants.has(p.participant.id) && <Check size={12} strokeWidth={2.5} />}
+                            {selectedParticipants.has(p.participant.id) && <Check size={10} strokeWidth={2.5} />}
                           </button>
                         )}
                         <button
                           onClick={() => !batchMode && handleToggleCheckin(p.participant.id)}
-                          className="flex-1 flex items-center gap-3 text-left min-w-0"
+                          className="flex-1 flex items-center gap-2.5 text-left min-w-0"
                         >
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
-                            isChecked ? 'ring-2 ring-success ring-offset-1 ring-offset-surface' : ''
+                          {/* Avatar */}
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
+                            isChecked ? 'ring-2 ring-green-500 ring-offset-1' : ''
                           }`}>
                             {p.participant.avatar_url ? (
-                              <img src={p.participant.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className={`w-full h-full flex items-center justify-center font-semibold text-sm ${
-                                isChecked ? 'bg-success-soft text-success' : 'bg-primary-soft text-primary'
-                              }`}>
-                                {p.participant.nickname[0] || '?'}
-                              </div>
-                            )}
+                              <img 
+                                src={p.participant.avatar_url.startsWith('/uploads/') 
+                                  ? p.participant.avatar_url.replace('/uploads/', '/api/uploads/') 
+                                  : p.participant.avatar_url} 
+                                alt="" 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallbackDiv) fallbackDiv.style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div 
+                              className="w-full h-full flex items-center justify-center font-semibold text-[11px]"
+                              style={{ 
+                                backgroundColor: p.participant.avatar_url ? '#F3F4F6' : avatarStyle.bg, 
+                                color: p.participant.avatar_url ? '#9CA3AF' : avatarStyle.color,
+                                display: p.participant.avatar_url ? 'none' : 'flex'
+                              }}
+                            >
+                              {avatarLetter}
+                            </div>
                           </div>
+                          
+                          {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`t-body-strong ${isChecked ? 'text-success' : 'text-text-primary'}`}>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`text-[13px] font-medium ${isChecked ? 'text-green-600' : 'text-gray-900'}`}>
                                 {p.participant.nickname}
                               </span>
                               {record?.display_name && (
-                                <span className="badge badge-success">
+                                <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded">
                                   {record.display_name}
                                 </span>
                               )}
                               {p.participant.child_name && (
-                                <span className="t-small">({p.participant.child_name})</span>
+                                <span className="text-[11px] text-gray-400">({p.participant.child_name})</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-3 mt-0.5">
-                              <span className="t-small">
-                                累计 <span className={`font-medium ${isChecked ? 'text-success' : 'text-text-secondary'}`}>{p.checkin_days}</span> 天
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[11px] text-gray-400">
+                                {p.checkin_days}天
                               </span>
                               {p.current_streak >= 2 && (
-                                <span className="flex items-center gap-0.5 t-small text-warning">
-                                  <Flame size={11} strokeWidth={2} />
-                                  连续{p.current_streak}天
-                                </span>
-                              )}
-                              {p.max_streak > p.current_streak && p.max_streak >= 3 && (
-                                <span className="t-small text-text-tertiary">
-                                  最长{p.max_streak}天
+                                <span className="flex items-center gap-0.5 text-[11px] text-orange-500">
+                                  <Flame size={10} strokeWidth={2} />
+                                  {p.current_streak}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className={`shrink-0 ${isChecked ? 'text-success' : 'text-text-disabled'}`}>
-                            {isChecked ? <CheckCircle2 size={20} strokeWidth={1.8} /> : <Circle size={20} strokeWidth={1.5} />}
+                          
+                          {/* Check status icon */}
+                          <div className={`shrink-0 ${isChecked ? 'text-green-500' : 'text-gray-300'}`}>
+                            {isChecked ? <CheckCircle2 size={18} strokeWidth={1.8} /> : <Circle size={18} strokeWidth={1.5} />}
                           </div>
                         </button>
+                        
                         {!batchMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleRemoveParticipant(p.participant.id); }}
-                            className="opacity-0 group-hover:opacity-100 btn-icon-sm transition-opacity text-text-tertiary hover:text-danger"
+                            className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
                           >
-                            <Trash2 size={14} strokeWidth={1.8} />
+                            <Trash2 size={13} strokeWidth={1.8} />
                           </button>
                         )}
                       </div>
@@ -872,20 +969,44 @@ export default function CheckinDetail() {
                 <Loading text="" size="sm" />
               </div>
             ) : reviewRecords.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
-                  <FileText size={22} strokeWidth={1.5} />
+              <div className="px-5 py-20 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-gray-50">
+                  <FileText size={32} strokeWidth={1.5} className="text-gray-300" />
                 </div>
-                <p className="t-caption text-text-tertiary">暂无打卡记录</p>
+                <p className="text-[14px] font-medium text-gray-900 mb-1">暂无打卡记录</p>
+                <p className="text-[13px] text-gray-400">
+                  {reviewStatus ? '试试切换筛选条件' : '等待用户提交打卡'}
+                </p>
               </div>
             ) : (
               reviewRecords.map((r: any) => (
-                <div key={r.id} className="px-5 py-4 flex items-start gap-4 hover:bg-bg-hover transition-colors duration-150 group">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                <div key={r.id} className="px-5 py-4 flex items-start gap-4 hover:bg-gray-50 transition-colors duration-150 group">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0 relative">
                     {r.avatar_url ? (
-                      <img src={r.avatar_url} alt="" className="w-full h-full object-cover" />
+                      <>
+                        <img 
+                          src={r.avatar_url.startsWith('/uploads/') 
+                            ? r.avatar_url.replace('/uploads/', '/api/uploads/') 
+                            : r.avatar_url} 
+                          alt="" 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallbackDiv) {
+                              fallbackDiv.style.display = 'flex';
+                            }
+                          }}
+                        />
+                        <div 
+                          className="w-full h-full absolute inset-0 flex items-center justify-center font-semibold text-sm bg-gray-100 text-gray-400"
+                          style={{ display: 'none' }}
+                        >
+                          {r.nickname?.[0] || '?'}
+                        </div>
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-semibold text-sm bg-primary-soft text-primary">
+                      <div className="w-full h-full flex items-center justify-center font-semibold text-sm bg-blue-50 text-blue-600">
                         {r.nickname?.[0] || '?'}
                       </div>
                     )}
@@ -986,13 +1107,22 @@ export default function CheckinDetail() {
 
           <div className="px-5 py-5">
             {badges.length === 0 ? (
-              <div className="py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFFBEB', color: '#F59E0B' }}>
-                  <Award size={22} strokeWidth={1.5} />
+              <div className="py-20 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-gray-50">
+                  <Award size={32} strokeWidth={1.5} className="text-gray-300" />
                 </div>
-                <p className="t-caption text-text-tertiary">
-                  还没有徽章，点击右上角添加第一个吧
-                </p>
+                <p className="text-[14px] font-medium text-gray-900 mb-1">还没有徽章</p>
+                <p className="text-[13px] text-gray-400 mb-4">创建你的第一个打卡徽章吧</p>
+                <button
+                  onClick={() => {
+                    setEditingBadge(null);
+                    setBadgeForm({ name: '', description: '', icon: '🏅', type: 'streak', target_days: 7 });
+                    setShowBadgeForm(true);
+                  }}
+                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  添加徽章
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1041,86 +1171,6 @@ export default function CheckinDetail() {
         </motion.div>
       )}
 
-      {activeTab === 'materials' && (
-        <motion.div variants={fadeUp} className="clean-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
-            <h3 className="panel-title">
-              <BookOpen size={15} strokeWidth={1.8} style={{ color: '#2563EB' }} />
-              资料管理
-            </h3>
-            <button
-              onClick={() => {
-                setEditingMaterial(null);
-                setMaterialForm({ title: '', description: '', file_url: '', file_type: 'pdf', sort_order: 0, is_active: true });
-                setShowMaterialForm(true);
-              }}
-              className="btn btn-primary"
-            >
-              <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
-                <Plus size={13} strokeWidth={2.5} />
-              </span>
-              添加资料
-            </button>
-          </div>
-
-          <div className="divide-y divide-border-subtle">
-            {materials.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
-                  <BookOpen size={22} strokeWidth={1.5} />
-                </div>
-                <p className="t-caption text-text-tertiary">
-                  还没有资料，点击右上角添加第一个吧
-                </p>
-              </div>
-            ) : (
-              materials.map((m: any) => (
-                <div key={m.id}
-                     className="px-5 py-4 flex items-start gap-4 group transition-colors duration-150 hover:bg-bg-hover"
-                >
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-lg bg-primary-soft">
-                    {m.file_type === 'pdf' ? '📄' : m.file_type === 'video' ? '🎬' : m.file_type === 'audio' ? '🎵' : '📎'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="t-body-strong mb-1 flex items-center gap-2">
-                      {m.title}
-                      {!m.is_active && (
-                        <span className="badge badge-neutral">已下架</span>
-                      )}
-                    </div>
-                    {m.description && <p className="t-caption mb-1 text-text-secondary">{m.description}</p>}
-                    {m.file_url && (
-                      <a href={m.file_url} target="_blank" rel="noreferrer"
-                         className="t-small truncate block text-primary hover:underline">
-                        {m.file_url}
-                      </a>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => {
-                        setEditingMaterial(m);
-                        setMaterialForm({ title: m.title, description: m.description || '', file_url: m.file_url || '', file_type: m.file_type || 'pdf', sort_order: m.sort_order || 0, is_active: !!m.is_active });
-                        setShowMaterialForm(true);
-                      }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-primary hover:bg-primary-soft transition-colors"
-                    >
-                      <Edit2 size={14} strokeWidth={1.8} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteMaterial(m.id)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-danger hover:bg-danger-soft transition-colors"
-                    >
-                      <Trash2 size={14} strokeWidth={1.8} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </motion.div>
-      )}
-
       {activeTab === 'rewards' && (
         <motion.div variants={fadeUp} className="clean-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1156,13 +1206,16 @@ export default function CheckinDetail() {
             </div>
           </div>
 
-          <div className="divide-y divide-border-subtle">
+          <div className="divide-y divide-gray-100">
             {rewards.length === 0 ? (
-              <div className="px-5 py-12 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center bg-bg-subtle text-text-tertiary">
-                  <Gift size={22} strokeWidth={1.5} />
+              <div className="px-5 py-20 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-gray-50">
+                  <Gift size={32} strokeWidth={1.5} className="text-gray-300" />
                 </div>
-                <p className="t-caption text-text-tertiary">暂无数据</p>
+                <p className="text-[14px] font-medium text-gray-900 mb-1">暂无数据</p>
+                <p className="text-[13px] text-gray-400">
+                  {rewardStatus ? '试试切换筛选条件' : '活动结束后会为参与者发放奖励'}
+                </p>
               </div>
             ) : (
               rewards.map((p: any) => (
@@ -1351,88 +1404,6 @@ export default function CheckinDetail() {
         </Modal>
       )}
 
-      {showMaterialForm && (
-        <Modal
-          isOpen={showMaterialForm}
-          onClose={() => { setShowMaterialForm(false); setEditingMaterial(null); }}
-          title={editingMaterial ? '编辑资料' : '添加资料'}
-          footer={
-            <>
-              <button onClick={() => { setShowMaterialForm(false); setEditingMaterial(null); }} className="btn btn-secondary">取消</button>
-              <button onClick={handleSaveMaterial} disabled={!materialForm.title} className="btn btn-primary"><Check className="w-4 h-4" />保存</button>
-            </>
-          }
-        >
-            <div className="space-y-4">
-              <div>
-                <label className="form-label">资料标题 *</label>
-                <input
-                  type="text"
-                  value={materialForm.title}
-                  onChange={e => setMaterialForm({ ...materialForm, title: e.target.value })}
-                  placeholder="如：第1周学习资料"
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="form-label">资料描述</label>
-                <textarea
-                  value={materialForm.description}
-                  onChange={e => setMaterialForm({ ...materialForm, description: e.target.value })}
-                  placeholder="简短介绍一下这个资料"
-                  className="input min-h-[80px]"
-                />
-              </div>
-              <div>
-                <label className="form-label">文件类型</label>
-                <select
-                  value={materialForm.file_type}
-                  onChange={e => setMaterialForm({ ...materialForm, file_type: e.target.value })}
-                  className="input"
-                >
-                  <option value="pdf">PDF文档</option>
-                  <option value="video">视频</option>
-                  <option value="audio">音频</option>
-                  <option value="other">其他</option>
-                </select>
-              </div>
-              <div>
-                <label className="form-label">文件链接</label>
-                <input
-                  type="text"
-                  value={materialForm.file_url}
-                  onChange={e => setMaterialForm({ ...materialForm, file_url: e.target.value })}
-                  placeholder="https://..."
-                  className="input"
-                />
-                <p className="text-xs text-text-tertiary mt-1">先把文件上传到服务器或云存储，然后把链接填在这里</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label">排序</label>
-                  <input
-                    type="number"
-                    value={materialForm.sort_order}
-                    onChange={e => setMaterialForm({ ...materialForm, sort_order: parseInt(e.target.value) || 0 })}
-                    className="input"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">状态</label>
-                  <select
-                    value={materialForm.is_active ? '1' : '0'}
-                    onChange={e => setMaterialForm({ ...materialForm, is_active: e.target.value === '1' })}
-                    className="input"
-                  >
-                    <option value="1">上架</option>
-                    <option value="0">下架</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-        </Modal>
-      )}
-
       {showRewardModal && (
         <Modal
           isOpen={!!showRewardModal}
@@ -1460,6 +1431,38 @@ export default function CheckinDetail() {
                 />
               </div>
             </div>
+        </Modal>
+      )}
+
+      {showCheckinConfirm && (
+        <Modal
+          isOpen={!!showCheckinConfirm}
+          onClose={() => setShowCheckinConfirm(null)}
+          title={showCheckinConfirm.action === 'checkin' ? '确认打卡' : '确认取消打卡'}
+          footer={
+            <>
+              <button onClick={() => setShowCheckinConfirm(null)} className="btn btn-secondary">取消</button>
+              <button 
+                onClick={confirmToggleCheckin} 
+                className={showCheckinConfirm.action === 'checkin' ? 'btn btn-primary' : 'btn btn-danger-solid'}
+              >
+                {showCheckinConfirm.action === 'checkin' ? '确认打卡' : '确认取消'}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <p className="text-[14px] text-gray-700">
+              {showCheckinConfirm.action === 'checkin' 
+                ? `确定为该用户补卡 ${formatDate(showCheckinConfirm.date)} 的打卡吗？`
+                : `确定取消该用户 ${formatDate(showCheckinConfirm.date)} 的打卡记录吗？`}
+            </p>
+            <p className="text-[12px] text-gray-400">
+              {showCheckinConfirm.action === 'checkin' 
+                ? '此操作将记录到打卡日志中'
+                : '此操作不可撤销'}
+            </p>
+          </div>
         </Modal>
       )}
       </div>
