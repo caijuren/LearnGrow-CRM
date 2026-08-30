@@ -1,6 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// 从package.json读取版本号
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf-8'));
+const appVersion = packageJson.version || '0.0.0';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -9,6 +18,10 @@ export default defineConfig({
     }),
     tsconfigPaths(),
   ],
+  define: {
+    // 将版本号注入到环境变量，前端可通过 import.meta.env.VITE_APP_VERSION 访问
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
+  },
   server: {
     proxy: {
       '/api': {

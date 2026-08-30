@@ -2,12 +2,14 @@
 /**
  * 数据备份服务：将 SQLite 数据库（一致性快照）与 uploads 媒体目录打包为 zip，
  * 支持手动备份（后台下载/命令行）与每日自动备份，并按保留数量清理旧备份。
+ * v2.7.0: 新增AES256加密备份功能
  */
 import { ZipArchive } from 'archiver';
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { encryptBackup } from './backup-encrypt.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -247,6 +249,51 @@ export async function createBackup(): Promise<BackupFileInfo> {
     filePath,
     size: fs.statSync(filePath).size,
     createdAt: bjtNowString(),
+  };
+}
+
+/**
+ * v2.7.0: 创建加密备份
+ * 先创建普通zip备份，然后进行AES256加密，最后删除明文zip
+ */
+export async function createEncryptedBackup(): Promise<BackupFileInfo & { encryptedSize?: number }> {
+  // 1. 先创建普通备份
+  const plainBackup = await createBackup();
+  
+  // 2. 检查是否启用加密
+  const encryptionEnabled = process.env.BACKUP_ENCRYPTION_KEY && process.env.BACKUP_ENCRYPTION_KEY.length >= 32;
+  
+  if (!encryptionEnabled) {
+    console.warn('⚠️  BACKUP_ENCRYPTION_KEY 未配置或长度不足，跳过加密步骤');
+    return plainBackup;
+  }
+  
+  // 3. 加密备份文件
+  const encryptedPath = `${plainBackup.filePath}.enc`;
+  const encryptResult = await encryptBackup(plainBackup.filePath, encryptedPath);
+  
+  if (!encryptResult.success) {
+    throw new Error(`备份加密失败: ${encryptResult.error}`);
+  }
+  
+  // 4. 删除明文zip文件
+  try {
+    fs.unlinkSync(plainBackup.filePath);
+    console.log('🔒 已删除明文备份文件');
+  } catch (error) {
+    console.warn('⚠️  删除明文备份失败:', error);
+  }
+  
+  // 5. 返回加密备份信息
+  const encryptedStats = fs.statSync(encryptedPath);
+  const encryptedFileName = path.basename(encryptedPath);
+  
+  return {
+    name: encryptedFileName,
+    filePath: encryptedPath,
+    size: encryptedStats.size,
+    createdAt: bjtNowString(),
+    encryptedSize: encryptResult.encryptedSize
   };
 }
 
