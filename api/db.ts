@@ -22,6 +22,18 @@ sqlite.pragma('foreign_keys = ON');
 
 export default sqlite;
 
+// ===== 早期迁移：必须在 CREATE TABLE 之前执行 =====
+// 迁移 orders/follow_ups 表从 customer_id 改为 wx_user_id（在 CREATE TABLE IF NOT EXISTS 之前）
+const existingOrderColsEarly = (sqlite.prepare("PRAGMA table_info(orders)").all() as any[]).map(c => c.name);
+if (existingOrderColsEarly.length > 0 && !existingOrderColsEarly.includes('wx_user_id') && existingOrderColsEarly.includes('customer_id')) {
+  sqlite.exec(`ALTER TABLE orders RENAME COLUMN customer_id TO wx_user_id;`);
+}
+const existingFollowUpColsEarly = (sqlite.prepare("PRAGMA table_info(follow_ups)").all() as any[]).map(c => c.name);
+if (existingFollowUpColsEarly.length > 0 && !existingFollowUpColsEarly.includes('wx_user_id') && existingFollowUpColsEarly.includes('customer_id')) {
+  sqlite.exec(`ALTER TABLE follow_ups RENAME COLUMN customer_id TO wx_user_id;`);
+}
+// ====================================================
+
 sqlite.exec(`
   -- DEPRECATED: kept for rollback safety, will be dropped in next release
   CREATE TABLE IF NOT EXISTS customers (
@@ -179,24 +191,11 @@ if (!existingProductCols.includes('commission_percent')) {
   sqlite.exec("ALTER TABLE products ADD COLUMN commission_percent REAL NOT NULL DEFAULT 0");
 }
 
-// 迁移：orders 表从 customer_id 改为 wx_user_id
 const existingOrderCols = (sqlite.prepare("PRAGMA table_info(orders)").all() as any[]).map(c => c.name);
-if (!existingOrderCols.includes('wx_user_id') && existingOrderCols.includes('customer_id')) {
-  sqlite.exec(`
-    ALTER TABLE orders RENAME COLUMN customer_id TO wx_user_id;
-  `);
-}
 if (!existingOrderCols.includes('child_id')) {
   sqlite.exec("ALTER TABLE orders ADD COLUMN child_id INTEGER");
 }
-
-// 迁移：follow_ups 表从 customer_id 改为 wx_user_id
 const existingFollowUpCols = (sqlite.prepare("PRAGMA table_info(follow_ups)").all() as any[]).map(c => c.name);
-if (!existingFollowUpCols.includes('wx_user_id') && existingFollowUpCols.includes('customer_id')) {
-  sqlite.exec(`
-    ALTER TABLE follow_ups RENAME COLUMN customer_id TO wx_user_id;
-  `);
-}
 if (!existingFollowUpCols.includes('child_id')) {
   sqlite.exec("ALTER TABLE follow_ups ADD COLUMN child_id INTEGER");
 }
