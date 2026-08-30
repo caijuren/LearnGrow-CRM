@@ -40,8 +40,14 @@ jobs:
       - name: TypeScript type check
         run: npm run check
       
+      - name: Run database migrations for tests
+        run: npx drizzle-kit migrate --config=drizzle.config.ts
+      
       - name: Run tests
         run: ./node_modules/.bin/vitest run
+        env:
+          JWT_SECRET: test-secret-key-for-ci-cd-pipeline-must-be-at-least-32-chars-long
+          NODE_ENV: test
       
       - name: Upload coverage
         uses: codecov/codecov-action@v3
