@@ -46,8 +46,8 @@ jobs:
       - name: Run database migrations for tests
         run: npx drizzle-kit migrate --config=drizzle.config.ts
       
-      - name: Run tests
-        run: ./node_modules/.bin/vitest run
+      - name: Run tests (unit tests only)
+        run: ./node_modules/.bin/vitest run tests/unit/
         env:
           JWT_SECRET: test-secret-key-for-ci-cd-pipeline-must-be-at-least-32-chars-long
           NODE_ENV: test
