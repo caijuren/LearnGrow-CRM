@@ -179,11 +179,24 @@ if (!existingProductCols.includes('commission_percent')) {
   sqlite.exec("ALTER TABLE products ADD COLUMN commission_percent REAL NOT NULL DEFAULT 0");
 }
 
+// 迁移：orders 表从 customer_id 改为 wx_user_id
 const existingOrderCols = (sqlite.prepare("PRAGMA table_info(orders)").all() as any[]).map(c => c.name);
+if (!existingOrderCols.includes('wx_user_id') && existingOrderCols.includes('customer_id')) {
+  sqlite.exec(`
+    ALTER TABLE orders RENAME COLUMN customer_id TO wx_user_id;
+  `);
+}
 if (!existingOrderCols.includes('child_id')) {
   sqlite.exec("ALTER TABLE orders ADD COLUMN child_id INTEGER");
 }
+
+// 迁移：follow_ups 表从 customer_id 改为 wx_user_id
 const existingFollowUpCols = (sqlite.prepare("PRAGMA table_info(follow_ups)").all() as any[]).map(c => c.name);
+if (!existingFollowUpCols.includes('wx_user_id') && existingFollowUpCols.includes('customer_id')) {
+  sqlite.exec(`
+    ALTER TABLE follow_ups RENAME COLUMN customer_id TO wx_user_id;
+  `);
+}
 if (!existingFollowUpCols.includes('child_id')) {
   sqlite.exec("ALTER TABLE follow_ups ADD COLUMN child_id INTEGER");
 }
