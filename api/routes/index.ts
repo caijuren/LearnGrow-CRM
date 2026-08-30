@@ -7,6 +7,7 @@
 import { FastifyInstance } from 'fastify';
 import { registerAuthRoutes } from './auth.routes.js';
 import { registerWxUserRoutes } from './wxUser.routes.js';
+import { registerCheckinRoutes } from './checkin.routes.js';
 
 export async function registerAllRoutes(app: FastifyInstance) {
   // 系统接口
@@ -19,8 +20,6 @@ export async function registerAllRoutes(app: FastifyInstance) {
   // 微信用户管理
   await registerWxUserRoutes(app);
 
-  // TODO: 继续添加其他路由模块（后续重构阶段完成）
-  // - await registerCheckinRoutes(app);
-  // - await registerOrderRoutes(app);
-  // - await registerDashboardRoutes(app);
+  // 打卡管理
+  await registerCheckinRoutes(app);
 }
