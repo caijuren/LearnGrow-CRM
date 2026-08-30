@@ -33,7 +33,7 @@ if (existingFollowUpColsEarly.length > 0 && !existingFollowUpColsEarly.includes(
   sqlite.exec(`ALTER TABLE follow_ups RENAME COLUMN customer_id TO wx_user_id;`);
 }
 
-// 老库 wx_users 补齐 CRM 列（必须在 CREATE TABLE IF NOT EXISTS + CREATE INDEX 之前）
+// 老库 wx_users/children/wechat_group_members 补齐 CRM 列（必须在 CREATE TABLE IF NOT EXISTS + CREATE INDEX 之前）
 const existingWxUserColsEarly = (sqlite.prepare("PRAGMA table_info(wx_users)").all() as any[]).map(c => c.name);
 const wxUserColDefsEarly: [string, string][] = [
   ['points', 'INTEGER NOT NULL DEFAULT 0'],
@@ -59,6 +59,18 @@ for (const [col, def] of wxUserColDefsEarly) {
   if (!existingWxUserColsEarly.includes(col)) {
     sqlite.exec(`ALTER TABLE wx_users ADD COLUMN ${col} ${def}`);
   }
+}
+
+// children 表需要 wx_user_id 列
+const existingChildrenColsEarly = (sqlite.prepare("PRAGMA table_info(children)").all() as any[]).map(c => c.name);
+if (existingChildrenColsEarly.length > 0 && !existingChildrenColsEarly.includes('wx_user_id')) {
+  sqlite.exec(`ALTER TABLE children ADD COLUMN wx_user_id INTEGER`);
+}
+
+// wechat_group_members 表需要 wx_user_id 列
+const existingGroupMemberColsEarly = (sqlite.prepare("PRAGMA table_info(wechat_group_members)").all() as any[]).map(c => c.name);
+if (existingGroupMemberColsEarly.length > 0 && !existingGroupMemberColsEarly.includes('wx_user_id')) {
+  sqlite.exec(`ALTER TABLE wechat_group_members ADD COLUMN wx_user_id INTEGER`);
 }
 // ====================================================
 
