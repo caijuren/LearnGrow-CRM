@@ -142,15 +142,6 @@ export function resetMetrics() {
  * 注册指标路由到 Fastify 实例
  */
 export function registerMetricsRoutes(app: FastifyInstance) {
-  // 公开的健康检查端点
-  app.get('/api/health', async (request, reply) => {
-    reply.send({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: Math.floor((Date.now() - metrics.startTime) / 1000),
-    });
-  });
-
   // 需要认证的指标端点
   app.get('/api/metrics', async (request, reply) => {
     const summary = getMetricsSummary();
