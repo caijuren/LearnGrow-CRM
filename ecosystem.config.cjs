@@ -2,42 +2,49 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// 解析 .env.production 文件（支持多个路径）
+// 解析 .env.production 文件：扫描所有候选路径并合并，路径越靠前优先级越高。
+// 这样即使某个文件只含部分键（如只有 VITE_API_BASE_URL），也不会遮蔽其他文件里的密钥。
 const homeDir = os.homedir();
 const possiblePaths = [
-  path.join(homeDir, 'learngrow-crm', 'current', '.env.production'),
   path.join(homeDir, 'learngrow-crm', '.env.production'),
   '/home/ubuntu/learngrow-crm/.env.production',
+  path.join(homeDir, '.env.production'),
+  path.join(homeDir, 'learngrow-crm', 'current', '.env.production'),
   '/var/www/learngrow-crm/.env.production',
   '/opt/learngrow-crm/.env.production',
   './.env.production'
 ];
 
-let envPath = null;
-for (const p of possiblePaths) {
-  if (fs.existsSync(p)) {
-    envPath = p;
-    break;
-  }
+function parseEnvFile(content) {
+  return content
+    .split('\n')
+    .filter(line => line.trim() && !line.trim().startsWith('#'))
+    .reduce((acc, line) => {
+      const [key, ...valueParts] = line.split('=');
+      acc[key.trim()] = valueParts.join('=').trim();
+      return acc;
+    }, {});
 }
 
-let envConfig = {};
-if (envPath) {
+const envConfig = {};
+const envPathsFound = [];
+for (const p of possiblePaths) {
   try {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    envConfig = envContent
-      .split('\n')
-      .filter(line => line.trim() && !line.trim().startsWith('#'))
-      .reduce((acc, line) => {
-        const [key, ...valueParts] = line.split('=');
-        acc[key.trim()] = valueParts.join('=').trim();
-        return acc;
-      }, {});
+    if (fs.existsSync(p)) {
+      envPathsFound.push(p);
+      const parsed = parseEnvFile(fs.readFileSync(p, 'utf8'));
+      for (const [k, v] of Object.entries(parsed)) {
+        if (!(k in envConfig)) envConfig[k] = v;
+      }
+    }
   } catch (e) {
-    console.error('Warning: Could not read .env.production:', e.message);
+    console.error('Warning: Could not read .env.production at ' + p + ':', e.message);
   }
-} else {
+}
+if (envPathsFound.length === 0) {
   console.warn('Warning: .env.production not found in standard locations');
+} else {
+  console.log('Loaded env files (precedence order):', envPathsFound.join(', '));
 }
 
 const pm2LogDir = process.env.PM2_LOG_DIR || path.join(os.homedir(), '.pm2', 'logs');

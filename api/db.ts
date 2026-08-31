@@ -601,8 +601,10 @@ sqlite.exec(`
 `);
 
 // 使用 INSERT OR IGNORE 防止多线程/多进程初始化时重复插入
+// 仅当 admin 账号尚不存在时才强制要求配置初始密码；已有账号的部署不受此限制
+const adminExists = (sqlite.prepare("SELECT COUNT(*) AS n FROM users WHERE username = 'admin'").get() as any).n > 0;
 const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD;
-if (isProduction && (!initialAdminPassword || initialAdminPassword.length < 12)) {
+if (isProduction && !adminExists && (!initialAdminPassword || initialAdminPassword.length < 12)) {
   throw new Error('生产环境初始化管理员时必须配置至少12位 INITIAL_ADMIN_PASSWORD');
 }
 const hash = bcrypt.hashSync(initialAdminPassword || 'admin123', 10);

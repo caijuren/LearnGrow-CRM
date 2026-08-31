@@ -17,7 +17,7 @@ on:
 env:
   NODE_ENV: production
   DATA_DIR: ${{ vars.DATA_DIR || './data' }}
-  DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/opt/learngrow-crm' }}
+  DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/home/ubuntu/learngrow-crm' }}
 
 jobs:
   test:
@@ -91,7 +91,7 @@ jobs:
       - name: Deploy via SSH
         run: |
           DEPLOY_ENV="${{ github.event.inputs.environment || 'production' }}"
-          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/opt/learngrow-crm' }}"
+          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/home/ubuntu/learngrow-crm' }}"
           RELEASE_DIR="$DEPLOY_DIR/releases/$(git rev-parse --short HEAD)_$(date +%Y%m%d_%H%M%S)"
           
           # Create release directory on server
@@ -167,7 +167,7 @@ jobs:
       - name: Auto rollback on failure
         if: failure()
         run: |
-          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/opt/learngrow-crm' }}"
+          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/home/ubuntu/learngrow-crm' }}"
           ssh ubuntu@124.220.103.120 "
             PREV=\$(ls -t $DEPLOY_DIR/releases/ | grep -v '\$(git rev-parse --short HEAD)' | head -n 1)
             if [ -n \"\$PREV\" ]; then
@@ -195,7 +195,7 @@ jobs:
       
       - name: Remove old releases (keep last 3)
         run: |
-          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/opt/learngrow-crm' }}"
+          DEPLOY_DIR="${{ vars.DEPLOY_DIR || '/home/ubuntu/learngrow-crm' }}"
           ssh ubuntu@124.220.103.120 "
             cd $DEPLOY_DIR/releases && ls -t | tail -n +4 | xargs -r rm -rf
             echo 'Old releases cleaned up, keeping last 3 versions'
