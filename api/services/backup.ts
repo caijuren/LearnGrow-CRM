@@ -15,9 +15,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const projectRoot = path.join(__dirname, '..', '..');
+// v3.3.18: 备份目录必须独立于代码版本，防止部署时被替换
 export const dataDir = process.env.DATA_DIR || path.join(projectRoot, 'data');
 export const uploadsDir = path.join(projectRoot, 'uploads');
-export const backupsDir = process.env.BACKUP_DIR || path.join(projectRoot, 'backups');
+export const backupsDir = process.env.BACKUP_DIR || path.join(process.env.HOME || projectRoot, 'learngrow-crm', 'backups');
 
 // 备份保留份数（默认 14 份），可通过环境变量覆盖
 export const BACKUP_KEEP_COUNT = parseInt(process.env.BACKUP_KEEP_COUNT || '14', 10) || 14;
