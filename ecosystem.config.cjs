@@ -3,9 +3,11 @@ const path = require('path');
 const os = require('os');
 
 // 解析 .env.production 文件（支持多个路径）
+const homeDir = os.homedir();
 const possiblePaths = [
   '/var/www/learngrow-crm/.env.production',
   '/opt/learngrow-crm/.env.production',
+  path.join(homeDir, 'learngrow-crm', 'current', '.env.production'),
   './.env.production'
 ];
 
