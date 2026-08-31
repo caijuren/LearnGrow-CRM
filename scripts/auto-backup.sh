@@ -66,7 +66,7 @@ cat > "$BACKUP_DIR/db_learngrow_$TIMESTAMP.meta.json" <<EOF
     "wxUsers": $(node -e "const Database = require('better-sqlite3'); const db = new Database('$DB_BACKUP'); console.log(db.prepare('SELECT COUNT(*) as c FROM wx_users').get().c);"),
     "children": $(node -e "const Database = require('better-sqlite3'); const db = new Database('$DB_BACKUP'); console.log(db.prepare('SELECT COUNT(*) as c FROM children').get().c);"),
     "orders": $(node -e "const Database = require('better-sqlite3'); const db = new Database('$DB_BACKUP'); console.log(db.prepare('SELECT COUNT(*) as c FROM orders').get().c);"),
-    "products": $(node -e "const Database = require('better-sqlite3'); const db = new Database('$DB_BACKUP'); console.log(db.prepare('SELECT COUNT(*) as c FROM products').get().c);"
+    "products": $(node -e "const Database = require('better-sqlite3'); const db = new Database('$DB_BACKUP'); console.log(db.prepare('SELECT COUNT(*) as c FROM products').get().c);")
   }
 }
 EOF
