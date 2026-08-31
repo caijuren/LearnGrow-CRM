@@ -150,16 +150,18 @@ fi
 
 # ---------- Step 3: 同步代码 ----------
 info "Step 3/7: 同步代码到 $RELEASE_DIR"
-run_remote <<< "mkdir -p $RELEASE_DIR"
+run_remote <<< "mkdir -p $RELEASE_DIR $DEPLOY_DIR/uploads"
 rsync -az --delete \
   --exclude='node_modules' --exclude='.git' --exclude='data' \
   --exclude='.env' --exclude='.env.*' \
   --exclude='backups' --exclude='releases' \
-  --exclude='miniprogram' \
+  --exclude='miniprogram' --exclude='uploads' \
   --exclude='*.zip' --exclude='docs' \
   -e "ssh -o BatchMode=yes" \
   "$PROJECT_ROOT/" "$DEPLOY_SSH:$RELEASE_DIR/"
-ok "代码同步完成（已排除 miniprogram / .env / data）"
+# uploads 独立于 release 目录，软链到共享目录，发版永不覆盖
+run_remote <<< "ln -sfn $DEPLOY_DIR/uploads $RELEASE_DIR/uploads"
+ok "代码同步完成（已排除 miniprogram / .env / data / uploads）"
 
 # ---------- Step 4: 安装依赖 + 构建 + 迁移 ----------
 info "Step 4/7: 远程安装依赖、构建前端、运行迁移（耗时数分钟）"
@@ -244,6 +246,12 @@ ok "健康检查通过"
 
 # ---------- Step 7: 部署后验证 + 清理 ----------
 info "Step 7/7: 部署后验证与清理"
+UPLOAD_COUNT=$(run_remote <<< "find -L $DEPLOY_DIR/current/uploads -type f 2>/dev/null | wc -l")
+if [ "${UPLOAD_COUNT:-0}" -gt 0 ]; then
+  ok "uploads 完整（$UPLOAD_COUNT 个文件）"
+else
+  warn "uploads 为空或软链失效，请立即检查 $DEPLOY_DIR/uploads！"
+fi
 run_remote <<< "curl -fsS http://127.0.0.1:3456/api/version" || true
 echo
 run_remote <<EOF || warn "数据完整性检查失败（不影响部署结果，请人工确认）"
