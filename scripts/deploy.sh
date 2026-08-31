@@ -210,13 +210,16 @@ else
         echo "✓ 环境文件已复制"
     fi
     
+    # 创建独立数据目录（如果不存在）
+    mkdir -p "$DEPLOY_DIR/data"
+    
     # 安装生产依赖
     echo "安装依赖..."
     npm ci --omit=dev
     
-    # 运行数据库迁移
+    # 运行数据库迁移（使用独立数据目录）
     echo "运行数据库迁移..."
-    NODE_ENV=production npx drizzle-kit migrate --config=drizzle.config.ts
+    NODE_ENV=production DATA_DIR="$DEPLOY_DIR/data" npx drizzle-kit migrate --config=drizzle.config.ts
     
     # 构建前端
     echo "构建前端..."
