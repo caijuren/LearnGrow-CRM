@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 配置变量
-DEPLOY_DIR="${DEPLOY_DIR:-/opt/learngrow-crm}"
+DEPLOY_DIR="${DEPLOY_DIR:-/home/ubuntu/learngrow-crm}"
 RELEASES_DIR="$DEPLOY_DIR/releases"
 BACKUP_DIR="$DEPLOY_DIR/backups"
 CURRENT_LINK="$DEPLOY_DIR/current"
@@ -109,9 +109,13 @@ rollback_deployment() {
     cd "$DEPLOY_DIR"
     ln -sfn "releases/$PREV_RELEASE" current
     
-    # 重启 PM2
+    # 重启 PM2（尝试 .cjs 和 .js 两种扩展名）
     cd "$CURRENT_LINK"
-    pm2 reload ecosystem.config.js --env production || pm2 restart all
+    if [ -f "ecosystem.config.cjs" ]; then
+        pm2 reload ecosystem.config.cjs --env production || pm2 restart all
+    else
+        pm2 reload ecosystem.config.js --env production || pm2 restart all
+    fi
     
     echo -e "${GREEN}回滚成功!${NC}"
     send_wechat_notification "rollback" "已回滚到版本 $PREV_RELEASE" ""
@@ -279,9 +283,13 @@ if [ "$DRY_RUN" = true ]; then
 else
     cd "$CURRENT_LINK"
     
-    # 重载 PM2
+    # 重载 PM2（尝试 .cjs 和 .js 两种扩展名）
     echo "重载 PM2 服务..."
-    pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+    if [ -f "ecosystem.config.cjs" ]; then
+        pm2 reload ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
+    else
+        pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+    fi
     
     # 等待服务启动
     echo "等待服务启动..."
