@@ -5,9 +5,11 @@ const os = require('os');
 // 解析 .env.production 文件（支持多个路径）
 const homeDir = os.homedir();
 const possiblePaths = [
+  path.join(homeDir, 'learngrow-crm', 'current', '.env.production'),
+  path.join(homeDir, 'learngrow-crm', '.env.production'),
+  '/home/ubuntu/learngrow-crm/.env.production',
   '/var/www/learngrow-crm/.env.production',
   '/opt/learngrow-crm/.env.production',
-  path.join(homeDir, 'learngrow-crm', 'current', '.env.production'),
   './.env.production'
 ];
 
@@ -40,7 +42,7 @@ if (envPath) {
 
 const pm2LogDir = process.env.PM2_LOG_DIR || path.join(os.homedir(), '.pm2', 'logs');
 const deployDir = process.env.DEPLOY_DIR || path.join(os.homedir(), 'learngrow-crm');
-const dataDir = process.env.DATA_DIR || envConfig.DATA_DIR || path.join(os.homedir(), 'learngrow-crm', 'data');
+const dataDir = process.env.DATA_DIR || envConfig.DATA_DIR || path.join(deployDir, 'data');
 
 module.exports = {
   apps: [
