@@ -173,15 +173,42 @@ else
     echo -e "${GREEN}✓ 发布目录: $RELEASE_DIR${NC}"
 fi
 
-echo -e "${BLUE}Step 3/7: 备份当前版本...${NC}"
+echo -e "${BLUE}Step 3/7: 备份当前版本和数据库...${NC}"
 
 if [ -L "$CURRENT_LINK" ] && [ -d "$CURRENT_LINK" ]; then
     if [ "$DRY_RUN" = true ]; then
-        echo -e "${YELLOW}[Dry-run] 将备份当前版本${NC}"
+        echo -e "${YELLOW}[Dry-run] 将备份当前版本和数据库${NC}"
     else
+        # 备份代码版本
         BACKUP_PATH="$BACKUP_DIR/release_$TIMESTAMP"
         cp -r "$CURRENT_LINK" "$BACKUP_PATH"
-        echo -e "${GREEN}✓ 备份完成: $BACKUP_PATH${NC}"
+        echo -e "${GREEN}✓ 代码备份完成: $BACKUP_PATH${NC}"
+        
+        # 备份数据库（关键！）
+        if [ -f "$DEPLOY_DIR/data/learngrow.db" ]; then
+            DB_BACKUP="$BACKUP_DIR/db_learngrow_$TIMESTAMP.db"
+            cp "$DEPLOY_DIR/data/learngrow.db" "$DB_BACKUP"
+            
+            # 验证备份完整性
+            if node -e "const Database = require('better-sqlite3'); new Database('$DB_BACKUP').prepare('SELECT 1').get();" 2>/dev/null; then
+                echo -e "${GREEN}✓ 数据库备份完成: $DB_BACKUP${NC}"
+                
+                # 记录备份数据统计
+                echo "--- 备份数据统计 ---"
+                node -e "
+                    const Database = require('better-sqlite3');
+                    const db = new Database('$DB_BACKUP');
+                    console.log('微信用户:', db.prepare('SELECT COUNT(*) as c FROM wx_users').get().c);
+                    console.log('孩子档案:', db.prepare('SELECT COUNT(*) as c FROM children').get().c);
+                    console.log('订单数:', db.prepare('SELECT COUNT(*) as c FROM orders').get().c);
+                " || true
+            else
+                echo -e "${RED}✗ 数据库备份损坏，中止部署！${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${YELLOW}警告: 未找到现有数据库，跳过数据库备份${NC}"
+        fi
     fi
 else
     echo -e "${YELLOW}首次部署，无需备份${NC}"
@@ -283,6 +310,33 @@ else
         echo "健康检查尝试 $RETRY_COUNT/$MAX_RETRIES，5秒后重试..."
         sleep 5
     done
+    
+    # 数据完整性验证（关键！）
+    echo -e "${BLUE}验证数据完整性...${NC}"
+    node -e "
+        const Database = require('better-sqlite3');
+        const db = new Database('$DEPLOY_DIR/data/learngrow.db');
+        const stats = {
+            wxUsers: db.prepare('SELECT COUNT(*) as c FROM wx_users').get().c,
+            children: db.prepare('SELECT COUNT(*) as c FROM children').get().c,
+            orders: db.prepare('SELECT COUNT(*) as c FROM orders').get().c,
+            products: db.prepare('SELECT COUNT(*) as c FROM products').get().c
+        };
+        console.log('=== 部署后数据统计 ===');
+        console.log('微信用户:', stats.wxUsers);
+        console.log('孩子档案:', stats.children);
+        console.log('订单数:', stats.orders);
+        console.log('产品数:', stats.products);
+        
+        // 如果关键数据为0，发出警告
+        if (stats.wxUsers === 0) {
+            console.error('⚠️  警告: 微信用户数为0，可能存在数据问题！');
+            process.exit(1);
+        }
+    " || {
+        echo -e "${RED}✗ 数据验证失败，建议检查数据库！${NC}"
+        send_wechat_notification "failure" "部署成功但数据验证异常" "请手动检查数据库完整性"
+    }
 fi
 
 # 清理旧版本
