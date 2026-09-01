@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js');
 const avatarUtil = require('../../utils/avatar.js');
+const timeUtil = require('../../utils/time.js');
 const app = getApp();
 
 Page({
@@ -140,7 +141,7 @@ Page({
       try {
         feed = (await api.getEventFeed(this.data.eventId) || []).map(item => ({
           ...item,
-          formattedDate: this.formatFeedDate(item.created_at || item.checkin_date)
+          formattedDate: timeUtil.formatRelativeTime(item.created_at || item.checkin_date)
         }));
       } catch (e) {
         // 动态加载失败不阻断主流程
@@ -827,19 +828,7 @@ Page({
   },
 
   formatFeedDate(dateStr) {
-    if (!dateStr) return '';
-    const date = new Date(dateStr.replace(/-/g, '/'));
-    if (isNaN(date.getTime())) return dateStr;
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const diff = Math.floor((target - today) / 86400000);
-
-    const pad = n => n.toString().padStart(2, '0');
-    if (diff === 0) return `今天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    if (diff === -1) return `昨天 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    return timeUtil.formatRelativeTime(dateStr);
   },
 
   previewFeedImage(e) {

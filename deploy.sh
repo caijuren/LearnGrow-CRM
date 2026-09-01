@@ -16,13 +16,16 @@ echo ""
 echo "1️⃣ 上传代码到服务器..."
 ssh $SERVER_USER@$SERVER_HOST "rm -rf $TMP_DIR && mkdir -p $TMP_DIR"
 
+# 上传整个项目根目录（排除不需要的目录）
 rsync -avz \
   -e "ssh -o StrictHostKeyChecking=no" \
   --exclude='node_modules' \
   --exclude='dist' \
-  --exclude='data/*.db' \
+  --exclude='data' \
   --exclude='*.log' \
   --exclude='.git' \
+  --exclude='.DS_Store' \
+  --exclude='miniprogram' \
   --exclude='.env' \
   --exclude='.env.local' \
   --exclude='.env.production' \
@@ -48,29 +51,29 @@ ssh $SERVER_USER@$SERVER_HOST << ENDSSH
     --exclude='.env.local' \
     --exclude='.env.production' \
     $TMP_DIR/ $PROJECT_DIR/
-  
+
   # 历史遗留的 root 属主目录会导致 ubuntu 的 PM2 进程写不进（uploads/backups 曾因此报 EACCES）
   sudo chown -R ubuntu:ubuntu $PROJECT_DIR/uploads $PROJECT_DIR/data $PROJECT_DIR/backups 2>/dev/null || true
-  
+
   cd $PROJECT_DIR
-  
+
   echo "   📦 安装依赖..."
   sudo npm ci
 
   echo "   🔍 类型检查和测试..."
   sudo npm run check
   sudo npm test
-  
+
   echo "   🔨 构建中..."
   sudo npm run build
 
   echo "   🧪 生产预检..."
   sudo npm run preflight:prod
-  
+
   echo "   🔄 重载服务..."
   pm2 startOrReload ecosystem.config.cjs --only learngrow-crm --update-env
   pm2 save
-  
+
   echo "   ✅ 验证API..."
   sleep 2
   curl -s http://localhost:3456/api/health

@@ -89,11 +89,15 @@ Page({
 
       const nickname = result.user.nickname || '';
       const childName = result.user.child_name || '';
+      const avatarUrl = result.user.avatar_url || '';
+      const needsProfile = nickname === '微信用户' || nickname === '' || !avatarUrl;
 
-      if (nickname === '微信用户' || nickname === '') {
+      if (needsProfile) {
         this.setData({
           showNicknameSetup: true,
-          setupNickname: '',
+          setupNickname: nickname === '微信用户' ? '' : nickname,
+          setupAvatarUrl: avatarUrl,
+          setupAvatarFile: avatarUrl ? '' : '',
           loading: false
         });
       } else if (!childName) {
@@ -126,7 +130,10 @@ Page({
 
   async onChooseAvatar(e) {
     const tempFilePath = e.detail.avatarUrl;
-    if (!tempFilePath) return;
+    if (!tempFilePath) {
+      wx.showToast({ title: '请选择微信头像', icon: 'none' });
+      return;
+    }
 
     this.setData({ saving: true });
     try {
@@ -136,7 +143,8 @@ Page({
         setupAvatarFile: tempFilePath
       });
     } catch (err) {
-      wx.showToast({ title: '头像上传失败', icon: 'none' });
+      const message = (err && err.message) || '头像上传失败';
+      wx.showToast({ title: message, icon: 'none' });
     } finally {
       this.setData({ saving: false });
     }

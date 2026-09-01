@@ -19,11 +19,13 @@ Page({
     loading: true,
     isLoggedIn: false,
     baseUrl: app.globalData.baseUrl,
-    brokenAvatars: {}
+    brokenAvatars: {},
+    showLoginPrompt: false
   },
 
   onAvatarError(e) {
     avatarUtil.onAvatarError(e, this);
+
   },
 
   onLoad() {
@@ -118,11 +120,33 @@ Page({
   },
 
   goToMyCheckins() {
-    wx.reLaunch({ url: '/pages/my-checkins/my-checkins' });
+    if (!app.checkLogin()) {
+      this.setData({ showLoginPrompt: true });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
   },
 
   goToProfile() {
-    wx.reLaunch({ url: '/pages/profile/profile' });
+    if (!app.checkLogin()) {
+      this.setData({ showLoginPrompt: true });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/profile/profile' });
+
+  },
+
+  preventClose() {
+    // 阻止冒泡，避免点击弹窗内容时关闭
+  },
+
+  closeLoginPrompt() {
+    this.setData({ showLoginPrompt: false });
+  },
+
+  confirmLoginPrompt() {
+    this.setData({ showLoginPrompt: false });
+    wx.navigateTo({ url: '/pages/login/login' });
   },
 
   goToLogin() {

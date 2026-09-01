@@ -299,6 +299,18 @@
   font-weight: 500;
 }
 
+.avatar-required {
+  border-color: rgba(244, 63, 122, 0.7) !important;
+  background: rgba(244, 63, 122, 0.08) !important;
+}
+
+.avatar-required-text {
+  font-size: 20rpx;
+  color: var(--primary);
+  font-weight: 600;
+  margin-top: 8rpx;
+}
+
 .avatar-edit-badge {
   position: absolute;
   right: 0;

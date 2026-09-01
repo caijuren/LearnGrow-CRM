@@ -243,4 +243,16 @@
       <text class="nav-text">我的</text>
     </view>
   </view>
+
+  <!-- 登录提示弹窗 -->
+  <view wx:if="{{showLoginPrompt}}" class="modal-mask" bindtap="closeLoginPrompt">
+    <view class="modal-content" catchtap="preventClose">
+      <view class="modal-title">需要登录</view>
+      <view class="modal-desc">登录后可查看个人打卡记录和更多信息，游客模式下仍可继续浏览活动。</view>
+      <view class="modal-actions">
+        <button class="modal-btn modal-btn-secondary" bindtap="closeLoginPrompt">先逛逛</button>
+        <button class="modal-btn modal-btn-primary" bindtap="confirmLoginPrompt">去登录</button>
+      </view>
+    </view>
+  </view>
 </view>

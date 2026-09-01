@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js');
+const timeUtil = require('../../utils/time.js');
 
 Page({
   data: {
@@ -16,9 +17,13 @@ Page({
     this.setData({ loading: true });
     try {
       const p = await api.getMyPoints();
+      const items = (p.items || []).map(item => ({
+        ...item,
+        created_at: timeUtil.formatBJT(item.created_at)
+      }));
       this.setData({
         balance: p.balance || 0,
-        items: p.items || []
+        items
       });
     } catch (e) {
       wx.showToast({ title: '积分明细加载失败', icon: 'none' });

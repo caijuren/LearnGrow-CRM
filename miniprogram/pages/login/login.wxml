@@ -30,11 +30,11 @@
   <view class="nickname-overlay" wx:if="{{showNicknameSetup}}">
     <view class="nickname-modal">
       <view class="nickname-title">完善一下资料</view>
-      <view class="nickname-desc">选择头像并设置昵称</view>
+      <view class="nickname-desc">请从微信头像中选择头像，并设置昵称</view>
 
       <view class="profile-form">
         <button
-          class="avatar-picker"
+          class="avatar-picker {{setupAvatarUrl ? '' : 'avatar-required'}}"
           open-type="chooseAvatar"
           bind:chooseavatar="onChooseAvatar"
         >
@@ -47,6 +47,7 @@
           <view wx:else class="avatar-placeholder">
             <text class="avatar-placeholder-icon">◉</text>
             <text class="avatar-placeholder-text">点击选择微信头像</text>
+            <text class="avatar-required-text">必填</text>
           </view>
           <view wx:if="{{setupAvatarUrl}}" class="avatar-edit-badge">
             <text class="avatar-edit-icon">✎</text>
@@ -70,7 +71,12 @@
       </view>
 
       <view class="nickname-actions">
-        <button class="btn-save" bindtap="saveNickname" loading="{{saving}}">保存</button>
+        <button
+          class="btn-save {{setupAvatarUrl && setupNickname ? '' : 'btn-disabled'}}"
+          bindtap="saveNickname"
+          loading="{{saving}}"
+          disabled="{{!setupAvatarUrl || !setupNickname}}"
+        >保存</button>
       </view>
     </view>
   </view>
