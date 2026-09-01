@@ -203,7 +203,7 @@ EOF
 HEALTH_OK=false
 for i in $(seq 1 12); do
   sleep 5
-  if run_remote <<< "curl -fsS $HEALTH_URL" | grep -q '"status"'; then
+  if run_remote <<< "curl -fsS $HEALTH_URL" | grep -q '"success"'; then
     HEALTH_OK=true
     break
   fi
