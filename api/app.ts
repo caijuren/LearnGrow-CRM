@@ -1910,7 +1910,8 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
     try {
       const res = await fetch(`https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_SECRET}&js_code=${code}&grant_type=authorization_code`);
       data = await res.json();
-      request.log.info({ wxCode: code.substring(0, 8) + '...', wxResponse: data }, '微信 jscode2session 响应');
+      // 日志脱敏：session_key 是敏感凭证，不能落盘
+      request.log.info({ wxCode: code.substring(0, 8) + '...', openid: data?.openid, errcode: data?.errcode }, '微信 jscode2session 响应');
     } catch (e) {
       request.log.error({ err: e }, '调用微信 jscode2session 失败');
       if (isProduction) return reply.code(502).send({ success: false, error: '微信登录服务暂不可用' });
@@ -1959,6 +1960,12 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
 app.post('/api/wx/update-profile', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const { nickname, avatar_url, child_name } = request.body || {};
+
+  // 更新头像时强制非空
+  if (avatar_url !== undefined && !avatar_url) {
+    return reply.code(400).send({ success: false, error: '请从微信头像中选择头像' });
+  }
+
   const updates: string[] = [];
   const params: any[] = [];
   if (nickname !== undefined) { updates.push('nickname = ?'); params.push(nickname); }

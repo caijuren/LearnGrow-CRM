@@ -36,12 +36,18 @@ export function listCheckinEvents(options: {
   const { status, search, page = 1, limit = 20 } = options;
   const offset = (page - 1) * limit;
 
-  let whereSql = ' WHERE 1=1';
+  // 使用北京时间当天日期
+  const today = bjtToday();
+
+  let whereSql = ' WHERE is_deleted = 0';
   const params: any[] = [];
 
-  if (status) {
-    whereSql += ' AND status = ?';
-    params.push(status);
+  if (status === 'active') {
+    whereSql += ' AND end_date >= ?';
+    params.push(today);
+  } else if (status === 'ended') {
+    whereSql += ' AND end_date < ?';
+    params.push(today);
   }
   if (search) {
     whereSql += ' AND (title LIKE ? OR description LIKE ?)';
@@ -51,10 +57,13 @@ export function listCheckinEvents(options: {
   const total = (db.prepare(`SELECT COUNT(*) as total FROM checkin_events${whereSql}`).get(...params) as any).total;
 
   const events = db.prepare(`
-    SELECT * FROM checkin_events${whereSql}
-    ORDER BY created_at DESC
+    SELECT
+      *,
+      CASE WHEN end_date < ? THEN 'ended' ELSE 'active' END AS status
+    FROM checkin_events${whereSql}
+    ORDER BY end_date DESC
     LIMIT ? OFFSET ?
-  `).all(...params, limit, offset) as any[];
+  `).all(today, ...params, limit, offset) as any[];
 
   return { events, total };
 }
@@ -63,7 +72,12 @@ export function listCheckinEvents(options: {
  * 获取单个打卡活动详情
  */
 export function getCheckinEventById(id: number) {
-  return db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(id) as any;
+  const today = bjtToday();
+  return db.prepare(`
+    SELECT *, CASE WHEN end_date < ? THEN 'ended' ELSE 'active' END AS status
+    FROM checkin_events
+    WHERE id = ?
+  `).get(today, id) as any;
 }
 
 /**

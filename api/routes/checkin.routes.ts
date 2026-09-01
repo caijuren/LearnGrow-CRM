@@ -139,15 +139,36 @@ export async function registerCheckinRoutes(app: FastifyInstance) {
      * 获取可参与的打卡活动列表
      */
     router.get('/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any) => {
-      const events = db.prepare(`
-        SELECT * FROM checkin_events
-        WHERE status = 'active' AND end_date >= date('now')
-        ORDER BY created_at DESC
-      `).all() as any[];
+      const query = request.query as any;
+      const result = listCheckinEvents({
+        status: query.status,
+        search: query.search,
+        page: parseInt(query.page || '1'),
+        limit: parseInt(query.limit || '20')
+      });
 
       return {
         success: true,
-        data: events
+        data: result.events,
+        pagination: { total: result.total, page: parseInt(query.page || '1'), limit: parseInt(query.limit || '20') }
+      };
+    });
+
+    /**
+     * GET /api/wx/checkin-events/:id
+     * 获取活动详情
+     */
+    router.get('/checkin-events/:id', { preHandler: [wxOptionalAuthMiddleware] }, async (request: any, reply: any) => {
+      const id = parseInt(request.params.id);
+      const event = getCheckinEventById(id);
+
+      if (!event) {
+        return reply.code(404).send({ success: false, error: '活动不存在' });
+      }
+
+      return {
+        success: true,
+        data: event
       };
     });
 
