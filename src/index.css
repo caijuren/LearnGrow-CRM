@@ -23,10 +23,10 @@
   --color-border-default: rgba(255, 255, 255, 0.05);
   --color-border-strong: rgba(255, 255, 255, 0.10);
 
-  --color-primary: #2563EB;
+  --color-primary: #5B5CE2;
   --color-primary-hover: #6F70EA;
-  --color-primary-soft: rgba(37, 99, 235, 0.15);
-  --color-primary-glow: rgba(37, 99, 235, 0.35);
+  --color-primary-soft: rgba(91, 92, 226, 0.15);
+  --color-primary-glow: rgba(91, 92, 226, 0.35);
 
   --color-success: #22C55E;
   --color-success-soft: rgba(34, 197, 94, 0.12);
@@ -80,10 +80,10 @@
   --color-border-default: #E4E7EC;
   --color-border-strong: #D0D5DD;
 
-  --color-primary: #2563EB;
+  --color-primary: #5B5CE2;
   --color-primary-hover: #4F50D8;
   --color-primary-soft: #EEF0FF;
-  --color-primary-glow: rgba(37, 99, 235, 0.25);
+  --color-primary-glow: rgba(91, 92, 226, 0.25);
 
   --color-success: #12B76A;
   --color-success-soft: #ECFDF3;
@@ -98,7 +98,7 @@
   --shadow-sm: 0 2px 8px rgba(16, 24, 40, 0.04);
   --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.05);
   --shadow-lg: 0 8px 32px rgba(16, 24, 40, 0.06);
-  --shadow-glow: 0 0 24px rgba(37, 99, 235, 0.2);
+  --shadow-glow: 0 0 24px rgba(91, 92, 226, 0.2);
 }
 
 @layer base {
@@ -125,13 +125,13 @@
 @layer utilities {
   .bg-mesh {
     background-image:
-      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(37, 99, 235, 0.04), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59, 130, 246, 0.03), transparent 50%);
+      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(91, 92, 226, 0.05), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(139, 92, 246, 0.04), transparent 50%);
   }
   :root.light .bg-mesh {
     background-image:
-      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(37, 99, 235, 0.04), transparent 50%),
-      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59, 130, 246, 0.03), transparent 50%);
+      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(91, 92, 226, 0.05), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgba(139, 92, 246, 0.04), transparent 50%);
   }
   .glass {
     background: var(--color-bg-surface);
@@ -187,7 +187,7 @@
     background: linear-gradient(135deg, var(--color-primary) 0%, #8B5CF6 100%);
   }
   .text-gradient {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #60A5FA 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #A78BFA 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -267,12 +267,12 @@
   .btn-primary {
     background-color: var(--color-primary);
     color: #FFFFFF;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(37, 99, 235, 0.25);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(91, 92, 226, 0.25);
   }
   .btn-primary:hover {
     background-color: var(--color-primary-hover);
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(16, 24, 40, 0.08), 0 8px 20px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 2px 4px rgba(16, 24, 40, 0.08), 0 8px 20px rgba(91, 92, 226, 0.35);
   }
   .btn-secondary {
     background-color: var(--color-bg-subtle);
@@ -677,9 +677,9 @@
     transition: transform 0.2s var(--ease-out);
   }
   .sidebar-link.active {
-    background: linear-gradient(90deg, rgba(37, 99, 235, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+    background: linear-gradient(90deg, rgba(91, 92, 226, 0.10) 0%, rgba(139, 92, 246, 0.04) 100%);
     color: var(--color-primary);
-    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(91, 92, 226, 0.10);
   }
   .sidebar-link.active::before {
     transform: translateY(-50%) scaleY(1);

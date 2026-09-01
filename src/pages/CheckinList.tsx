@@ -13,8 +13,7 @@ import {
 } from '../../shared/types';
 import Modal from '@/components/Modal';
 
-const STATUS_FILTERS: { value: CheckinEventStatus | ''; label: string }[] = [
-  { value: '', label: '全部' },
+const STATUS_FILTERS: { value: CheckinEventStatus; label: string }[] = [
   { value: 'active', label: '进行中' },
   { value: 'ended', label: '已结束' },
 ];
@@ -256,11 +255,11 @@ export default function CheckinList() {
           <motion.div variants={fadeUp} initial="hidden" animate="show" className="mb-6">
             <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
               {STATUS_FILTERS.map((f) => {
-                const isActive = (checkinFilter.status || '') === f.value;
+                const isActive = checkinFilter.status === f.value;
                 return (
                   <button
                     key={f.value}
-                    onClick={() => setCheckinFilter({ status: f.value || undefined })}
+                    onClick={() => setCheckinFilter({ status: f.value })}
                     className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition-all ${
                       isActive
                         ? 'bg-bg-surface text-text-primary shadow-sm'
@@ -321,7 +320,10 @@ export default function CheckinList() {
             {displayedEvents.map((event) => {
               const daysLeft = getDaysLeft(event.end_date);
               const progress = getProgress(event.start_date, event.end_date);
-              const isActive = event.status === 'active';
+              // 前端也根据 end_date 动态修正状态（双保险，避免依赖数据库静态 status）
+              const todayStr = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+              const realStatus = event.end_date < todayStr ? 'ended' : 'active';
+              const isActive = realStatus === 'active';
 
               return (
                 <motion.div
@@ -345,8 +347,8 @@ export default function CheckinList() {
                           <h3 className="text-sm font-semibold text-text-primary truncate">
                             {event.name}
                           </h3>
-                          <span className={`badge ${isRecycleBinView ? 'badge-neutral' : STATUS_BADGE[event.status]}`}>
-                            {isRecycleBinView ? '已删除' : CHECKIN_STATUS_LABELS[event.status]}
+                          <span className={`badge shrink-0 whitespace-nowrap ${isRecycleBinView ? 'badge-neutral' : STATUS_BADGE[realStatus]}`}>
+                            {isRecycleBinView ? '已删除' : CHECKIN_STATUS_LABELS[realStatus]}
                           </span>
                         </div>
                         {event.group_name && (

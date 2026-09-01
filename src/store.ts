@@ -57,7 +57,7 @@ interface AppState {
   loading: boolean;
   error: string | null;
 
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, remember?: boolean) => Promise<void>;
   logout: () => void;
   loadCurrentUser: () => Promise<void>;
   restoreAuth: () => void;
@@ -158,10 +158,29 @@ interface AppState {
   clearError: () => void;
 }
 
+function getStoredToken(): string | null {
+  return sessionStorage.getItem('token') || localStorage.getItem('token');
+}
+
+function setStoredToken(token: string, remember: boolean) {
+  if (remember) {
+    localStorage.setItem('token', token);
+    sessionStorage.removeItem('token');
+  } else {
+    sessionStorage.setItem('token', token);
+    localStorage.removeItem('token');
+  }
+}
+
+function clearStoredToken() {
+  localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
+}
+
 export const useStore = create<AppState>((set, get) => ({
-  token: localStorage.getItem('token'),
+  token: getStoredToken(),
   currentUser: null,
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: !!getStoredToken(),
   dashboard: null,
   wxUsers: [],
   totalWxUsers: 0,
@@ -192,18 +211,18 @@ export const useStore = create<AppState>((set, get) => ({
   checkinEvents: [],
   deletedCheckinEvents: [],
   selectedCheckinEvent: null,
-  checkinFilter: {},
+  checkinFilter: { status: 'active' },
   materials: [],
   materialCategory: 'all',
   materialSearch: '',
   loading: false,
   error: null,
 
-  login: async (username, password) => {
+  login: async (username, password, remember = true) => {
     set({ loading: true, error: null });
     try {
       const data = await api.login(username, password);
-      localStorage.setItem('token', data.token);
+      setStoredToken(data.token, remember);
       set({ token: data.token, currentUser: data.user, isAuthenticated: true, loading: false });
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
@@ -211,7 +230,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   logout: () => {
-    localStorage.removeItem('token');
+    clearStoredToken();
     set({ token: null, currentUser: null, isAuthenticated: false });
   },
   loadCurrentUser: async () => {
@@ -219,12 +238,12 @@ export const useStore = create<AppState>((set, get) => ({
       const user = await api.fetchCurrentUser();
       set({ currentUser: user });
     } catch {
-      localStorage.removeItem('token');
+      clearStoredToken();
       set({ token: null, currentUser: null, isAuthenticated: false });
     }
   },
   restoreAuth: () => {
-    const token = localStorage.getItem('token');
+    const token = getStoredToken();
     if (token) {
       set({ token, isAuthenticated: true });
       get().loadCurrentUser();

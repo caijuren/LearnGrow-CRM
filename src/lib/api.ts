@@ -4,7 +4,7 @@ import type { WxUser, WxUserFacets, Product, Order, FollowUp, DashboardData, Tod
 const API_BASE = '/api';
 
 function getToken() {
-  return localStorage.getItem('token');
+  return sessionStorage.getItem('token') || localStorage.getItem('token');
 }
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {

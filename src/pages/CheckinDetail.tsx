@@ -530,8 +530,10 @@ export default function CheckinDetail() {
         </motion.div>
 
       {activeTab === 'checkin' && (
-        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-[400px_300px_minmax(0,1fr)] gap-4">
+        <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-4 items-start">
           {/* Column 1: Calendar */}
+          {/* 左栏: 日历 + TOP5 垂直堆叠 */}
+          <div className="flex flex-col gap-4">
           <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-100">
               <h3 className="text-[13px] font-semibold text-gray-900 flex items-center gap-1.5">
@@ -700,6 +702,8 @@ export default function CheckinDetail() {
               </div>
             </div>
           )}
+
+          </div>
 
           {/* Column 3: Participant List */}
           <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
