@@ -5,6 +5,7 @@
  */
 
 import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
+import { authMiddleware, adminOnly } from '../services/auth.js';
 
 // 内存存储指标数据（生产环境建议接入 Prometheus）
 interface MetricsData {
@@ -143,7 +144,7 @@ export function resetMetrics() {
  */
 export function registerMetricsRoutes(app: FastifyInstance) {
   // 需要认证的指标端点
-  app.get('/api/metrics', async (request, reply) => {
+  app.get('/api/metrics', { preHandler: [authMiddleware, adminOnly] }, async (request, reply) => {
     const summary = getMetricsSummary();
     reply.send({
       success: true,
@@ -152,7 +153,7 @@ export function registerMetricsRoutes(app: FastifyInstance) {
   });
 
   // 详细的指标数据（仅管理员）
-  app.get('/api/metrics/detailed', async (request, reply) => {
+  app.get('/api/metrics/detailed', { preHandler: [authMiddleware, adminOnly] }, async (request, reply) => {
     reply.send({
       success: true,
       data: metrics,

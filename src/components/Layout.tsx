@@ -64,7 +64,7 @@ export const Layout: React.FC = () => {
     const saved = localStorage.getItem('theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'light';
   });
-  const { isAuthenticated, restoreAuth } = useStore();
+  const { isAuthenticated, restoreAuth, logout } = useStore();
 
   useEffect(() => {
     const root = document.documentElement;
@@ -208,7 +208,7 @@ export const Layout: React.FC = () => {
                     <div className="py-1">
                       <button
                         className="dropdown-item w-full text-left text-danger"
-                        onClick={() => { setUserMenuOpen(false); navigate('/login'); }}
+                        onClick={() => { setUserMenuOpen(false); logout(); navigate('/login'); }}
                       >
                         <LogOut size={15} strokeWidth={1.8} />
                         退出登录

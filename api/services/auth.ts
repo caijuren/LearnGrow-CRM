@@ -26,19 +26,20 @@ export interface WxAuthUser {
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
-    payload: { id?: number; username?: string; role?: string; wxUserId?: number };
+    payload: { id?: number; username?: string; role?: string; wxUserId?: number; type?: string };
     user: AuthUser | WxAuthUser;
   }
 }
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
-    const query = request.query as Record<string, unknown>;
-    if (query && typeof query === 'object' && 'token' in query && query.token) {
-      request.headers.authorization = `Bearer ${query.token}`;
-    }
     await request.jwtVerify();
   } catch {
+    reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+    return;
+  }
+  const user = request.user as { type?: string } | undefined;
+  if (!user || user.type !== 'admin') {
     reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
     return;
   }

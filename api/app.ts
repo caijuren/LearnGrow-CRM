@@ -297,14 +297,17 @@ await app.register(swagger, {
   },
 });
 
-await app.register(swaggerUi, {
-  routePrefix: '/api-docs',
-  uiConfig: {
-    docExpansion: 'list',
-    deepLinking: false,
-  },
-  staticCSP: true,
-});
+// Swagger UI 仅非生产环境注册，生产环境不暴露接口文档
+if (process.env.NODE_ENV !== 'production') {
+  await app.register(swaggerUi, {
+    routePrefix: '/api-docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: false,
+    },
+    staticCSP: true,
+  });
+}
 
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: JWT_SECRET, sign: { expiresIn: '7d' } });
@@ -391,7 +394,7 @@ app.post('/api/auth/login', {
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
   if (!user) return reply.code(401).send({ success: false, error: '用户名或密码错误' });
   if (!bcrypt.compareSync(password, user.password)) return reply.code(401).send({ success: false, error: '用户名或密码错误' });
-  const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role });
+  const token = app.jwt.sign({ id: user.id, username: user.username, role: user.role, type: 'admin' });
   return ok({ token, user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name } });
 });
 
@@ -807,14 +810,14 @@ app.register(async function (router) {
 
   router.get('/all', async () => ok((db.prepare('SELECT id, name, price, tier FROM products WHERE is_on_sale = 1 ORDER BY name').all() as any[]).map(mapProduct)));
 
-  router.post('/', async (request: any, reply: any) => {
+  router.post('/', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const { name, tier = 'main', category, price, commission_percent = 0, selling_points, related_product_ids = [], description, is_on_sale = true } = request.body;
     if (!name) return reply.code(400).send({ success: false, error: '商品名不能为空' });
     const r = db.prepare('INSERT INTO products (name, tier, category, price, commission_percent, selling_points, related_product_ids, description, is_on_sale) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(name, tier, category || null, price || 0, commission_percent || 0, selling_points || null, JSON.stringify(related_product_ids), description || null, is_on_sale ? 1 : 0);
     return reply.code(201).send(ok(mapProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(r.lastInsertRowid))));
   });
 
-  router.put('/:id', async (request: any, reply: any) => {
+  router.put('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '商品不存在' });
     const { name, tier, category, price, commission_percent, selling_points, related_product_ids, description, is_on_sale } = request.body;
@@ -833,7 +836,7 @@ app.register(async function (router) {
     return ok(mapProduct(db.prepare('SELECT * FROM products WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id', async (request: any) => { db.prepare('DELETE FROM products WHERE id = ?').run(parseInt(request.params.id)); return ok(null); });
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any) => { db.prepare('DELETE FROM products WHERE id = ?').run(parseInt(request.params.id)); return ok(null); });
 }, { prefix: '/api/products' });
 
 app.register(async function (router) {
@@ -847,7 +850,7 @@ app.register(async function (router) {
     sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?'; params.push(limitNum, offset);
     return ok({ orders: db.prepare(sql).all(...params), total: (db.prepare('SELECT COUNT(*) as total FROM orders').get() as any).total });
   });
-  router.delete('/:id', async (request: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any) => {
     const id = parseInt(request.params.id);
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM orders WHERE id = ?').run(id);
@@ -882,7 +885,7 @@ app.register(async function (router) {
     db.prepare(`UPDATE follow_ups SET ${fields.join(', ')} WHERE id = ?`).run(...params);
     return ok(mapFollowUp(db.prepare('SELECT * FROM follow_ups WHERE id = ?').get(id)));
   });
-  router.delete('/:id', async (request: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any) => {
     const id = parseInt(request.params.id);
     const f = db.prepare('SELECT wx_user_id FROM follow_ups WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM follow_ups WHERE id = ?').run(id);
@@ -981,7 +984,7 @@ app.register(async function (router) {
     return ok(group);
   });
 
-  router.post('/', async (request: any, reply: any) => {
+  router.post('/', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const { name, purpose, description, member_count = 0, status = 'active', tags = [], group_rules, owner_note, notes } = request.body;
     if (!name) return reply.code(400).send({ success: false, error: '群名称不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -992,7 +995,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(mapGroup(db.prepare('SELECT * FROM wechat_groups WHERE id = ?').get(r.lastInsertRowid))));
   });
 
-  router.put('/:id', async (request: any, reply: any) => {
+  router.put('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '群不存在' });
     const { name, purpose, description, member_count, status, tags, group_rules, owner_note, notes } = request.body;
@@ -1012,7 +1015,7 @@ app.register(async function (router) {
     return ok(mapGroup(db.prepare('SELECT * FROM wechat_groups WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id', async (request: any, reply: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM wechat_groups WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '群不存在' });
     db.prepare('DELETE FROM wechat_group_members WHERE group_id = ?').run(id);
@@ -1081,7 +1084,7 @@ app.register(async function (router) {
     return ok(mapGroupMember(db.prepare('SELECT * FROM wechat_group_members WHERE id = ?').get(memberId)));
   });
 
-  router.delete('/:id/members/:memberId', async (request: any, reply: any) => {
+  router.delete('/:id/members/:memberId', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const groupId = parseInt(request.params.id);
     const memberId = parseInt(request.params.memberId);
     if (!db.prepare('SELECT id FROM wechat_group_members WHERE id = ? AND group_id = ?').get(memberId, groupId)) return reply.code(404).send({ success: false, error: '成员不存在' });
@@ -1203,7 +1206,7 @@ app.register(async function (router) {
     return ok(mapChild(db.prepare('SELECT * FROM children WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id', async (request: any, reply: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM children WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '孩子不存在' });
     db.prepare('DELETE FROM child_learning_progress WHERE child_id = ?').run(id);
@@ -1257,7 +1260,7 @@ app.register(async function (router) {
     return ok(mapProgress(db.prepare('SELECT * FROM child_learning_progress WHERE id = ?').get(progressId)));
   });
 
-  router.delete('/:id/progress/:progressId', async (request: any, reply: any) => {
+  router.delete('/:id/progress/:progressId', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const childId = parseInt(request.params.id);
     const progressId = parseInt(request.params.progressId);
     if (!db.prepare('SELECT id FROM child_learning_progress WHERE id = ? AND child_id = ?').get(progressId, childId)) return reply.code(404).send({ success: false, error: '进度记录不存在' });
@@ -1282,7 +1285,7 @@ app.register(async function (router) {
     return ok(paths);
   });
 
-  router.post('/', async (request: any, reply: any) => {
+  router.post('/', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const { name, subject, description, is_active = true, stages = [] } = request.body;
     if (!name || !subject) return reply.code(400).send({ success: false, error: '名称和学科不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -1306,7 +1309,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(path));
   });
 
-  router.put('/:id', async (request: any, reply: any) => {
+  router.put('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '学习路径不存在' });
     const { name, subject, description, is_active, stages } = request.body;
@@ -1333,7 +1336,7 @@ app.register(async function (router) {
     return ok(path);
   });
 
-  router.delete('/:id', async (request: any, reply: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM learning_paths WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '学习路径不存在' });
     db.prepare('DELETE FROM child_learning_progress WHERE path_id = ?').run(id);
@@ -1529,7 +1532,7 @@ app.register(async function (router) {
     } satisfies CheckinEventDetail);
   });
 
-  router.post('/', async (request: any, reply: any) => {
+  router.post('/', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const {
       name,
       group_id,
@@ -1594,7 +1597,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(r.lastInsertRowid))));
   });
 
-  router.put('/:id', async (request: any, reply: any) => {
+  router.put('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id)) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
     const {
@@ -1632,7 +1635,7 @@ app.register(async function (router) {
     return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id)));
   });
 
-  router.delete('/:id', async (request: any, reply: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 0').get(id);
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
@@ -1648,7 +1651,7 @@ app.register(async function (router) {
     return ok({ events, total: events.length });
   });
 
-  router.put('/:id/restore', async (request: any, reply: any) => {
+  router.put('/:id/restore', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 1').get(id);
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在或未被删除' });
@@ -1656,7 +1659,7 @@ app.register(async function (router) {
     return ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(id)));
   });
 
-  router.delete('/:id/permanent', async (request: any, reply: any) => {
+  router.delete('/:id/permanent', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const event = db.prepare('SELECT id FROM checkin_events WHERE id = ? AND is_deleted = 1').get(id);
     if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在或不在回收站中' });
@@ -1678,7 +1681,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(mapCheckinParticipant(db.prepare('SELECT * FROM checkin_participants WHERE id = ?').get(r.lastInsertRowid))));
   });
 
-  router.delete('/:id/participants/:pid', async (request: any, reply: any) => {
+  router.delete('/:id/participants/:pid', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const pid = parseInt(request.params.pid);
     if (!db.prepare('SELECT id FROM checkin_participants WHERE id = ? AND event_id = ?').get(pid, eventId)) return reply.code(404).send({ success: false, error: '参与者不存在' });
@@ -1712,7 +1715,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(r.lastInsertRowid)));
   });
 
-  router.delete('/:id/checkin/:rid', async (request: any, reply: any) => {
+  router.delete('/:id/checkin/:rid', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const rid = parseInt(request.params.rid);
     const record = db.prepare('SELECT * FROM checkin_records WHERE id = ? AND event_id = ?').get(rid, eventId) as any;
@@ -1808,7 +1811,7 @@ app.register(async function (router) {
     return ok(mapMaterial(material));
   });
 
-  router.patch('/:id', async (request: any, reply: any) => {
+  router.patch('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     if (!db.prepare('SELECT id FROM materials WHERE id = ?').get(id)) return reply.code(404).send({ success: false, error: '资料不存在' });
     const { category, description, tags, product_id } = request.body as any;
@@ -1834,7 +1837,7 @@ app.register(async function (router) {
     return ok({ download_count: m.download_count + 1 });
   });
 
-  router.delete('/:id', async (request: any, reply: any) => {
+  router.delete('/:id', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const id = parseInt(request.params.id);
     const m = db.prepare('SELECT * FROM materials WHERE id = ?').get(id) as any;
     if (!m) return reply.code(404).send({ success: false, error: '资料不存在' });
@@ -1849,6 +1852,9 @@ async function wxAuthMiddleware(request: any, reply: any) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return reply.code(401).send({ success: false, error: '请先登录' });
     const decoded = app.jwt.verify(token) as any;
+    if (decoded.type === 'admin') return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+    const isWxToken = decoded.type === 'wx' || (!decoded.type && decoded.wxUserId != null);
+    if (!isWxToken) return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
     const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(decoded.wxUserId) as any;
     if (!user) return reply.code(401).send({ success: false, error: '用户不存在' });
     request.wxUser = user;
@@ -1862,6 +1868,9 @@ async function wxOptionalAuthMiddleware(request: any, _reply: any) {
     const token = request.headers.authorization?.replace('Bearer ', '');
     if (!token) return;
     const decoded = app.jwt.verify(token) as any;
+    if (decoded.type === 'admin') return;
+    const isWxToken = decoded.type === 'wx' || (!decoded.type && decoded.wxUserId != null);
+    if (!isWxToken) return;
     const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(decoded.wxUserId) as any;
     if (user) {
       request.wxUser = user;
@@ -1935,7 +1944,7 @@ app.post('/api/wx/login', async (request: any, reply: any) => {
     user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(r.lastInsertRowid);
   }
 
-  const token = app.jwt.sign({ wxUserId: user.id }, { expiresIn: '30d' });
+  const token = app.jwt.sign({ wxUserId: user.id, type: 'wx' }, { expiresIn: '30d' });
   return ok({
     token,
     user: {
@@ -2896,60 +2905,13 @@ app.register(async function (router) {
     return ok(db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId));
   });
 
-  router.get('/:id/export', async (request: any, reply: any) => {
-    const eventId = parseInt(request.params.id);
-    const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
-    if (!event) return reply.code(404).send({ success: false, error: '活动不存在' });
-
-    const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(eventId) as any[];
-    const records = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(eventId) as any[];
-
-    const csvRows = [];
-    csvRows.push(['昵称', '孩子姓名', '打卡天数', '加入时间']);
-
-    for (const p of participants) {
-      const pRecords = records.filter(r => r.participant_id === p.id && r.status === 'approved');
-      csvRows.push([
-        p.nickname || '',
-        p.child_name || '',
-        pRecords.length,
-        p.joined_at || ''
-      ]);
-    }
-
-    csvRows.push([]);
-    csvRows.push(['--- 打卡明细 ---']);
-    csvRows.push(['昵称', '孩子姓名', '打卡日期', '类型', '打卡内容', '状态', '审核备注']);
-
-    for (const r of records) {
-      const p = participants.find(p => p.id === r.participant_id);
-      csvRows.push([
-        p?.nickname || '',
-        p?.child_name || '',
-        r.checkin_date || '',
-        r.is_makeup ? '补卡' : '正常打卡',
-        r.note || '',
-        r.status === 'approved' ? '已通过' : r.status === 'rejected' ? '已拒绝' : '待审核',
-        r.review_note || ''
-      ]);
-    }
-
-    const csvContent = '\uFEFF' + csvRows.map(row =>
-      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-
-    reply.header('Content-Type', 'text/csv; charset=utf-8');
-    reply.header('Content-Disposition', `attachment; filename="checkin_${eventId}.csv"`);
-    return csvContent;
-  });
-
   router.get('/:id/badges', async (request: any) => {
     const eventId = parseInt(request.params.id);
     const badges = db.prepare('SELECT * FROM checkin_badges WHERE event_id = ? ORDER BY target_days ASC').all(eventId);
     return ok(badges);
   });
 
-  router.post('/:id/badges', async (request: any, reply: any) => {
+  router.post('/:id/badges', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const { name, description, icon, type = 'streak', target_days = 0 } = request.body;
     if (!name) return reply.code(400).send({ success: false, error: '徽章名称不能为空' });
@@ -2962,7 +2924,7 @@ app.register(async function (router) {
     return reply.code(201).send(ok(db.prepare('SELECT * FROM checkin_badges WHERE id = ?').get(r.lastInsertRowid)));
   });
 
-  router.put('/:id/badges/:bid', async (request: any, reply: any) => {
+  router.put('/:id/badges/:bid', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const badgeId = parseInt(request.params.bid);
     const { name, description, icon, type, target_days } = request.body;
@@ -2982,7 +2944,7 @@ app.register(async function (router) {
     return ok(db.prepare('SELECT * FROM checkin_badges WHERE id = ?').get(badgeId));
   });
 
-  router.delete('/:id/badges/:bid', async (request: any, reply: any) => {
+  router.delete('/:id/badges/:bid', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const badgeId = parseInt(request.params.bid);
     const badge = db.prepare('SELECT * FROM checkin_badges WHERE id = ? AND event_id = ?').get(badgeId, eventId);
@@ -3008,7 +2970,7 @@ app.register(async function (router) {
     return ok(participants);
   });
 
-  router.post('/:id/rewards/:pid/distribute', async (request: any, reply: any) => {
+  router.post('/:id/rewards/:pid/distribute', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const participantId = parseInt(request.params.pid);
     const { reward_note } = request.body;
@@ -3065,7 +3027,7 @@ app.register(async function (router) {
     return ok(db.prepare('SELECT * FROM checkin_materials WHERE id = ?').get(materialId));
   });
 
-  router.delete('/:id/materials/:mid', async (request: any, reply: any) => {
+  router.delete('/:id/materials/:mid', { preHandler: [adminOnly] }, async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
     const materialId = parseInt(request.params.mid);
     const material = db.prepare('SELECT * FROM checkin_materials WHERE id = ? AND event_id = ?').get(materialId, eventId);
@@ -3074,6 +3036,65 @@ app.register(async function (router) {
     return ok({ deleted: true });
   });
 }, { prefix: '/api/checkin-events' });
+
+// 打卡导出：前端以新窗口打开 ?token= 链接，故单独注册路由做作用域内鉴权（不再依赖全局 query-token 注入）
+app.get('/api/checkin-events/:id/export', async (request: any, reply: any) => {
+  let token = request.headers.authorization?.replace('Bearer ', '') as string | undefined;
+  const query = request.query as Record<string, unknown>;
+  if (!token && typeof query.token === 'string' && query.token) token = query.token;
+  if (!token) return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+  try {
+    const decoded = app.jwt.verify(token) as any;
+    if (decoded.type !== 'admin') return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+  } catch {
+    return reply.code(401).send({ success: false, error: '登录已过期，请重新登录' });
+  }
+
+  const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '活动不存在' });
+
+  const participants = db.prepare('SELECT * FROM checkin_participants WHERE event_id = ? ORDER BY joined_at ASC').all(eventId) as any[];
+  const records = db.prepare('SELECT * FROM checkin_records WHERE event_id = ?').all(eventId) as any[];
+
+  const csvRows = [];
+  csvRows.push(['昵称', '孩子姓名', '打卡天数', '加入时间']);
+
+  for (const p of participants) {
+    const pRecords = records.filter(r => r.participant_id === p.id && r.status === 'approved');
+    csvRows.push([
+      p.nickname || '',
+      p.child_name || '',
+      pRecords.length,
+      p.joined_at || ''
+    ]);
+  }
+
+  csvRows.push([]);
+  csvRows.push(['--- 打卡明细 ---']);
+  csvRows.push(['昵称', '孩子姓名', '打卡日期', '类型', '打卡内容', '状态', '审核备注']);
+
+  for (const r of records) {
+    const p = participants.find(p => p.id === r.participant_id);
+    csvRows.push([
+      p?.nickname || '',
+      p?.child_name || '',
+      r.checkin_date || '',
+      r.is_makeup ? '补卡' : '正常打卡',
+      r.note || '',
+      r.status === 'approved' ? '已通过' : r.status === 'rejected' ? '已拒绝' : '待审核',
+      r.review_note || ''
+    ]);
+  }
+
+  const csvContent = '\uFEFF' + csvRows.map(row =>
+    row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+  ).join('\n');
+
+  reply.header('Content-Type', 'text/csv; charset=utf-8');
+  reply.header('Content-Disposition', `attachment; filename="checkin_${eventId}.csv"`);
+  return csvContent;
+});
 
 // ---- 微信用户与积分管理 ----
 app.register(async function (router) {
