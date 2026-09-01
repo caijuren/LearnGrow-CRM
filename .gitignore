@@ -22,6 +22,7 @@ backups/
 .restore-tmp/
 data-before-restore-*/
 uploads-before-restore-*/
+backup_*.zip
 
 # Local config
 .trae/
@@ -41,6 +42,7 @@ miniprogram-avatar.png
 .vscode/*
 !.vscode/extensions.json
 .idea
+.qoder/
 .DS_Store
 *.suo
 *.ntvs*
