@@ -258,8 +258,9 @@ run_remote <<EOF || warn "数据完整性检查失败（不影响部署结果，
 cd $DEPLOY_DIR/current && node -e "
 const db = require('better-sqlite3')('$DEPLOY_DIR/data/learngrow.db', {readonly:true});
 const t = (n) => { try { return db.prepare('SELECT COUNT(*) c FROM ' + n).get().c; } catch(e) { return 'N/A'; } };
+const c = () => { try { return db.prepare(\"SELECT COUNT(*) c FROM wx_users WHERE child_name IS NOT NULL AND child_name != ''\").get().c; } catch(e) { return 'N/A'; } };
 console.log('=== 数据完整性 ===');
-console.log('微信用户:', t('wx_users'), '| 孩子档案:', t('children'), '| 订单:', t('orders'), '| 产品:', t('products'));
+console.log('微信用户:', t('wx_users'), '| 已设孩子名:', c(), '| 订单:', t('orders'), '| 产品:', t('products'));
 "
 EOF
 
