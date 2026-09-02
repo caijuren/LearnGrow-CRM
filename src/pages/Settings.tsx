@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { DatabaseBackup, Download, Loader2, RefreshCw, Clock, HardDriveDownload, Coins, Save } from 'lucide-react';
 import { fetchBackups, createBackup, downloadBackup, type BackupFileInfo } from '@/lib/api';
-import { fetchPointsConfig, updatePointsConfig } from '@/lib/api';
+import { fetchPointsConfig, updatePointsConfig, resetPoints } from '@/lib/api';
 import type { PointsConfig } from '../../shared/types';
 
 function formatFileSize(bytes: number): string {
@@ -37,6 +37,7 @@ export default function Settings() {
   const [pointsCheckin, setPointsCheckin] = useState('');
   const [pointsRate, setPointsRate] = useState('');
   const [savingPoints, setSavingPoints] = useState(false);
+  const [resettingPoints, setResettingPoints] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -77,6 +78,21 @@ export default function Settings() {
       setError(errMsg(e));
     } finally {
       setSavingPoints(false);
+    }
+  };
+
+  const handleResetPoints = async () => {
+    if (!confirm('确定要清空所有用户的积分吗？此操作会同时清空积分流水，且无法恢复。')) return;
+    setResettingPoints(true);
+    setError('');
+    setToast('');
+    try {
+      const r = await resetPoints();
+      setToast(`积分已清零：${r.users} 个用户、${r.ledger} 条流水`);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setResettingPoints(false);
     }
   };
 
@@ -184,7 +200,7 @@ export default function Settings() {
                   加载中...
                 </div>
               )}
-              <div className="mt-4">
+              <div className="mt-4 flex items-center gap-3">
                 <button
                   onClick={handleSavePoints}
                   disabled={savingPoints || !pointsConfig}
@@ -196,6 +212,19 @@ export default function Settings() {
                     <Save size={15} strokeWidth={1.8} />
                   )}
                   {savingPoints ? '保存中...' : '保存规则'}
+                </button>
+                <button
+                  onClick={handleResetPoints}
+                  disabled={resettingPoints}
+                  className="btn btn-secondary"
+                  title="清空所有用户积分余额与流水"
+                >
+                  {resettingPoints ? (
+                    <Loader2 size={15} strokeWidth={2} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={15} strokeWidth={1.8} />
+                  )}
+                  {resettingPoints ? '清零中...' : '清空所有积分'}
                 </button>
               </div>
             </div>

@@ -2126,6 +2126,9 @@ app.get('/api/wx/checkin-events', { preHandler: [wxOptionalAuthMiddleware] }, as
       signup_deadline: e.signup_deadline || e.start_date,
       required_text: e.required_text,
       reward_rules: e.reward_rules,
+      points_per_checkin: (e.points_per_checkin !== null && e.points_per_checkin !== undefined)
+        ? e.points_per_checkin
+        : getIntSetting('points_checkin'),
       status: e.status,
       event_status: eventStatus,
       can_signup: today < (e.signup_deadline || e.start_date),
@@ -3220,6 +3223,18 @@ app.put('/api/settings/points', { preHandler: [authMiddleware, adminOnly] }, asy
     upsert.run('points_order_rate', String(v));
   }
   return ok({ points_checkin: getIntSetting('points_checkin'), points_order_rate: getIntSetting('points_order_rate') });
+});
+
+app.post('/api/settings/reset-points', { preHandler: [authMiddleware, adminOnly] }, async (request: any) => {
+  const reset = db.transaction(() => {
+    const users = db.prepare('UPDATE wx_users SET points = 0').run().changes;
+    let ledger = 0;
+    try { ledger = db.prepare('DELETE FROM points_ledger').run().changes; } catch { /* 表可能不存在 */ }
+    return { users, ledger };
+  });
+  const r = reset();
+  request.log.info({ users: r.users, ledger: r.ledger }, '积分清零完成');
+  return ok({ users: r.users, ledger: r.ledger });
 });
 
 // ---- 数据备份管理 ----

@@ -488,3 +488,7 @@ export async function fetchPointsConfig() {
 export async function updatePointsConfig(data: Partial<PointsConfig>) {
   return request<PointsConfig>('/settings/points', { method: 'PUT', body: JSON.stringify(data) });
 }
+
+export async function resetPoints() {
+  return request<{ users: number; ledger: number }>('/settings/reset-points', { method: 'POST' });
+}

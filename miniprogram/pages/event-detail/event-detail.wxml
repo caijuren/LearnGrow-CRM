@@ -84,6 +84,14 @@
     <view class="text-secondary reward-text">{{event.reward_rules}}</view>
   </view>
 
+  <view wx:if="{{event.points_per_checkin > 0}}" class="card">
+    <view class="section-title-row">
+      <text class="section-mark">分</text>
+      <text class="font-bold text-lg">打卡积分</text>
+    </view>
+    <view class="text-secondary">每次有效打卡可获得 {{event.points_per_checkin}} 积分</view>
+  </view>
+
   <view wx:if="{{badges.length > 0}}" class="card">
     <view class="flex items-center gap-2 mb-4">
       <text class="section-mark">章</text>
