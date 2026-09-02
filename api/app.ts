@@ -1585,25 +1585,6 @@ app.register(async function (router) {
       now
     );
     
-    const autoImportMembers = normalizeBoolean(request.body.auto_import_members);
-    if (group_id && autoImportMembers) {
-      const members = db.prepare(`
-        SELECT gm.id, gm.wechat_name, gm.nickname, gm.wx_user_id, u.child_name
-        FROM wechat_group_members gm LEFT JOIN wx_users u ON gm.wx_user_id = u.id
-        WHERE gm.group_id = ?
-      `).all(group_id) as any[];
-      const insertParticipant = db.prepare(`
-        INSERT INTO checkin_participants (event_id, member_id, wx_user_id, nickname, child_name)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      const insertMembers = db.transaction((mems: any[]) => {
-        for (const m of mems) {
-          insertParticipant.run(r.lastInsertRowid, m.id, m.wx_user_id || null, m.nickname || m.wechat_name, m.child_name || null);
-        }
-      });
-      insertMembers(members);
-    }
-    
     return reply.code(201).send(ok(mapCheckinEvent(db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(r.lastInsertRowid))));
   });
 

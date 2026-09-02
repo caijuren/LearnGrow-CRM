@@ -25,7 +25,6 @@ const STATUS_BADGE: Record<CheckinEventStatus, string> = {
 
 interface EventForm {
   name: string;
-  group_id: number | null;
   start_date: string;
   end_date: string;
   signup_deadline?: string;
@@ -38,16 +37,13 @@ interface EventForm {
   makeup_requires_review: boolean;
   makeup_counts_for_streak: boolean;
   status: CheckinEventStatus;
-  auto_import_members?: boolean;
 }
 
 const emptyForm: EventForm = {
   name: '',
-  group_id: null,
   start_date: new Date().toISOString().split('T')[0],
   end_date: '',
   signup_deadline: '',
-  auto_import_members: false,
   required_text: '',
   reward_rules: '',
   points_per_checkin: '',
@@ -95,8 +91,8 @@ const fadeUp = {
 export default function CheckinList() {
   const navigate = useNavigate();
   const {
-    checkinEvents, deletedCheckinEvents, groups, checkinFilter,
-    loadCheckinEvents, loadDeletedCheckinEvents, loadGroups,
+    checkinEvents, deletedCheckinEvents, checkinFilter,
+    loadCheckinEvents, loadDeletedCheckinEvents,
     addCheckinEvent, editCheckinEvent, removeCheckinEvent,
     restoreCheckinEvent, permanentlyDeleteCheckinEvent, setCheckinFilter,
   } = useStore();
@@ -114,8 +110,7 @@ export default function CheckinList() {
 
   useEffect(() => {
     loadCheckinEvents();
-    loadGroups();
-  }, [loadCheckinEvents, loadGroups]);
+  }, [loadCheckinEvents]);
 
   useEffect(() => {
     if (isRecycleBinView) {
@@ -150,11 +145,9 @@ export default function CheckinList() {
     setEditingEvent(event);
     setForm({
       name: event.name,
-      group_id: event.group_id,
       start_date: event.start_date,
       end_date: event.end_date,
       signup_deadline: event.signup_deadline || '',
-      auto_import_members: false,
       required_text: event.required_text || '',
       reward_rules: event.reward_rules || '',
       points_per_checkin: event.points_per_checkin !== null && event.points_per_checkin !== undefined
@@ -524,31 +517,6 @@ export default function CheckinList() {
                   placeholder="如：ABC Reading 6月打卡"
                   className="input"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1.5">关联微信群（可选）</label>
-                <select
-                  value={form.group_id || ''}
-                  onChange={(e) => setForm({ ...form, group_id: e.target.value ? Number(e.target.value) : null })}
-                  className="input"
-                >
-                  <option value="">不关联群</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-                {!editingEvent && (
-                  <label className="flex items-center gap-2 mt-2 text-xs text-text-tertiary cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.auto_import_members}
-                      onChange={(e) => setForm({ ...form, auto_import_members: e.target.checked })}
-                      className="h-4 w-4 accent-primary"
-                    />
-                    发布时自动导入群成员为参与者（不勾选则需家长在小程序内报名）
-                  </label>
-                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
