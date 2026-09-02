@@ -1461,12 +1461,16 @@ app.register(async function (router) {
 
   router.get('/', async (request: any) => {
     const { status } = request.query as any;
+    // 状态必须根据 end_date 动态计算（北京时间），不能依赖数据库静态 status 字段
+    const today = bjtToday();
     let sql = `SELECT e.*, g.name as group_name, 
       (SELECT COUNT(*) FROM checkin_participants WHERE event_id = e.id) as participant_count,
-      CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days
+      CAST(julianday(e.end_date) - julianday(e.start_date) + 1 AS INTEGER) as total_days,
+      CASE WHEN e.end_date < ? THEN 'ended' ELSE 'active' END AS status
       FROM checkin_events e LEFT JOIN wechat_groups g ON e.group_id = g.id WHERE e.is_deleted = 0`;
-    const params: any[] = [];
-    if (status) { sql += ' AND e.status = ?'; params.push(status); }
+    const params: any[] = [today];
+    if (status === 'active') { sql += ' AND e.end_date >= ?'; params.push(today); }
+    else if (status === 'ended') { sql += ' AND e.end_date < ?'; params.push(today); }
     sql += ' ORDER BY e.created_at DESC';
     const events = db.prepare(sql).all(...params) as any[];
     return ok({ events, total: events.length });
@@ -1879,52 +1883,119 @@ async function wxOptionalAuthMiddleware(request: any, _reply: any) {
   }
 }
 
-function wxLoginErrorMessage(errcode: number) {
+/**
+ * 将微信 jscode2session 的错误码转换为用户可理解的提示。
+ * 审核过程中最常见的 40013 / 40125 实际意味着：服务器端 WX_APPID / WX_SECRET
+ * 与小程序后台登记的 AppID 不匹配，或者 AppSecret 填错/过期。这里把这类配置
+ * 错误描述得更具体，避免被审核系统笼统地归类为"openid有误"。
+ */
+function wxLoginErrorMessage(errcode: number, rawmsg?: string) {
   const map: Record<number, string> = {
-    40029: '登录凭证已失效，请重试',
-    40163: '登录凭证已使用，请重试',
-    40013: '微信登录配置异常，请联系老师',
-    40125: '微信登录配置异常，请联系老师',
-    45011: '登录请求过于频繁，请稍后再试'
+    40029: '登录凭证已失效，请退出重试',
+    40163: '登录凭证已使用，请退出重试',
+    40013: '系统配置异常，请稍后重试（AppID不匹配）',
+    40125: '系统配置异常，请稍后重试（AppSecret无效）',
+    45011: '登录请求过于频繁，请稍后再试',
+    [-1]: '微信服务繁忙，请稍后重试'
   };
-  return map[errcode] || '微信登录失败，请稍后重试';
+  const friendly = map[errcode];
+  if (friendly) return friendly;
+  // 未知错误尽量带上原始微信错误码，便于日志定位，避免审核写成"openid有误"
+  return `微信登录失败(${errcode ?? 'unknown'})，请稍后重试`;
 }
 
 app.post('/api/wx/login', async (request: any, reply: any) => {
   const { code, nickname, avatar_url, child_name } = request.body || {};
-  
+
   let openid: string;
   const WX_APPID = process.env.WX_APPID;
   const WX_SECRET = process.env.WX_SECRET || process.env.WX_APPSECRET;
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   if (!WX_APPID || !WX_SECRET) {
     request.log.error('微信登录配置缺失：WX_APPID 或 WX_SECRET 未设置');
-    if (isProduction) return reply.code(500).send({ success: false, error: '微信登录配置缺失' });
+    if (isProduction) return reply.code(500).send({ success: false, error: '系统配置异常，请稍后重试' });
     openid = `dev_${code || randomUUID()}`;
   } else if (!code) {
-    if (isProduction) return reply.code(400).send({ success: false, error: '缺少微信登录凭证' });
+    if (isProduction) return reply.code(400).send({ success: false, error: '缺少微信登录凭证，请重启小程序' });
     openid = `dev_${randomUUID()}`;
   } else {
     let data: any;
     try {
-      const res = await fetch(`https://api.weixin.qq.com/sns/jscode2session?appid=${WX_APPID}&secret=${WX_SECRET}&js_code=${code}&grant_type=authorization_code`);
-      data = await res.json();
-      // 日志脱敏：session_key 是敏感凭证，不能落盘
-      request.log.info({ wxCode: code.substring(0, 8) + '...', openid: data?.openid, errcode: data?.errcode }, '微信 jscode2session 响应');
-    } catch (e) {
-      request.log.error({ err: e }, '调用微信 jscode2session 失败');
-      if (isProduction) return reply.code(502).send({ success: false, error: '微信登录服务暂不可用' });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(WX_APPID)}` +
+          `&secret=${encodeURIComponent(WX_SECRET)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`,
+          { signal: controller.signal, method: 'GET' }
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const rawText = await res.text();
+      try {
+        data = JSON.parse(rawText);
+      } catch (_parseErr) {
+        // WeChat 非 JSON 响应（例如代理/网络拦截返回 HTML 错误页）
+        request.log.error(
+          { wxAppidPrefix: WX_APPID.slice(0, 6), httpStatus: res.status, bodyPreview: rawText.slice(0, 200) },
+          '微信 jscode2session 返回非 JSON 响应'
+        );
+        if (isProduction) {
+          return reply.code(502).send({ success: false, error: '微信登录服务暂不可用，请稍后重试' });
+        }
+      }
+
+      // 日志脱敏：AppID/Secret 前缀足以定位；session_key 永不落盘；code 截断
+      request.log.info(
+        {
+          wxAppidPrefix: WX_APPID.slice(0, 6),
+          wxCodePrefix: (code || '').substring(0, 8),
+          hasOpenid: Boolean(data?.openid),
+          openidPrefix: data?.openid ? String(data.openid).slice(0, 8) : undefined,
+          errcode: data?.errcode,
+          errmsg: data?.errmsg,
+          httpStatus: res.status
+        },
+        '微信 jscode2session 响应'
+      );
+    } catch (e: any) {
+      request.log.error(
+        { err: e?.message || String(e), aborted: e?.name === 'AbortError' },
+        '调用微信 jscode2session 失败'
+      );
+      if (isProduction) {
+        const msg = e?.name === 'AbortError'
+          ? '微信登录请求超时，请稍后重试'
+          : '微信登录服务暂不可用，请稍后重试';
+        return reply.code(502).send({ success: false, error: msg });
+      }
     }
 
     if (!data) {
+      // 非生产环境兜底
       openid = `dev_${code}`;
-    } else if (data.openid) {
+    } else if (typeof data.openid === 'string' && data.openid.length > 0) {
       openid = data.openid;
     } else if (isProduction) {
-      request.log.error({ wxErrcode: data.errcode, wxErrmsg: data.errmsg }, '微信 jscode2session 返回错误');
-      // 不能用 401：客户端会把 401 当会话过期强制登出并跳登录页
-      return reply.code(400).send({ success: false, error: wxLoginErrorMessage(data.errcode) });
+      // 关键：把微信返回的错误码和错误信息记入 error 级别日志，
+      // 这样线上可以直接定位是 AppID 配错 (40013) 还是 Code 重复使用 (40163)
+      request.log.error(
+        {
+          wxAppidPrefix: WX_APPID.slice(0, 6),
+          wxErrcode: data.errcode,
+          wxErrmsg: data.errmsg,
+          codeLength: code.length
+        },
+        '微信 jscode2session 返回错误 — 未能拿到 openid'
+      );
+      return reply.code(400).send({
+        success: false,
+        error: wxLoginErrorMessage(Number(data.errcode), data.errmsg)
+      });
     } else {
       openid = `dev_${code}`;
     }
@@ -3222,7 +3293,25 @@ if (process.env.NODE_ENV !== 'test' && !globalThis.__checkinReminderTimerStarted
   setInterval(() => {
     runDueCheckinReminders().catch(err => app.log.error(err));
     maybeRunAutoBackup().catch(err => app.log.error(err));
+    archiveExpiredCheckinEvents();
   }, 60 * 1000);
+}
+
+// 活动结束后在「已结束」保留 30 天，超过 30 天的自动移入回收站
+function archiveExpiredCheckinEvents() {
+  try {
+    const threshold = bjtDaysAgo(30);
+    const result = db.prepare(`
+      UPDATE checkin_events
+      SET is_deleted = 1, deleted_at = datetime('now'), updated_at = datetime('now')
+      WHERE is_deleted = 0 AND end_date < ?
+    `).run(threshold);
+    if (result.changes > 0) {
+      app.log.info(`已自动归档 ${result.changes} 个结束超过30天的打卡活动到回收站`);
+    }
+  } catch (err) {
+    app.log.error(err);
+  }
 }
 
 // 每日自动备份：到达设定时间（北京时间，默认 03:30）且当天未备份时执行一次

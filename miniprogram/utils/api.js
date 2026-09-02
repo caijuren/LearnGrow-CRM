@@ -2,13 +2,35 @@ const app = getApp();
 
 const BASE_URL = app.globalData.baseUrl;
 
+/**
+ * 根据 wx.request fail 回调的 errMsg 推断具体原因，避免所有底层错误都
+ * 被笼统地写成"网络连接失败"——审核系统会基于弹窗文案判定功能问题，
+ * 文案越具体越有助于审核员理解原因。
+ */
+function friendlyNetworkError(url, errMsg) {
+  const msg = String(errMsg || '').toLowerCase();
+  if (msg.indexOf('url not in domain') >= 0 || msg.indexOf('域名') >= 0) {
+    return '请求域名未配置，请联系老师开通';
+  }
+  if (msg.indexOf('ssl') >= 0 || msg.indexOf('certificate') >= 0 || msg.indexOf('证书') >= 0) {
+    return '网络证书异常，请稍后重试';
+  }
+  if (msg.indexOf('timeout') >= 0 || msg.indexOf('超时') >= 0) {
+    return '网络请求超时，请稍后重试';
+  }
+  if (msg.indexOf('fail') >= 0) {
+    return '网络连接失败，请检查网络后重试';
+  }
+  return '网络连接失败，请检查网络后重试';
+}
+
 function request(options) {
   return new Promise((resolve, reject) => {
     const header = {
       'Content-Type': 'application/json',
       ...options.header
     };
-    
+
     if (app.globalData.token) {
       header['Authorization'] = `Bearer ${app.globalData.token}`;
     }
@@ -28,23 +50,26 @@ function request(options) {
         if (res.data && res.data.success) {
           resolve(res.data.data);
         } else {
+          const errMsg = res.data?.error || '请求失败';
           if (options.showError !== false) {
             wx.showToast({
-              title: res.data?.error || '请求失败',
+              title: errMsg,
               icon: 'none',
-              duration: 2000
+              duration: 2500
             });
           }
-          reject(new Error(res.data?.error || '请求失败'));
+          reject(new Error(errMsg));
         }
       },
       fail: (err) => {
-        const message = '网络连接失败，请检查网络后重试';
-        console.error('[api] 请求失败', options.url, err && err.errMsg);
+        const errMsg = err && err.errMsg;
+        const message = friendlyNetworkError(options.url, errMsg);
+        console.error('[api] 请求失败', options.url, errMsg);
         if (options.showError !== false) {
           wx.showToast({
             title: message,
-            icon: 'none'
+            icon: 'none',
+            duration: 2500
           });
         }
         reject(new Error(message));

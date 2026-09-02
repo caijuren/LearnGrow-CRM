@@ -178,7 +178,10 @@ export async function registerCheckinRoutes(app: FastifyInstance) {
      */
     router.post('/checkin-events/:id/join', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
       const id = parseInt(request.params.id);
-      const wxUserId = (request as any).wxOpenid ? 1 : 0; // TODO: 从openid获取真实用户ID
+      const wxUserId = request.wxUser?.id;
+      if (!wxUserId) {
+        return reply.code(401).send({ success: false, error: '请先登录' });
+      }
 
       try {
         const participantId = joinCheckinEvent(id, wxUserId);
@@ -227,8 +230,11 @@ export async function registerCheckinRoutes(app: FastifyInstance) {
      * GET /api/wx/my-checkins
      * 获取我的打卡记录
      */
-    router.get('/my-checkins', { preHandler: [wxAuthMiddleware] }, async (request: any) => {
-      const wxUserId = (request as any).wxOpenid ? 1 : 0; // TODO: 从openid获取真实用户ID
+    router.get('/my-checkins', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
+      const wxUserId = request.wxUser?.id;
+      if (!wxUserId) {
+        return reply.code(401).send({ success: false, error: '请先登录' });
+      }
       const query = request.query as any;
 
       const result = getUserCheckinRecords(wxUserId, {

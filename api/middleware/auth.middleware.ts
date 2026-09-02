@@ -5,6 +5,7 @@
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
+import db from '../db.js';
 
 export interface AuthUser {
   id: number;
@@ -44,8 +45,8 @@ export function allowAdminLogin(request: FastifyRequest, reply: FastifyReply): b
 }
 
 /**
- * JWT认证中间件
- * 验证请求中的Bearer token
+ * JWT认证中间件（管理端）
+ * 验证请求中的Bearer token，要求type=admin
  */
 export async function authMiddleware(
   request: FastifyRequest,
@@ -54,6 +55,13 @@ export async function authMiddleware(
   try {
     await request.jwtVerify();
   } catch (_err) {
+    return reply.code(401).send({
+      success: false,
+      error: '登录已过期，请重新登录'
+    });
+  }
+  const payload = request.user as any;
+  if (!payload || payload.type !== 'admin') {
     return reply.code(401).send({
       success: false,
       error: '登录已过期，请重新登录'
@@ -101,33 +109,73 @@ export async function operatorOrAbove(
 
 /**
  * 微信小程序认证中间件
- * 验证小程序用户的openid
+ *
+ * 通过 @fastify/jwt 校验 Bearer Token（JWT payload: { wxUserId, type: 'wx' }），
+ * 从数据库查询用户对象后挂载到 request.wxUser，并兼容写入 request.wxOpenid = user.openid。
+ *
+ * 旧实现错误地读取 x-wx-openid 请求头——客户端根本不会发送该头，会导致所有受保护接口 401。
  */
-export function wxAuthMiddleware(
-  request: any,
-  reply: any
+export async function wxAuthMiddleware(
+  request: FastifyRequest,
+  reply: FastifyReply
 ) {
-  const openid = request.headers['x-wx-openid'];
-  if (!openid) {
+  try {
+    await request.jwtVerify();
+  } catch (_err) {
     return reply.code(401).send({
       success: false,
-      error: '缺少微信认证信息'
+      error: '请先登录'
     });
   }
-  // 将openid附加到request对象
-  request.wxOpenid = openid;
+
+  const payload = request.user as { type?: string; wxUserId?: number } | undefined;
+  if (!payload || payload.type === 'admin') {
+    return reply.code(401).send({
+      success: false,
+      error: '登录已过期，请重新登录'
+    });
+  }
+
+  if (payload.wxUserId == null) {
+    return reply.code(401).send({
+      success: false,
+      error: '登录已过期，请重新登录'
+    });
+  }
+
+  const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(payload.wxUserId) as any;
+  if (!user) {
+    return reply.code(401).send({
+      success: false,
+      error: '用户不存在'
+    });
+  }
+
+  (request as any).wxUser = user;
+  (request as any).wxOpenid = user.openid; // 兼容旧路由对 wxOpenid 的读取
 }
 
 /**
  * 微信小程序可选认证中间件
- * 有token则验证，无token则放行
+ * 有合法 JWT 则验证并挂载用户信息，无 JWT 或 JWT 无效则静默放行（匿名浏览）。
  */
-export function wxOptionalAuthMiddleware(
-  request: any,
-  _reply: any
+export async function wxOptionalAuthMiddleware(
+  request: FastifyRequest,
+  _reply: FastifyReply
 ) {
-  const openid = request.headers['x-wx-openid'];
-  if (openid) {
-    request.wxOpenid = openid;
+  try {
+    await request.jwtVerify();
+  } catch (_err) {
+    return;
+  }
+
+  const payload = request.user as { type?: string; wxUserId?: number } | undefined;
+  if (!payload || payload.type === 'admin') return;
+  if (payload.wxUserId == null) return;
+
+  const user = db.prepare('SELECT * FROM wx_users WHERE id = ?').get(payload.wxUserId) as any;
+  if (user) {
+    (request as any).wxUser = user;
+    (request as any).wxOpenid = user.openid;
   }
 }
