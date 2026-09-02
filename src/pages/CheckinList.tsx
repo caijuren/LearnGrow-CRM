@@ -31,6 +31,7 @@ interface EventForm {
   signup_deadline?: string;
   required_text: string;
   reward_rules: string;
+  points_per_checkin: string;
   allow_makeup: boolean;
   makeup_window_days: number;
   makeup_limit_per_user: number;
@@ -49,6 +50,7 @@ const emptyForm: EventForm = {
   auto_import_members: false,
   required_text: '',
   reward_rules: '',
+  points_per_checkin: '',
   allow_makeup: false,
   makeup_window_days: 3,
   makeup_limit_per_user: 3,
@@ -125,7 +127,11 @@ export default function CheckinList() {
     if (!form.name || !form.start_date || !form.end_date) return;
     setSaving(true);
     try {
-      const payload = { ...form, signup_deadline: form.signup_deadline || undefined };
+      const payload = {
+        ...form,
+        signup_deadline: form.signup_deadline || undefined,
+        points_per_checkin: form.points_per_checkin === '' ? null : Number(form.points_per_checkin),
+      };
       if (editingEvent) {
         await editCheckinEvent(editingEvent.id, payload);
         setEditingEvent(null);
@@ -151,6 +157,9 @@ export default function CheckinList() {
       auto_import_members: false,
       required_text: event.required_text || '',
       reward_rules: event.reward_rules || '',
+      points_per_checkin: event.points_per_checkin !== null && event.points_per_checkin !== undefined
+        ? String(event.points_per_checkin)
+        : '',
       allow_makeup: !!event.allow_makeup,
       makeup_window_days: event.makeup_window_days ?? 3,
       makeup_limit_per_user: event.makeup_limit_per_user ?? 3,
@@ -594,6 +603,19 @@ export default function CheckinList() {
                   placeholder="如：满21天送绘本，满15天送电子资料..."
                   className="input min-h-[80px] resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1.5">每次打卡积分（选填）</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.points_per_checkin}
+                  onChange={(e) => setForm({ ...form, points_per_checkin: e.target.value })}
+                  placeholder="留空则用全局默认积分"
+                  className="input"
+                />
+                <p className="text-xs text-text-tertiary mt-1.5">留空则用全局默认积分；填 0 表示本活动不发放积分</p>
               </div>
 
               <div className="rounded-xl border border-border-default bg-bg-subtle/50 p-4 space-y-4">

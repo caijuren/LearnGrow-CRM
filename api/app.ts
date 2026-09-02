@@ -1545,6 +1545,7 @@ app.register(async function (router) {
       signup_deadline,
       required_text,
       reward_rules,
+      points_per_checkin,
       allow_makeup = 0,
       makeup_window_days = 3,
       makeup_limit_per_user = 3,
@@ -1554,13 +1555,17 @@ app.register(async function (router) {
     } = request.body;
     if (!name || !start_date || !end_date) return reply.code(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    // 积分：留空/null → 用全局默认；填 0 → 明确不给分；填正数 → 覆盖全局
+    const pointsPerCheckin = (points_per_checkin === undefined || points_per_checkin === null || points_per_checkin === '')
+      ? null
+      : Number(points_per_checkin);
     const r = db.prepare(`
       INSERT INTO checkin_events (
-        name, group_id, start_date, end_date, signup_deadline, required_text, reward_rules,
+        name, group_id, start_date, end_date, signup_deadline, required_text, reward_rules, points_per_checkin,
         allow_makeup, makeup_window_days, makeup_limit_per_user, makeup_requires_review, makeup_counts_for_streak,
         status, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name,
       group_id || null,
@@ -1569,6 +1574,7 @@ app.register(async function (router) {
       signup_deadline || start_date,
       required_text || null,
       reward_rules || null,
+      pointsPerCheckin,
       normalizeBoolean(allow_makeup),
       Number(makeup_window_days) || 3,
       Number(makeup_limit_per_user) || 3,
@@ -1612,6 +1618,7 @@ app.register(async function (router) {
       signup_deadline,
       required_text,
       reward_rules,
+      points_per_checkin,
       allow_makeup,
       makeup_window_days,
       makeup_limit_per_user,
@@ -1627,6 +1634,10 @@ app.register(async function (router) {
     if (signup_deadline !== undefined) { fields.push('signup_deadline = ?'); params.push(signup_deadline || null); }
     if (required_text !== undefined) { fields.push('required_text = ?'); params.push(required_text); }
     if (reward_rules !== undefined) { fields.push('reward_rules = ?'); params.push(reward_rules); }
+    if (points_per_checkin !== undefined) {
+      fields.push('points_per_checkin = ?');
+      params.push((points_per_checkin === null || points_per_checkin === '') ? null : Number(points_per_checkin));
+    }
     if (allow_makeup !== undefined) { fields.push('allow_makeup = ?'); params.push(normalizeBoolean(allow_makeup)); }
     if (makeup_window_days !== undefined) { fields.push('makeup_window_days = ?'); params.push(Number(makeup_window_days) || 3); }
     if (makeup_limit_per_user !== undefined) { fields.push('makeup_limit_per_user = ?'); params.push(Number(makeup_limit_per_user) || 3); }

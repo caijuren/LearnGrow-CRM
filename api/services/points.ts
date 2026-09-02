@@ -61,8 +61,19 @@ export function grantPoints(p: GrantPointsParams): { ledgerId: number } | null {
 }
 
 export function grantCheckinPoints(wxUserId: number, recordId: number): { points_earned: number } | null {
-  const amount = getIntSetting('points_checkin');
-  if (amount <= 0) return null;
+  // 活动级积分优先：记录所属活动若设置了 points_per_checkin（非 NULL），则用之；
+  // 否则回退全局 points_checkin。0 表示该活动明确不发放积分。
+  const record = db.prepare('SELECT event_id FROM checkin_records WHERE id = ?').get(recordId) as { event_id: number } | undefined;
+  let amount: number;
+  if (record) {
+    const event = db.prepare('SELECT points_per_checkin FROM checkin_events WHERE id = ?').get(record.event_id) as { points_per_checkin: number | null } | undefined;
+    amount = (event && event.points_per_checkin !== null && event.points_per_checkin !== undefined)
+      ? event.points_per_checkin
+      : getIntSetting('points_checkin');
+  } else {
+    amount = getIntSetting('points_checkin');
+  }
+  if (!Number.isFinite(amount) || amount <= 0) return null;
   const result = grantPoints({ wxUserId, amount, type: 'checkin', refType: 'checkin_record', refId: recordId });
   return result ? { points_earned: amount } : null;
 }

@@ -243,6 +243,7 @@ export const checkinEvents = sqliteTable('checkin_events', {
   signupDeadline: text('signup_deadline'),
   requiredText: text('required_text'),
   rewardRules: text('reward_rules'),
+  pointsPerCheckin: integer('points_per_checkin'),
   allowMakeup: integer('allow_makeup', { mode: 'boolean' }).notNull().default(false),
   makeupWindowDays: integer('makeup_window_days').notNull().default(3),
   makeupLimitPerUser: integer('makeup_limit_per_user').notNull().default(3),

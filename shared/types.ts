@@ -555,6 +555,7 @@ export interface CheckinEvent {
   signup_deadline?: string | null;
   required_text: string | null;
   reward_rules: string | null;
+  points_per_checkin?: number | null;
   allow_makeup?: number | boolean;
   makeup_window_days?: number;
   makeup_limit_per_user?: number;

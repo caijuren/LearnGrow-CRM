@@ -635,6 +635,7 @@ sqlite.exec(`
     signup_deadline TEXT,
     required_text TEXT,
     reward_rules TEXT,
+    points_per_checkin INTEGER,
     allow_makeup INTEGER NOT NULL DEFAULT 0,
     makeup_window_days INTEGER NOT NULL DEFAULT 3,
     makeup_limit_per_user INTEGER NOT NULL DEFAULT 3,
@@ -754,6 +755,9 @@ if (!existingCheckinEventCols.includes('is_deleted')) {
 }
 if (!existingCheckinEventCols.includes('deleted_at')) {
   sqlite.exec("ALTER TABLE checkin_events ADD COLUMN deleted_at TEXT");
+}
+if (!existingCheckinEventCols.includes('points_per_checkin')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN points_per_checkin INTEGER");
 }
 if (!existingCheckinEventCols.includes('is_deleted')) {
   sqlite.exec("CREATE INDEX IF NOT EXISTS idx_checkin_events_is_deleted ON checkin_events(is_deleted)");
