@@ -246,6 +246,19 @@ export default function CheckinDetail() {
     ? Math.round((totalCheckinDays / (event.participant_count * event.total_days)) * 100)
     : 0;
 
+  const getParticipantCheckedOnDate = (participantId: number, date: string): number | null => {
+    const p = event.participants.find((x: any) => x.participant.id === participantId);
+    if (!p) return null;
+    const record = p.records.find((r: any) => r.checkin_date === date);
+    return record?.id || null;
+  };
+
+  const getParticipantRecordOnDate = (participantId: number, date: string): any | null => {
+    const p = event.participants.find((x: any) => x.participant.id === participantId);
+    if (!p) return null;
+    return p.records.find((r: any) => r.checkin_date === date) || null;
+  };
+
   const topParticipants = [...event.participants].sort((a: any, b: any) => b.checkin_days - a.checkin_days).slice(0, 5);
   const filteredParticipants = event.participants.filter((p: any) => {
     // Search filter
@@ -263,19 +276,6 @@ export default function CheckinDetail() {
     
     return matchesSearch && matchesFilter;
   });
-
-  const getParticipantCheckedOnDate = (participantId: number, date: string): number | null => {
-    const p = event.participants.find((x: any) => x.participant.id === participantId);
-    if (!p) return null;
-    const record = p.records.find((r: any) => r.checkin_date === date);
-    return record?.id || null;
-  };
-
-  const getParticipantRecordOnDate = (participantId: number, date: string): any | null => {
-    const p = event.participants.find((x: any) => x.participant.id === participantId);
-    if (!p) return null;
-    return p.records.find((r: any) => r.checkin_date === date) || null;
-  };
 
   const handleToggleCheckin = async (participantId: number) => {
     const recordId = getParticipantCheckedOnDate(participantId, selectedDate);
@@ -1030,11 +1030,25 @@ export default function CheckinDetail() {
                     <div className="t-caption mb-2 text-text-tertiary">{r.checkin_date}</div>
                     {r.note && <p className="t-body mb-2 text-text-secondary">{r.note}</p>}
                     {r.image_url && (
-                      <img
-                        src={r.image_url}
-                        alt="打卡图片"
-                        className="w-24 h-24 object-cover rounded-lg border border-border-subtle"
-                      />
+                      <div className="relative w-24 h-24 rounded-lg border border-border-subtle overflow-hidden shrink-0">
+                        <img
+                          src={r.image_url}
+                          alt="打卡图片"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
+                            if (fallbackDiv) fallbackDiv.style.display = 'flex';
+                          }}
+                        />
+                        <div
+                          className="w-full h-full absolute inset-0 flex flex-col items-center justify-center bg-bg-subtle text-text-tertiary gap-1"
+                          style={{ display: 'none' }}
+                        >
+                          <FileText size={20} strokeWidth={1.5} />
+                          <span className="text-[10px]">图片已丢失</span>
+                        </div>
+                      </div>
                     )}
                     {r.review_note && (
                       <div className="mt-2 t-caption rounded-lg p-2 bg-bg-subtle text-text-secondary">

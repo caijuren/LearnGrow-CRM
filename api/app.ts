@@ -8,7 +8,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { z } from 'zod';
 import { adminOnly, authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
-import { AUTO_BACKUP_TIME, backupsDir, createBackup, isValidBackupName, listBackups } from './services/backup.js';
+import { AUTO_BACKUP_TIME, backupsDir, createBackup, dataDir, isValidBackupName, listBackups, scanMediaReferences } from './services/backup.js';
 import { getIntSetting, grantCheckinPoints, grantOrderPoints, grantPoints, revokeByRef } from './services/points.js';
 import { getEventShareLink } from './services/wx-share.js';
 import db from './db.js';
@@ -3321,10 +3321,34 @@ async function maybeRunAutoBackup() {
   const today = bjtToday();
   const row = db.prepare("SELECT value FROM settings WHERE key = 'last_auto_backup_date'").get() as any;
   if (row && row.value === today) return;
-  const backup = await createBackup();
-  db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('last_auto_backup_date', ?, datetime('now'))")
-    .run(today);
-  app.log.info(`每日自动备份完成：${backup.name} (${backup.size} bytes)`);
+  try {
+    const backup = await createBackup();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('last_auto_backup_date', ?, datetime('now'))")
+      .run(today);
+    app.log.info(`每日自动备份完成：${backup.name} (${backup.size} bytes)`);
+  } catch (err) {
+    app.log.error(err, '每日自动备份失败');
+  } finally {
+    // 无论备份成败，都做一次媒体完整性体检，发现「库有记录、盘上没文件」时告警
+    reportMediaIntegrity();
+  }
+}
+
+// 每日媒体完整性体检：扫描数据库引用的 /uploads 文件，磁盘缺失时用 error 级日志告警
+function reportMediaIntegrity() {
+  try {
+    const scan = scanMediaReferences(path.join(dataDir, 'learngrow.db'));
+    if (scan.missing > 0) {
+      app.log.error(
+        { referenced: scan.referenced, missing: scan.missing, samples: scan.samples },
+        `⚠️ 媒体完整性告警：数据库引用 ${scan.referenced} 个媒体文件，其中 ${scan.missing} 个在磁盘上缺失`
+      );
+    } else {
+      app.log.info(`媒体完整性正常：${scan.referenced} 个媒体引用全部存在`);
+    }
+  } catch (err) {
+    app.log.error(err, '媒体完整性体检失败');
+  }
 }
 
 // 注册指标监控路由

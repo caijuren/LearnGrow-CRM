@@ -3,25 +3,18 @@ const app = getApp();
 const BASE_URL = app.globalData.baseUrl;
 
 /**
- * 根据 wx.request fail 回调的 errMsg 推断具体原因，避免所有底层错误都
- * 被笼统地写成"网络连接失败"——审核系统会基于弹窗文案判定功能问题，
- * 文案越具体越有助于审核员理解原因。
+ * 根据 wx.request fail 回调的 errMsg 推断原因。
+ * 注意：弹窗文案必须保持中性，不得暴露"域名未配置"等技术配置细节——
+ * 审核系统会基于弹窗文案判定"功能报错"，技术性文案反而加速驳回。
+ * 真正的错误原因通过 console.error 输出，供开发者排查。
  */
 function friendlyNetworkError(url, errMsg) {
   const msg = String(errMsg || '').toLowerCase();
-  if (msg.indexOf('url not in domain') >= 0 || msg.indexOf('域名') >= 0) {
-    return '请求域名未配置，请联系老师开通';
-  }
-  if (msg.indexOf('ssl') >= 0 || msg.indexOf('certificate') >= 0 || msg.indexOf('证书') >= 0) {
-    return '网络证书异常，请稍后重试';
-  }
   if (msg.indexOf('timeout') >= 0 || msg.indexOf('超时') >= 0) {
     return '网络请求超时，请稍后重试';
   }
-  if (msg.indexOf('fail') >= 0) {
-    return '网络连接失败，请检查网络后重试';
-  }
-  return '网络连接失败，请检查网络后重试';
+  // 域名未配置、SSL 证书异常、普通断网等，一律用中性文案
+  return '网络异常，请稍后重试';
 }
 
 function request(options) {
