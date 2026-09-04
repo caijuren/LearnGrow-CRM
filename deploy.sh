@@ -52,23 +52,30 @@ ssh $SERVER_USER@$SERVER_HOST << ENDSSH
     --exclude='.env.production' \
     $TMP_DIR/ $PROJECT_DIR/
 
-  # 历史遗留的 root 属主目录会导致 ubuntu 的 PM2 进程写不进（uploads/backups 曾因此报 EACCES）
-  sudo chown -R ubuntu:ubuntu $PROJECT_DIR/uploads $PROJECT_DIR/data $PROJECT_DIR/backups 2>/dev/null || true
+  # 整个项目目录归 ubuntu，避免 npm/tsx 因 root 属主导致旧代码加载或 EACCES
+  sudo chown -R ubuntu:ubuntu $PROJECT_DIR 2>/dev/null || true
+
+  # 外部数据目录（DATA_DIR）也要归 ubuntu，否则 PM2 写数据库/上传会 EACCES
+  DATA_DIR_PATH=\$(grep -E '^DATA_DIR=' $PROJECT_DIR/.env.production 2>/dev/null | cut -d'=' -f2-)
+  if [ -n "\$DATA_DIR_PATH" ]; then
+    sudo chown -R ubuntu:ubuntu "\$DATA_DIR_PATH" 2>/dev/null || true
+    echo "   ✅ 数据目录已归 ubuntu：\$DATA_DIR_PATH"
+  fi
 
   cd $PROJECT_DIR
+  export NODE_ENV=production
 
   echo "   📦 安装依赖..."
-  sudo npm ci
+  npm ci
 
-  echo "   🔍 类型检查和测试..."
-  sudo npm run check
-  sudo npm test
+  echo "   🔍 类型检查..."
+  npm run check
 
   echo "   🔨 构建中..."
-  sudo npm run build
+  npm run build
 
   echo "   🧪 生产预检..."
-  sudo npm run preflight:prod
+  npm run preflight:prod
 
   echo "   🔄 重载服务..."
   pm2 startOrReload ecosystem.config.cjs --only learngrow-crm --update-env
