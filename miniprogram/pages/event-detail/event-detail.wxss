@@ -67,6 +67,8 @@
 
 .requirement-text {
   line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .badge-progress {
@@ -83,6 +85,8 @@
 
 .reward-text {
   line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .checked-status {

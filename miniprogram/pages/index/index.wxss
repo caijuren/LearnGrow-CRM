@@ -301,6 +301,11 @@
 .meta-hint {
   font-size: 24rpx;
   line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-all;
 }
 
 .progress-section {
