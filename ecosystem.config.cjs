@@ -48,7 +48,7 @@ if (envPathsFound.length === 0) {
 }
 
 const pm2LogDir = process.env.PM2_LOG_DIR || path.join(os.homedir(), '.pm2', 'logs');
-const deployDir = process.env.DEPLOY_DIR || '/var/www/learngrow-crm';
+const deployDir = process.env.DEPLOY_DIR || path.join(os.homedir(), 'learngrow-crm');
 const dataDir = process.env.DATA_DIR || envConfig.DATA_DIR || path.join(deployDir, 'data');
 
 module.exports = {
@@ -57,7 +57,7 @@ module.exports = {
       name: 'learngrow-crm',
       script: 'npm',
       args: 'run start',
-      cwd: deployDir,
+      cwd: deployDir + '/current',
       instances: 1,
       autorestart: true,
       watch: false,
