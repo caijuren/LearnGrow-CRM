@@ -42,11 +42,18 @@ Page({
       template_id: null
     },
     savingReminder: false,
-    brokenAvatars: {}
+    brokenAvatars: {},
+    networkError: false,
+    activeTab: 'record'
   },
 
   onAvatarError(e) {
     avatarUtil.onAvatarError(e, this);
+  },
+
+  switchTab(e) {
+    const tab = e.currentTarget.dataset.tab;
+    this.setData({ activeTab: tab });
   },
 
   onLoad(options) {
@@ -73,6 +80,7 @@ Page({
   },
 
   async loadData() {
+    this.setData({ networkError: false });
     try {
       const events = await api.getEvents();
       const event = events.find(e => e.id === this.data.eventId);
@@ -171,8 +179,12 @@ Page({
         brokenAvatars: {}
       });
     } catch (e) {
-      wx.showToast({ title: '活动详情加载失败', icon: 'none' });
+      this.setData({ networkError: true });
     }
+  },
+
+  retryLoadData() {
+    this.loadData();
   },
 
   buildCalendar(calendarData) {

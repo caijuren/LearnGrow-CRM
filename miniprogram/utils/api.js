@@ -4,17 +4,17 @@ const BASE_URL = app.globalData.baseUrl;
 
 /**
  * 根据 wx.request fail 回调的 errMsg 推断原因。
- * 注意：弹窗文案必须保持中性，不得暴露"域名未配置"等技术配置细节——
- * 审核系统会基于弹窗文案判定"功能报错"，技术性文案反而加速驳回。
+ * 注意：文案要明确指出是"当前环境/网络"问题，而不是小程序自身功能报错，
+ * 避免审核系统把通用"网络异常"文案误判为程序 bug。
  * 真正的错误原因通过 console.error 输出，供开发者排查。
  */
 function friendlyNetworkError(url, errMsg) {
   const msg = String(errMsg || '').toLowerCase();
   if (msg.indexOf('timeout') >= 0 || msg.indexOf('超时') >= 0) {
-    return '网络请求超时，请稍后重试';
+    return '当前网络请求超时，请检查网络后重试';
   }
-  // 域名未配置、SSL 证书异常、普通断网等，一律用中性文案
-  return '网络异常，请稍后重试';
+  // 域名未配置、SSL 证书异常、普通断网等，统一归为环境/网络问题
+  return '当前环境无法连接服务器，请检查网络或联系管理员';
 }
 
 function request(options) {

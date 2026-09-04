@@ -1,9 +1,28 @@
 .container {
-  padding-bottom: 180rpx;
+  padding-bottom: 60rpx;
 }
 
 .page-header {
   padding: 24rpx 4rpx 32rpx;
+}
+
+.back-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-bottom: 12rpx;
+  color: var(--text-secondary);
+}
+
+.back-arrow {
+  font-size: 40rpx;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.back-text {
+  font-size: 28rpx;
+  font-weight: 500;
 }
 
 .page-header .text-xl {

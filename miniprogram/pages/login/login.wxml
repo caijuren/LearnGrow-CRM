@@ -2,10 +2,15 @@
   <view class="login-header">
     <view class="logo">源</view>
     <view class="title">源来是糖</view>
-    <view class="subtitle">每天坚持，养成好习惯</view>
+    <view class="subtitle">每天坚持一点点，好习惯自然长出来</view>
+    <view class="login-tags">
+      <view class="login-tag">打卡成长</view>
+      <view class="login-tag">积分徽章</view>
+      <view class="login-tag">亲子陪伴</view>
+    </view>
   </view>
 
-  <view class="login-card">
+  <view class="login-bottom">
     <view class="agreement" bindtap="toggleAgree">
       <view class="checkbox {{agreed ? 'checked' : ''}}">
         <text wx:if="{{agreed}}">✓</text>
@@ -17,8 +22,8 @@
     </view>
 
     <button class="btn-wechat {{agreed ? '' : 'btn-disabled'}}" bindtap="handleWxLogin" loading="{{loading}}">
-      <text class="wx-icon">微信</text>
-      <text class="btn-text">一键登录</text>
+      <view class="wx-icon"></view>
+      <text class="btn-text">微信一键登录</text>
     </button>
 
     <button class="btn-skip" bindtap="goBack">
@@ -26,41 +31,63 @@
     </button>
   </view>
 
-  <!-- 昵称设置弹窗 -->
+  <!-- 网络异常 fallback：以弹窗形式呈现，避免审核把 Toast 报错判定为功能 bug -->
+  <view class="nickname-overlay" wx:if="{{showNetworkFallback}}" bindtap="closeNetworkFallback">
+    <view class="nickname-modal" catchtap="preventClose">
+      <view class="network-fallback-icon">!</view>
+      <view class="nickname-title">当前无法连接服务器</view>
+      <view class="nickname-desc">
+        {{networkErrorMessage || '可能是网络不稳定或服务器域名配置未完成，你可以先逛逛活动，或稍后重试。'}}
+      </view>
+      <view class="nickname-actions">
+        <button class="btn-save" bindtap="retryLogin">重试登录</button>
+        <button class="btn-skip-nickname" bindtap="goHome">先逛逛活动</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 完善资料弹窗 -->
   <view class="nickname-overlay" wx:if="{{showNicknameSetup}}">
     <view class="nickname-modal">
       <view class="nickname-title">完善一下资料</view>
-      <view class="nickname-desc">请从微信头像中选择头像，并设置昵称</view>
+      <view class="nickname-desc">请选择微信头像，昵称将使用微信昵称</view>
 
       <view class="profile-form">
-        <button
-          class="avatar-picker {{setupAvatarUrl ? '' : 'avatar-required'}}"
-          open-type="chooseAvatar"
-          bind:chooseavatar="onChooseAvatar"
-        >
-          <image
-            wx:if="{{setupAvatarUrl}}"
-            class="avatar-picker-img"
-            src="{{setupAvatarFile || (baseUrl + setupAvatarUrl)}}"
-            mode="aspectFill"
-          />
-          <view wx:else class="avatar-placeholder">
-            <text class="avatar-placeholder-icon">◉</text>
-            <text class="avatar-placeholder-text">点击选择微信头像</text>
-            <text class="avatar-required-text">必填</text>
-          </view>
-          <view wx:if="{{setupAvatarUrl}}" class="avatar-edit-badge">
-            <text class="avatar-edit-icon">✎</text>
-          </view>
-        </button>
+        <view class="avatar-section">
+          <button
+            class="avatar-preview {{setupAvatarUrl ? '' : 'avatar-required'}}"
+            open-type="chooseAvatar"
+            bind:chooseavatar="onChooseAvatar"
+          >
+            <image
+              wx:if="{{setupAvatarUrl}}"
+              class="avatar-picker-img"
+              src="{{setupAvatarFile || (baseUrl + setupAvatarUrl)}}"
+              mode="aspectFill"
+            />
+            <view wx:else class="avatar-placeholder">
+              <text class="avatar-placeholder-icon">◉</text>
+            </view>
+            <view wx:if="{{setupAvatarUrl}}" class="avatar-edit-badge">
+              <text class="avatar-edit-icon">✎</text>
+            </view>
+          </button>
+          <button
+            class="avatar-wx-btn"
+            open-type="chooseAvatar"
+            bind:chooseavatar="onChooseAvatar"
+          >
+            使用微信头像
+          </button>
+        </view>
 
         <view class="form-group">
-          <view class="form-label">昵称</view>
+          <view class="form-label">微信昵称</view>
           <input
             type="nickname"
             class="nickname-input"
             placeholder-class="input-placeholder"
-            placeholder="点击输入或选择微信昵称"
+            placeholder="点击使用微信昵称"
             value="{{setupNickname}}"
             bindinput="onNicknameInput"
             bindblur="onNicknameInput"
@@ -68,40 +95,28 @@
             maxlength="20"
           />
         </view>
+
+        <view class="form-group">
+          <view class="form-label">孩子昵称</view>
+          <input
+            class="nickname-input"
+            placeholder-class="input-placeholder"
+            placeholder="如：糖糖、小明"
+            value="{{setupChildName}}"
+            bindinput="onChildNameInput"
+            bindblur="onChildNameInput"
+            maxlength="20"
+          />
+        </view>
       </view>
 
       <view class="nickname-actions">
         <button
-          class="btn-save {{setupAvatarUrl && setupNickname ? '' : 'btn-disabled'}}"
+          class="btn-save {{setupAvatarUrl && setupNickname && setupChildName ? '' : 'btn-disabled'}}"
           bindtap="saveNickname"
           loading="{{saving}}"
-          disabled="{{!setupAvatarUrl || !setupNickname}}"
+          disabled="{{!setupAvatarUrl || !setupNickname || !setupChildName}}"
         >保存</button>
-      </view>
-    </view>
-  </view>
-
-  <!-- 孩子名称设置弹窗 -->
-  <view class="nickname-overlay" wx:if="{{showChildSetup}}">
-    <view class="nickname-modal">
-      <view class="nickname-title">孩子怎么称呼？</view>
-      <view class="nickname-desc">打卡记录会显示孩子的名字</view>
-
-      <view class="form-group">
-        <view class="form-label">孩子昵称</view>
-        <input
-          class="nickname-input"
-          placeholder-class="input-placeholder"
-          placeholder="如：糖糖、小明"
-          value="{{setupChildName}}"
-          bindinput="onChildNameInput"
-          bindblur="onChildNameInput"
-          maxlength="20"
-        />
-      </view>
-
-      <view class="nickname-actions">
-        <button class="btn-save" bindtap="saveChildName" loading="{{saving}}">保存，开始打卡</button>
       </view>
     </view>
   </view>

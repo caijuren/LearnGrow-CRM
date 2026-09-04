@@ -2,7 +2,6 @@
  * 打卡流程集成测试
  * 测试完整打卡流程：创建活动 -> 报名 -> 提交打卡 -> 审核 -> 积分发放
  */
-
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import db from '../../api/db.js';
 
@@ -22,31 +21,30 @@ describe('Checkin Flow Integration', () => {
     // 创建测试产品
     const productResult = db.prepare(
       "INSERT INTO products (name, price, commission_percent, is_on_sale) VALUES (?, ?, ?, ?)"
-    ).run('打卡课程', 500, 10, true);
+    ).run('打卡课程', 500, 10, 1);
     testProductId = productResult.lastInsertRowid as number;
 
-    // 创建打卡活动
+    // 创建打卡活动（列名：name / required_text / reward_rules / points_per_checkin）
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const eventResult = db.prepare(`
-      INSERT INTO checkin_events (title, description, start_date, end_date, signup_deadline, status, points_per_checkin, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run('测试打卡活动', '每日阅读打卡', now, now, now, 'active', 10, now);
+      INSERT INTO checkin_events (name, start_date, end_date, signup_deadline, required_text, status, points_per_checkin, created_at)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+    `).run('测试打卡活动', now, now, now, '每日阅读打卡', 10, now);
     testEventId = eventResult.lastInsertRowid as number;
 
-    // 报名参与
+    // 报名参与（checkin_participants 无 status 列，nickname 必填）
     const participantResult = db.prepare(
-      "INSERT INTO checkin_participants (event_id, wx_user_id, status) VALUES (?, ?, ?)"
-    ).run(testEventId, testUserId, 'active');
+      "INSERT INTO checkin_participants (event_id, wx_user_id, nickname) VALUES (?, ?, ?)"
+    ).run(testEventId, testUserId, '测试用户');
     testParticipantId = participantResult.lastInsertRowid as number;
   });
 
   afterAll(() => {
     // 清理测试数据（按依赖顺序）
+    db.prepare('DELETE FROM points_ledger WHERE wx_user_id = ?').run(testUserId);
     db.prepare('DELETE FROM checkin_records WHERE participant_id IN (SELECT id FROM checkin_participants WHERE event_id = ?)').run(testEventId);
     db.prepare('DELETE FROM checkin_participants WHERE event_id = ?').run(testEventId);
     db.prepare('DELETE FROM checkin_events WHERE id = ?').run(testEventId);
-    db.prepare('DELETE FROM orders WHERE wx_user_id = ?').run(testUserId);
-    db.prepare('DELETE FROM points_ledger WHERE wx_user_id = ?').run(testUserId);
     db.prepare('DELETE FROM products WHERE id = ?').run(testProductId);
     db.prepare('DELETE FROM wx_users WHERE openid = ?').run('test_openid_checkin');
   });
@@ -55,7 +53,7 @@ describe('Checkin Flow Integration', () => {
     it('应该成功创建打卡活动', () => {
       const event = db.prepare('SELECT * FROM checkin_events WHERE id = ?').get(testEventId) as any;
       expect(event).toBeDefined();
-      expect(event.title).toBe('测试打卡活动');
+      expect(event.name).toBe('测试打卡活动');
       expect(event.status).toBe('active');
       expect(event.points_per_checkin).toBe(10);
     });
@@ -64,10 +62,11 @@ describe('Checkin Flow Integration', () => {
   describe('Submit Checkin Record', () => {
     it('应该成功提交打卡记录', () => {
       const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      // checkin_records 使用 image_url 列（非 media_url）
       const result = db.prepare(`
-        INSERT INTO checkin_records (participant_id, media_type, media_url, status, checkin_date, created_at)
-        VALUES (?, 'image', '/uploads/test.jpg', 'pending', ?, ?)
-      `).run(testParticipantId, now, now);
+        INSERT INTO checkin_records (event_id, participant_id, media_type, image_url, status, checkin_date, created_at)
+        VALUES (?, ?, 'image', '/uploads/test.jpg', 'pending', ?, ?)
+      `).run(testEventId, testParticipantId, now, now);
 
       expect(result.lastInsertRowid).toBeGreaterThan(0);
 
@@ -101,30 +100,31 @@ describe('Checkin Flow Integration', () => {
       if (!recordId) return;
 
       const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      db.prepare("UPDATE checkin_records SET status = 'approved', approved_at = ? WHERE id = ?").run(now, recordId);
+      // 审核时间字段为 reviewed_at（非 approved_at）
+      db.prepare("UPDATE checkin_records SET status = 'approved', reviewed_at = ? WHERE id = ?").run(now, recordId);
 
       const record = db.prepare('SELECT * FROM checkin_records WHERE id = ?').get(recordId) as any;
       expect(record.status).toBe('approved');
-      expect(record.approved_at).toBeDefined();
+      expect(record.reviewed_at).toBeDefined();
     });
 
     it('审核通过后应发放积分', () => {
       if (!recordId) return;
 
-      // 模拟积分发放逻辑
+      // 模拟积分发放逻辑（points_ledger 列：amount / type / ref_type / note）
       const event = db.prepare('SELECT points_per_checkin FROM checkin_events WHERE id = ?').get(testEventId) as any;
       const points = event.points_per_checkin;
 
       const ledgerResult = db.prepare(`
-        INSERT INTO points_ledger (wx_user_id, ref_type, ref_id, points, reason, created_at)
-        VALUES (?, 'checkin', ?, ?, '打卡奖励', datetime('now'))
-      `).run(testUserId, recordId, points);
+        INSERT INTO points_ledger (wx_user_id, amount, type, ref_type, ref_id, note, created_at)
+        VALUES (?, ?, 'checkin', 'checkin_record', ?, '打卡奖励', datetime('now'))
+      `).run(testUserId, points, recordId);
 
       expect(ledgerResult.lastInsertRowid).toBeGreaterThan(0);
 
       const ledger = db.prepare('SELECT * FROM points_ledger WHERE id = ?').get(ledgerResult.lastInsertRowid) as any;
-      expect(ledger.points).toBe(points);
-      expect(ledger.ref_type).toBe('checkin');
+      expect(ledger.amount).toBe(points);
+      expect(ledger.ref_type).toBe('checkin_record');
     });
   });
 

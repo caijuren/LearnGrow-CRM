@@ -4,6 +4,8 @@
     "pages/login/login",
     "pages/event-detail/event-detail",
     "pages/my-checkins/my-checkins",
+    "pages/my-events/my-events",
+    "pages/my-badges/my-badges",
     "pages/ranking/ranking",
     "pages/profile/profile",
     "pages/points/points",

@@ -1,0 +1,106 @@
+.container {
+  padding-bottom: 60rpx;
+}
+
+.page-header {
+  padding: 24rpx 4rpx 32rpx;
+}
+
+.back-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  margin-bottom: 12rpx;
+  color: var(--text-secondary);
+}
+
+.back-arrow {
+  font-size: 40rpx;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.back-text {
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.page-header .text-xl {
+  font-size: 40rpx;
+  color: var(--text);
+}
+
+.badge-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 24rpx;
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 28rpx rgba(0, 0, 0, 0.24);
+}
+
+.badge-icon {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.08) 100%);
+  color: var(--warning);
+  font-size: 48rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2rpx solid rgba(251, 191, 36, 0.25);
+  box-shadow: 0 6rpx 16rpx rgba(251, 191, 36, 0.15);
+}
+
+.badge-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.badge-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.badge-desc {
+  font-size: 24rpx;
+  color: var(--text-secondary);
+  margin-top: 8rpx;
+  line-height: 1.5;
+}
+
+.badge-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.badge-event {
+  font-size: 22rpx;
+  color: var(--accent-light);
+  padding: 4rpx 14rpx;
+  background: var(--accent-soft);
+  border-radius: 999rpx;
+}
+
+.badge-days {
+  font-size: 22rpx;
+  color: var(--warning);
+  padding: 4rpx 14rpx;
+  background: var(--warning-soft);
+  border-radius: 999rpx;
+}
+
+.badge-date {
+  font-size: 22rpx;
+  color: var(--text-muted);
+}

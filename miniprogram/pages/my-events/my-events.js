@@ -6,7 +6,6 @@ Page({
     checkins: [],
     loading: true,
     loadedOnce: false,
-    baseUrl: app.globalData.baseUrl,
     isLoggedIn: false
   },
 
@@ -17,17 +16,17 @@ Page({
   onShow() {
     this.setData({ isLoggedIn: app.checkLogin() });
     if (app.checkLogin()) {
-      this.loadCheckins();
+      this.loadEvents();
     }
   },
 
-  async loadCheckins() {
+  async loadEvents() {
     this.setData({ loading: true });
     try {
       const checkins = await api.getMyCheckins();
       this.setData({ checkins });
     } catch (e) {
-      wx.showToast({ title: '打卡记录加载失败', icon: 'none' });
+      wx.showToast({ title: '活动加载失败', icon: 'none' });
     } finally {
       this.setData({ loading: false, loadedOnce: true });
     }
@@ -50,7 +49,7 @@ Page({
 
   onPullDownRefresh() {
     if (app.checkLogin()) {
-      this.loadCheckins().then(() => wx.stopPullDownRefresh());
+      this.loadEvents().then(() => wx.stopPullDownRefresh());
     } else {
       wx.stopPullDownRefresh();
     }

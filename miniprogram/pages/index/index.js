@@ -20,7 +20,8 @@ Page({
     isLoggedIn: false,
     baseUrl: app.globalData.baseUrl,
     brokenAvatars: {},
-    showLoginPrompt: false
+    showLoginPrompt: false,
+    networkError: false
   },
 
   onAvatarError(e) {
@@ -44,7 +45,7 @@ Page({
   },
 
   async loadEvents() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, networkError: false });
     try {
       const events = await api.getEvents();
       const upcomingEvents = events.filter(e => e.event_status === 'upcoming');
@@ -75,10 +76,14 @@ Page({
         todayRingPercent: joinedEvents.length > 0 ? Math.round((completedEvents.length / joinedEvents.length) * 100) : 0
       });
     } catch (e) {
-      wx.showToast({ title: '活动加载失败', icon: 'none' });
+      this.setData({ networkError: true });
     } finally {
       this.setData({ loading: false, loadedOnce: true });
     }
+  },
+
+  retryLoadEvents() {
+    this.loadEvents();
   },
 
   async handleJoin(e) {
@@ -127,13 +132,16 @@ Page({
     wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
   },
 
+  goToRankingTab() {
+    wx.reLaunch({ url: '/pages/ranking/ranking' });
+  },
+
   goToProfile() {
     if (!app.checkLogin()) {
       this.setData({ showLoginPrompt: true });
       return;
     }
-    wx.navigateTo({ url: '/pages/profile/profile' });
-
+    wx.reLaunch({ url: '/pages/profile/profile' });
   },
 
   preventClose() {

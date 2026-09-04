@@ -181,7 +181,19 @@ Page({
   },
 
   goToMyCheckins() {
-    wx.reLaunch({ url: '/pages/my-checkins/my-checkins' });
+    wx.navigateTo({ url: '/pages/my-checkins/my-checkins' });
+  },
+
+  goToMyEvents() {
+    wx.navigateTo({ url: '/pages/my-events/my-events' });
+  },
+
+  goToMyBadges() {
+    wx.navigateTo({ url: '/pages/my-badges/my-badges' });
+  },
+
+  goToRankingTab() {
+    wx.reLaunch({ url: '/pages/ranking/ranking' });
   },
 
   goToPoints() {

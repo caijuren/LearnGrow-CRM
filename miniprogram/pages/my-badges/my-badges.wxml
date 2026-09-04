@@ -1,0 +1,38 @@
+<view class="container">
+  <view class="page-header">
+    <view class="back-row" bindtap="goBack">
+      <text class="back-arrow">‹</text>
+      <text class="back-text">返回</text>
+    </view>
+    <view class="text-xl font-bold">我的徽章</view>
+    <view class="text-secondary mt-1">已获得 {{badges.length}} 个徽章</view>
+  </view>
+
+  <view wx:if="{{!isLoggedIn}}" class="empty">
+    <view class="empty-icon">锁</view>
+    <view class="empty-title">登录后查看</view>
+    <view class="empty-desc">登录后即可查看您获得的徽章</view>
+    <view class="mt-4">
+      <button class="btn-primary btn-small" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && badges.length === 0 && !loading}}" class="empty">
+    <view class="empty-icon">章</view>
+    <view class="empty-title">还没有徽章</view>
+    <view class="empty-desc">坚持打卡，就能获得专属徽章</view>
+  </view>
+
+  <view wx:for="{{badges}}" wx:key="id" class="badge-card">
+    <view class="badge-icon">{{item.badge_icon || '章'}}</view>
+    <view class="badge-body">
+      <view class="badge-name">{{item.badge_name}}</view>
+      <view wx:if="{{item.badge_description}}" class="badge-desc">{{item.badge_description}}</view>
+      <view class="badge-meta">
+        <text wx:if="{{item.event_name}}" class="badge-event">{{item.event_name}}</text>
+        <text wx:if="{{item.target_days}}" class="badge-days">{{item.target_days}} 天</text>
+        <text class="badge-date">{{item.achievedDate}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -716,8 +716,6 @@ app.register(async function (router) {
 
   // v2.7.0: 使用新的用户删除服务（支持级联删除和审计日志）
   router.delete('/:id', async (request: any, reply: any) => {
-    const { registerUserDeleteRoutes } = await import('./routes/user-delete.routes.js');
-    // 注意: 这里简化处理，实际应该直接在主路由中注册
     const id = parseInt(request.params.id);
     const user = (request as any).user;
     

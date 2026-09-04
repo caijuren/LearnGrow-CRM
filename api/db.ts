@@ -55,9 +55,11 @@ const wxUserColDefsEarly: [string, string][] = [
   ['stage', "TEXT NOT NULL DEFAULT 'new_friend'"],
   ['next_talk_topic', 'TEXT'],
 ];
-for (const [col, def] of wxUserColDefsEarly) {
-  if (!existingWxUserColsEarly.includes(col)) {
-    sqlite.exec(`ALTER TABLE wx_users ADD COLUMN ${col} ${def}`);
+if (existingWxUserColsEarly.length > 0) {
+  for (const [col, def] of wxUserColDefsEarly) {
+    if (!existingWxUserColsEarly.includes(col)) {
+      sqlite.exec(`ALTER TABLE wx_users ADD COLUMN ${col} ${def}`);
+    }
   }
 }
 
@@ -672,6 +674,7 @@ sqlite.exec(`
     image_hash TEXT,
     media_type TEXT NOT NULL DEFAULT 'image' CHECK(media_type IN ('image', 'video')),
     is_makeup INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('pending', 'approved', 'rejected')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (event_id) REFERENCES checkin_events(id) ON DELETE CASCADE,
     FOREIGN KEY (participant_id) REFERENCES checkin_participants(id) ON DELETE CASCADE,

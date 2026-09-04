@@ -2,6 +2,12 @@
   <view class="ranking-header">
     <view class="ranking-header-title">打卡排行榜</view>
     <view class="ranking-header-subtitle">坚持打卡，见证成长每一步</view>
+    <picker wx:if="{{eventNames.length > 0}}" mode="selector" range="{{eventNames}}" value="{{eventIndex}}" bindchange="onEventChange">
+      <view class="event-switcher">
+        <text class="event-switcher-name">{{eventNames[eventIndex]}}</text>
+        <text class="event-switcher-arrow">▾</text>
+      </view>
+    </picker>
   </view>
 
   <view wx:if="{{myRank}}" class="my-rank-card">
@@ -93,6 +99,21 @@
         <view wx:if="{{item.current_streak >= 2}}" class="streak-tag">连续 {{item.current_streak}} 天</view>
       </view>
       <view class="user-days">{{item.checkin_days}} 天</view>
+    </view>
+  </view>
+
+  <view class="bottom-nav">
+    <view class="nav-item" bindtap="goHome">
+      <text class="nav-icon">⌂</text>
+      <text class="nav-text">活动</text>
+    </view>
+    <view class="nav-item active">
+      <text class="nav-icon">◈</text>
+      <text class="nav-text">排行榜</text>
+    </view>
+    <view class="nav-item" bindtap="goToProfile">
+      <text class="nav-icon">◉</text>
+      <text class="nav-text">我的</text>
     </view>
   </view>
 </view>

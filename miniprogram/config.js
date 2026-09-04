@@ -20,15 +20,15 @@ function resolveEnvVersion() {
     const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
     const v = info && info.miniProgram && info.miniProgram.envVersion;
     if (v === 'develop') {
-      // 开发者环境再做一道保险：真机一定没有 devtools 标签
+      // 关键：只有「明确运行在开发者工具里」（platform === 'devtools'）才允许用 localhost。
+      // 真机（platform 为 ios/android/devtools 之外）和审核环境一律兜底到 HTTPS 正式域名。
+      // 注意：不能用 __wxConfig.envVersion === 'develop' 来判断，因为此时 v 本身就是 'develop'，
+      // 该条件恒真，会导致审核环境也被误判为 devtools 而连到 127.0.0.1。
       try {
         const sys = wx.getSystemInfoSync && wx.getSystemInfoSync();
         const platform = (sys && sys.platform) || '';
-        const isDevtools =
-          platform === 'devtools' ||
-          (typeof __wxConfig !== 'undefined' && __wxConfig && __wxConfig.envVersion === 'develop');
-        if (isDevtools) return 'develop';
-        // 真机上报了 develop → 判定为异常，兜底走 release
+        if (platform === 'devtools') return 'develop';
+        // 真机 / 审核环境上报了 develop → 兜底走 HTTPS 正式域名
         return 'release';
       } catch (_) {
         return 'release';

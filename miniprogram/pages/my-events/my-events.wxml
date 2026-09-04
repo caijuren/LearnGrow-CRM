@@ -1,0 +1,52 @@
+<view class="container">
+  <view class="page-header">
+    <view class="back-row" bindtap="goBack">
+      <text class="back-arrow">‹</text>
+      <text class="back-text">返回</text>
+    </view>
+    <view class="text-xl font-bold">参加的活动</view>
+    <view class="text-secondary mt-1">已报名 {{checkins.length}} 个活动</view>
+  </view>
+
+  <view wx:if="{{!isLoggedIn}}" class="empty">
+    <view class="empty-icon">锁</view>
+    <view class="empty-title">登录后查看</view>
+    <view class="empty-desc">登录后即可查看您参加的活动</view>
+    <view class="mt-4">
+      <button class="btn-primary btn-small" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn && checkins.length === 0 && !loading}}" class="empty">
+    <view class="empty-icon">空</view>
+    <view class="empty-title">还没有参加任何活动</view>
+    <view class="empty-desc">去发现一些感兴趣的活动吧</view>
+    <navigator url="/pages/index/index" open-type="reLaunch" class="mt-4">
+      <button class="btn-primary btn-small">去看看活动</button>
+    </navigator>
+  </view>
+
+  <view wx:for="{{checkins}}" wx:key="event.id" class="event-card" bindtap="goToDetail" data-id="{{item.event.id}}">
+    <view class="event-top">
+      <view class="event-name">{{item.event.name}}</view>
+      <view wx:if="{{item.event.status === 'active'}}" class="status-pill active">进行中</view>
+      <view wx:else class="status-pill done">已结束</view>
+    </view>
+    <view class="event-meta">{{item.event.start_date}} ~ {{item.event.end_date}}</view>
+    <view class="event-stats">
+      <view class="stat-cell">
+        <view class="stat-val">{{item.checkin_days}}<text class="stat-total">/{{item.event.total_days}}</text></view>
+        <view class="stat-label">打卡天数</view>
+      </view>
+      <view class="stat-cell">
+        <view class="stat-val">{{item.current_streak}}</view>
+        <view class="stat-label">当前连续</view>
+      </view>
+      <view class="stat-cell">
+        <view class="stat-val">{{item.max_streak}}</view>
+        <view class="stat-label">最长连续</view>
+      </view>
+    </view>
+    <view class="event-arrow">›</view>
+  </view>
+</view>

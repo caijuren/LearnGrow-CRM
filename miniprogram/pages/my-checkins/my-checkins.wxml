@@ -1,5 +1,9 @@
 <view class="container">
   <view class="page-header">
+    <view class="back-row" bindtap="goBack">
+      <text class="back-arrow">‹</text>
+      <text class="back-text">返回</text>
+    </view>
     <view class="text-xl font-bold">我的打卡</view>
     <view class="text-secondary mt-1">查看所有参与的打卡活动</view>
   </view>
@@ -96,18 +100,4 @@
     </view>
   </view>
 
-  <view class="bottom-nav">
-    <view class="nav-item" bindtap="goHome">
-      <text class="nav-icon">⌂</text>
-      <text class="nav-text">活动</text>
-    </view>
-    <view class="nav-item active">
-      <text class="nav-icon">☰</text>
-      <text class="nav-text">我的打卡</text>
-    </view>
-    <view class="nav-item" bindtap="goToProfile">
-      <text class="nav-icon">◉</text>
-      <text class="nav-text">我的</text>
-    </view>
-  </view>
 </view>

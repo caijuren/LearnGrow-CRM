@@ -146,11 +146,16 @@
 .profile-avatar-img {
   width: 100%;
   height: 100%;
+  border-radius: inherit;
 }
 
 .profile-avatar-edit {
   width: 140rpx;
   height: 140rpx;
+  min-width: 140rpx;
+  max-width: 140rpx;
+  min-height: 140rpx;
+  max-height: 140rpx;
   border-radius: 28rpx;
   font-size: 56rpx;
   background: rgba(255, 255, 255, 0.15);
@@ -386,6 +391,16 @@
   padding: 0;
   border-radius: 28rpx;
   overflow: hidden;
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
+  background: var(--surface);
+  border: 2rpx solid var(--border);
+}
+
+.menu-group {
+  padding: 0;
+  border-radius: 28rpx;
+  overflow: hidden;
+  margin-bottom: 24rpx;
   box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.24);
   background: var(--surface);
   border: 2rpx solid var(--border);
