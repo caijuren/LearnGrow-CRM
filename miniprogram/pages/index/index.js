@@ -41,6 +41,10 @@ Page({
       isLoggedIn: app.checkLogin(),
       userInfo: app.globalData.userInfo 
     });
+    // 设置自定义 tabBar 选中态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 0 });
+    }
     this.loadEvents();
   },
 
@@ -121,7 +125,9 @@ Page({
 
   goToRanking(e) {
     const { id } = e.currentTarget.dataset;
-    wx.navigateTo({ url: `/pages/ranking/ranking?id=${id}` });
+    // 排行榜是 tabBar 页面，switchTab 无法带参数，通过全局变量传递活动 id
+    app.globalData.rankingEventId = id;
+    wx.switchTab({ url: '/pages/ranking/ranking' });
   },
 
   goToMyCheckins() {
@@ -133,15 +139,12 @@ Page({
   },
 
   goToRankingTab() {
-    wx.reLaunch({ url: '/pages/ranking/ranking' });
+    app.globalData.rankingEventId = null;
+    wx.switchTab({ url: '/pages/ranking/ranking' });
   },
 
   goToProfile() {
-    if (!app.checkLogin()) {
-      this.setData({ showLoginPrompt: true });
-      return;
-    }
-    wx.reLaunch({ url: '/pages/profile/profile' });
+    wx.switchTab({ url: '/pages/profile/profile' });
   },
 
   preventClose() {

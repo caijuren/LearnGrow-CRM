@@ -40,7 +40,7 @@ Page({
 
   goBack() {
     wx.navigateBack({
-      fail: () => wx.reLaunch({ url: '/pages/profile/profile' })
+      fail: () => wx.switchTab({ url: '/pages/profile/profile' })
     });
   },
 

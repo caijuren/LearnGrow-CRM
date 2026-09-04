@@ -20,5 +20,16 @@
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "tabBar": {
+    "custom": true,
+    "color": "#64748b",
+    "selectedColor": "#F43F7A",
+    "backgroundColor": "#0B0F1A",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "活动" },
+      { "pagePath": "pages/ranking/ranking", "text": "排行榜" },
+      { "pagePath": "pages/profile/profile", "text": "我的" }
+    ]
+  }
 }

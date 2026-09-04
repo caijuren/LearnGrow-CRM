@@ -36,6 +36,10 @@ Page({
 
   onShow() {
     this.setData({ isLoggedIn: app.checkLogin() });
+    // 设置自定义 tabBar 选中态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 2 });
+    }
     if (app.checkLogin()) {
       this.setData({ userInfo: app.globalData.userInfo });
       this.loadStats();
@@ -177,7 +181,7 @@ Page({
   },
 
   goHome() {
-    wx.reLaunch({ url: '/pages/index/index' });
+    wx.switchTab({ url: '/pages/index/index' });
   },
 
   goToMyCheckins() {
@@ -193,7 +197,8 @@ Page({
   },
 
   goToRankingTab() {
-    wx.reLaunch({ url: '/pages/ranking/ranking' });
+    app.globalData.rankingEventId = null;
+    wx.switchTab({ url: '/pages/ranking/ranking' });
   },
 
   goToPoints() {

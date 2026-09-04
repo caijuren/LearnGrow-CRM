@@ -20,21 +20,33 @@ Page({
     avatarUtil.onAvatarError(e, this);
   },
 
-  async onLoad(options) {
+  async onLoad() {
     this.setData({ isLoggedIn: app.checkLogin() });
-    if (options.id) {
-      this.setData({ eventId: parseInt(options.id) });
-      // 有指定活动时也加载活动列表，用于顶部选择器
-      await this.loadEvents(options.id);
+    const pendingId = app.globalData.rankingEventId;
+    if (pendingId) {
+      app.globalData.rankingEventId = null;
+      this.setData({ eventId: parseInt(pendingId, 10) });
+      await this.loadEvents(pendingId);
       this.loadRanking();
     } else {
-      // 底部 tab 进入：无指定活动，默认选第一个进行中的活动
       await this.initDefaultEvent();
     }
   },
 
   onShow() {
     this.setData({ isLoggedIn: app.checkLogin() });
+    // 设置自定义 tabBar 选中态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 1 });
+    }
+    // 从详情页/首页「排行榜」按钮跳转过来时，通过全局变量传递活动 id
+    const pendingId = app.globalData.rankingEventId;
+    if (pendingId && parseInt(pendingId, 10) !== this.data.eventId) {
+      app.globalData.rankingEventId = null;
+      this.setData({ eventId: parseInt(pendingId, 10) });
+      this.loadEvents(pendingId);
+      this.loadRanking();
+    }
   },
 
   onPullDownRefresh() {
@@ -85,11 +97,11 @@ Page({
   },
 
   goHome() {
-    wx.reLaunch({ url: '/pages/index/index' });
+    wx.switchTab({ url: '/pages/index/index' });
   },
 
   goToProfile() {
-    wx.reLaunch({ url: '/pages/profile/profile' });
+    wx.switchTab({ url: '/pages/profile/profile' });
   },
 
   async loadRanking() {

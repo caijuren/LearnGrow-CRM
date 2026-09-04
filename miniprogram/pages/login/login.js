@@ -19,8 +19,10 @@ Page({
 
   onLoad() {
     if (app.checkLogin()) {
-      wx.navigateBack().catch(() => {
-        wx.reLaunch({ url: '/pages/index/index' });
+      wx.navigateBack({
+        fail: () => {
+          wx.switchTab({ url: '/pages/index/index' });
+        }
       });
     }
   },
@@ -38,7 +40,7 @@ Page({
     if (pages.length > 1) {
       wx.navigateBack();
     } else {
-      wx.reLaunch({ url: '/pages/index/index' });
+      wx.switchTab({ url: '/pages/index/index' });
     }
   },
 
@@ -47,7 +49,7 @@ Page({
     if (pages.length > 1) {
       wx.navigateBack();
     } else {
-      wx.reLaunch({ url: '/pages/index/index' });
+      wx.switchTab({ url: '/pages/index/index' });
     }
   },
 

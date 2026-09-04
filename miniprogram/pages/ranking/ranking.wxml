@@ -101,19 +101,4 @@
       <view class="user-days">{{item.checkin_days}} 天</view>
     </view>
   </view>
-
-  <view class="bottom-nav">
-    <view class="nav-item" bindtap="goHome">
-      <text class="nav-icon">⌂</text>
-      <text class="nav-text">活动</text>
-    </view>
-    <view class="nav-item active">
-      <text class="nav-icon">◈</text>
-      <text class="nav-text">排行榜</text>
-    </view>
-    <view class="nav-item" bindtap="goToProfile">
-      <text class="nav-icon">◉</text>
-      <text class="nav-text">我的</text>
-    </view>
-  </view>
 </view>

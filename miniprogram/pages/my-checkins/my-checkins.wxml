@@ -49,7 +49,7 @@
     <view class="empty-icon">空</view>
     <view class="empty-title">还没有参加任何打卡活动</view>
     <view class="empty-desc">去发现一些感兴趣的活动吧</view>
-    <navigator url="/pages/index/index" open-type="reLaunch" class="mt-4">
+    <navigator url="/pages/index/index" open-type="switchTab" class="mt-4">
       <button class="btn-primary btn-small">去看看活动</button>
     </navigator>
   </view>

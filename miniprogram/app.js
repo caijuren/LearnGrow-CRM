@@ -5,7 +5,9 @@ App({
     baseUrl: config.apiBaseUrl,
     appVersion: config.appVersion,
     userInfo: null,
-    token: null
+    token: null,
+    // 跳转到排行榜 tab 时，通过此变量传递指定活动 id（switchTab 无法带参数）
+    rankingEventId: null
   },
 
   onLaunch() {

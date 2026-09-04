@@ -832,7 +832,9 @@ Page({
   },
 
   goToRanking() {
-    wx.navigateTo({ url: `/pages/ranking/ranking?id=${this.data.eventId}` });
+    // 排行榜是 tabBar 页面，switchTab 无法带参数，通过全局变量传递活动 id
+    app.globalData.rankingEventId = this.data.eventId;
+    wx.switchTab({ url: '/pages/ranking/ranking' });
   },
 
   goToLogin() {

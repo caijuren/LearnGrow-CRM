@@ -50,6 +50,12 @@
       </view>
     </view>
 
+    <!-- 头像文件丢失提示：有头像记录但图片加载失败 -->
+    <view wx:if="{{!editing && userInfo.avatar_url && brokenAvatars.mine}}" class="avatar-lost-tip" bindtap="startEdit">
+      <text class="avatar-lost-icon">!</text>
+      <text>头像已失效，点击重新设置</text>
+    </view>
+
     <view class="menu-group">
       <view class="menu-item" bindtap="goToMyCheckins">
         <view class="menu-icon">✓</view>
@@ -86,19 +92,4 @@
 
     <button class="logout-btn" bindtap="handleLogout">退出登录</button>
   </block>
-
-  <view class="bottom-nav">
-    <view class="nav-item" bindtap="goHome">
-      <text class="nav-icon">⌂</text>
-      <text class="nav-text">活动</text>
-    </view>
-    <view class="nav-item" bindtap="goToRankingTab">
-      <text class="nav-icon">◈</text>
-      <text class="nav-text">排行榜</text>
-    </view>
-    <view class="nav-item active">
-      <text class="nav-icon">◉</text>
-      <text class="nav-text">我的</text>
-    </view>
-  </view>
 </view>
