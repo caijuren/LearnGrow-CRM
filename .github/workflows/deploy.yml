@@ -105,7 +105,6 @@ jobs:
           ssh ubuntu@124.220.103.120 "
             cd $RELEASE_DIR && tar xzf deploy.tar.gz && rm deploy.tar.gz
             npm ci --omit=dev
-            NODE_ENV=production npx drizzle-kit migrate --config=drizzle.config.ts
           "
           
           # Copy env file

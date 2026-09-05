@@ -163,8 +163,8 @@ rsync -az --delete \
 run_remote <<< "ln -sfn $DEPLOY_DIR/uploads $RELEASE_DIR/uploads"
 ok "代码同步完成（已排除 miniprogram / .env / data / uploads）"
 
-# ---------- Step 4: 安装依赖 + 构建 + 迁移 ----------
-info "Step 4/7: 远程安装依赖、构建前端、运行迁移（耗时数分钟）"
+# ---------- Step 4: 安装依赖 + 构建 ----------
+info "Step 4/7: 远程安装依赖、构建前端（耗时数分钟）"
 run_remote <<EOF
 set -e
 cd $RELEASE_DIR
@@ -174,10 +174,8 @@ echo '=== npm ci ==='
 npm ci --no-audit --no-fund
 echo '=== build ==='
 npm run build
-echo '=== migrate ==='
-NODE_ENV=production DATA_DIR=$DEPLOY_DIR/data DATABASE_URL=$DEPLOY_DIR/data/learngrow.db npx drizzle-kit migrate --config=drizzle.config.ts
 EOF
-ok "依赖安装、前端构建、数据库迁移完成"
+ok "依赖安装、前端构建完成"
 
 # ---------- Step 5: 原子切换 ----------
 info "Step 5/7: 原子切换 symlink"
