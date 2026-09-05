@@ -99,6 +99,7 @@ export default function CheckinDetail() {
   const [loadingReview, setLoadingReview] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [showReviewModal, setShowReviewModal] = useState<{ record: any; action: 'approve' | 'reject' } | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // 徽章相关
   const [badges, setBadges] = useState<any[]>([]);
@@ -1030,9 +1031,18 @@ export default function CheckinDetail() {
                     <div className="t-caption mb-2 text-text-tertiary">{r.checkin_date}</div>
                     {r.note && <p className="t-body mb-2 text-text-secondary">{r.note}</p>}
                     {r.image_url && (
-                      <div className="relative w-24 h-24 rounded-lg border border-border-subtle overflow-hidden shrink-0">
+                      <div
+                        className="relative w-24 h-24 rounded-lg border border-border-subtle overflow-hidden shrink-0 cursor-zoom-in"
+                        onClick={() => {
+                          const url = r.image_url.startsWith('/uploads/')
+                            ? r.image_url.replace('/uploads/', '/api/uploads/')
+                            : r.image_url;
+                          setPreviewImage(url);
+                        }}
+                        title="点击查看大图"
+                      >
                         <img
-                          src={r.image_url}
+                          src={r.image_url.startsWith('/uploads/') ? r.image_url.replace('/uploads/', '/api/uploads/') : r.image_url}
                           alt="打卡图片"
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -1480,6 +1490,23 @@ export default function CheckinDetail() {
                 ? '此操作将记录到打卡日志中'
                 : '此操作不可撤销'}
             </p>
+          </div>
+        </Modal>
+      )}
+
+      {previewImage && (
+        <Modal
+          isOpen={!!previewImage}
+          onClose={() => setPreviewImage(null)}
+          title="打卡图片"
+          size="lg"
+        >
+          <div className="flex items-center justify-center">
+            <img
+              src={previewImage}
+              alt="打卡图片预览"
+              className="max-w-full max-h-[70vh] object-contain rounded-lg"
+            />
           </div>
         </Modal>
       )}
