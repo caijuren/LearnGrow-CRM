@@ -10,7 +10,8 @@ import { z } from 'zod';
 import { adminOnly, authMiddleware, JWT_SECRET, type AuthUser } from './services/auth.js';
 import { AUTO_BACKUP_TIME, backupsDir, createBackup, dataDir, isValidBackupName, listBackups, scanMediaReferences } from './services/backup.js';
 import { getIntSetting, grantCheckinPoints, grantOrderPoints, grantPoints, revokeByRef } from './services/points.js';
-import { getEventShareLink } from './services/wx-share.js';
+import { getEventShareLink, getWxAccessToken } from './services/wx-share.js';
+import { generateEventShareCard } from './services/share-card.js';
 import db from './db.js';
 import bcrypt from 'bcryptjs';
 import path from 'path';
@@ -2183,6 +2184,21 @@ app.get('/api/wx/checkin-events/:id/share-link', async (request: any, reply: any
   }
 });
 
+app.get('/api/wx/checkin-events/:id/share-card', async (request: any, reply: any) => {
+  const eventId = parseInt(request.params.id);
+  const event = db.prepare('SELECT * FROM checkin_events WHERE id = ? AND is_deleted = 0').get(eventId) as any;
+  if (!event) return reply.code(404).send({ success: false, error: '打卡活动不存在' });
+
+  try {
+    const imageUrl = await generateEventShareCard(event);
+    if (!imageUrl) return reply.code(502).send({ success: false, error: '分享卡片生成失败' });
+    return ok({ image_url: imageUrl });
+  } catch (e: any) {
+    request.log.error({ err: e }, '生成分享卡片失败');
+    return reply.code(502).send({ success: false, error: e.message || '分享卡片生成失败' });
+  }
+});
+
 app.post('/api/wx/checkin', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
   const { event_id, note, image_url, image_hash, checkin_date, display_name, media_type } = request.body || {};
@@ -2738,34 +2754,6 @@ app.post('/api/wx/upload-image', { preHandler: [wxAuthMiddleware] }, async (requ
     } : null
   });
 });
-
-async function getWxAccessToken() {
-  const appId = process.env.WX_APPID;
-  const appSecret = process.env.WX_SECRET || process.env.WX_APPSECRET;
-  if (!appId || !appSecret) return null;
-
-  const cached = db.prepare("SELECT value FROM settings WHERE key = 'wx_access_token'").get() as any;
-  if (cached) {
-    const tokenData = JSON.parse(cached.value);
-    if (tokenData.expires_at > Date.now()) return tokenData.access_token;
-  }
-
-  try {
-    const res = await fetch(`https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appId}&secret=${appSecret}`);
-    const data: any = await res.json();
-    if (data.access_token) {
-      const tokenData = {
-        access_token: data.access_token,
-        expires_at: Date.now() + (data.expires_in - 300) * 1000
-      };
-      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('wx_access_token', ?)").run(JSON.stringify(tokenData));
-      return data.access_token;
-    }
-  } catch (e) {
-    console.error('获取微信access_token失败', e);
-  }
-  return null;
-}
 
 async function sendWxSubscribeMessage(openid: string, templateId: string, data: any, page?: string) {
   const accessToken = await getWxAccessToken();

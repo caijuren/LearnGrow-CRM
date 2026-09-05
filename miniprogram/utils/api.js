@@ -211,6 +211,10 @@ function getEventShareLink(eventId) {
   return request({ url: `/api/wx/checkin-events/${eventId}/share-link` });
 }
 
+function getEventShareCard(eventId) {
+  return request({ url: `/api/wx/checkin-events/${eventId}/share-card` });
+}
+
 function getMyBadges() {
   return request({ url: '/api/wx/my-badges' });
 }
@@ -265,6 +269,7 @@ module.exports = {
   getEventMaterials,
   getEventBadges,
   getEventShareLink,
+  getEventShareCard,
   getMyBadges,
   getMyPoints,
   formatDate,

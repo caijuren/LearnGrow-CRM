@@ -29,6 +29,7 @@ Page({
     shareLink: '',
     sharingLink: false,
     shareExpireText: '',
+    shareCardUrl: '',
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false,
     isJoined: false,
@@ -58,8 +59,20 @@ Page({
 
   onLoad(options) {
     wx.showShareMenu({ withShareTicket: true });
+    let eventId = options.id ? parseInt(options.id) : null;
+    // 通过小程序码扫码进入：scene 携带 id=活动ID
+    if (!eventId && options.scene) {
+      let scene = options.scene;
+      try { scene = decodeURIComponent(scene); } catch (e) {}
+      const match = String(scene).match(/(?:^|&)id=(\d+)/);
+      if (match) eventId = parseInt(match[1], 10);
+    }
+    if (!eventId) {
+      this.setData({ eventNotFound: true });
+      return;
+    }
     this.setData({ 
-      eventId: parseInt(options.id),
+      eventId,
       isLoggedIn: app.checkLogin()
     });
     this.loadData();
@@ -178,8 +191,21 @@ Page({
         reminder,
         brokenAvatars: {}
       });
+
+      this.loadShareCard();
     } catch (e) {
       this.setData({ networkError: true });
+    }
+  },
+
+  async loadShareCard() {
+    try {
+      const res = await api.getEventShareCard(this.data.eventId);
+      if (res && res.image_url) {
+        this.setData({ shareCardUrl: this.data.baseUrl + res.image_url });
+      }
+    } catch (e) {
+      // 分享卡片生成失败时静默回退到品牌图
     }
   },
 
@@ -853,10 +879,11 @@ Page({
 
   onShareAppMessage() {
     const event = this.data.event;
+    const imageUrl = this.data.shareCardUrl || `${this.data.baseUrl}/uploads/share_brand.png`;
     return {
       title: event ? `我正在坚持「${event.name}」打卡` : '一起来打卡',
       path: `/pages/event-detail/event-detail?id=${this.data.eventId}`,
-      imageUrl: `${this.data.baseUrl}/uploads/share_brand.png`,
+      imageUrl,
     };
   }
 });
