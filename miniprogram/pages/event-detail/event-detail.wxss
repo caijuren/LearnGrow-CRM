@@ -4,11 +4,12 @@
 
 .event-hero {
   background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-  margin: -32rpx -28rpx 32rpx;
-  padding: 80rpx 40rpx 56rpx;
-  border-radius: 0 0 40rpx 40rpx;
+  margin: 0 0 32rpx;
+  padding: 48rpx 40rpx;
+  border-radius: 28rpx;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 12rpx 40rpx rgba(244, 63, 122, 0.28);
 }
 
 .event-hero::before {

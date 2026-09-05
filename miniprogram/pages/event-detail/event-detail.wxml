@@ -190,12 +190,10 @@
         <view wx:for="{{calendarDays}}" wx:key="date" bindtap="selectMakeupDate" data-date="{{item.date}}" data-can-makeup="{{item.can_makeup}}" class="calendar-day {{item.checked ? 'checked' : ''}} {{item.status === 'pending' ? 'pending' : ''}} {{item.status === 'rejected' ? 'rejected' : ''}} {{item.can_makeup ? 'can-makeup' : ''}} {{item.missed && !item.can_makeup ? 'missed' : ''}} {{item.isToday ? 'today' : ''}} {{!item.inRange ? 'disabled' : ''}}">
           <text>{{item.day}}</text>
           <text wx:if="{{item.can_makeup}}" class="day-tag">补</text>
-          <text wx:elif="{{item.status === 'pending'}}" class="day-tag">审</text>
         </view>
       </view>
       <view class="calendar-legend">
-        <view><text class="legend-dot checked-dot"></text>已通过</view>
-        <view><text class="legend-dot pending-dot"></text>待审核</view>
+        <view><text class="legend-dot checked-dot"></text>已打卡</view>
         <view><text class="legend-dot makeup-dot"></text>可补卡</view>
         <view><text class="legend-dot missed-dot"></text>已错过</view>
       </view>

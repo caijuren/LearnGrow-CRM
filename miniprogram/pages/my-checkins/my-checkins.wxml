@@ -5,34 +5,26 @@
       <text class="back-text">返回</text>
     </view>
     <view class="text-xl font-bold">我的打卡</view>
-    <view class="text-secondary mt-1">查看所有参与的打卡活动</view>
+    <view class="text-secondary mt-1">每一次坚持都算数</view>
   </view>
 
   <!-- 首次加载骨架屏 -->
   <block wx:if="{{isLoggedIn && loading && !loadedOnce}}">
     <view class="skeleton-card">
       <view class="flex-between">
-        <view class="skeleton-line sk-w-60"></view>
-        <view class="skeleton-pill"></view>
+        <view class="skeleton-line sk-w-40"></view>
+        <view class="skeleton-line sk-w-30"></view>
       </view>
-      <view class="skeleton-line sk-w-40 mt-2"></view>
-      <view class="skeleton-actions">
-        <view class="skeleton-btn sk-w-30"></view>
-        <view class="skeleton-btn sk-w-30"></view>
-        <view class="skeleton-btn sk-w-30"></view>
-      </view>
+      <view class="skeleton-line sk-w-80 mt-3"></view>
+      <view class="skeleton-line sk-w-60 mt-2"></view>
     </view>
     <view class="skeleton-card">
       <view class="flex-between">
-        <view class="skeleton-line sk-w-60"></view>
-        <view class="skeleton-pill"></view>
+        <view class="skeleton-line sk-w-40"></view>
+        <view class="skeleton-line sk-w-30"></view>
       </view>
-      <view class="skeleton-line sk-w-40 mt-2"></view>
-      <view class="skeleton-actions">
-        <view class="skeleton-btn sk-w-30"></view>
-        <view class="skeleton-btn sk-w-30"></view>
-        <view class="skeleton-btn sk-w-30"></view>
-      </view>
+      <view class="skeleton-line sk-w-80 mt-3"></view>
+      <view class="skeleton-line sk-w-60 mt-2"></view>
     </view>
   </block>
 
@@ -45,59 +37,42 @@
     </view>
   </view>
 
-  <view wx:if="{{isLoggedIn && checkins.length === 0 && !loading}}" class="empty">
-    <view class="empty-icon">空</view>
-    <view class="empty-title">还没有参加任何打卡活动</view>
-    <view class="empty-desc">去发现一些感兴趣的活动吧</view>
-    <navigator url="/pages/index/index" open-type="switchTab" class="mt-4">
-      <button class="btn-primary btn-small">去看看活动</button>
-    </navigator>
-  </view>
-
-  <view wx:for="{{checkins}}" wx:key="id" class="checkin-card card" bindtap="goToDetail" data-id="{{item.event.id}}">
-    <view class="flex-between items-start mb-3">
-      <view class="flex-1">
-        <view class="text-lg font-bold">{{item.event.name}}</view>
-        <view class="text-secondary mt-1 event-date">
-          {{item.event.start_date}} ~ {{item.event.end_date}}
-        </view>
-      </view>
-      <view wx:if="{{item.event.status === 'active'}}" class="badge badge-success">进行中</view>
-      <view wx:else class="badge badge-muted">已结束</view>
-    </view>
-
-    <view class="stats-row flex gap-2 mb-3">
+  <block wx:if="{{isLoggedIn && !loading}}">
+    <!-- 统计概览 -->
+    <view class="stats-overview">
       <view class="stat-box">
-        <view class="stat-num stat-num-primary font-bold">{{item.checkin_days}}</view>
+        <view class="stat-num stat-num-primary font-bold">{{stats.totalDays}}</view>
         <view class="stat-label">累计打卡</view>
       </view>
       <view class="stat-box">
-        <view class="stat-num stat-num-warning font-bold">{{item.current_streak}}</view>
-        <view class="stat-label">当前连续</view>
-      </view>
-      <view class="stat-box">
-        <view class="stat-num stat-num-success font-bold">{{item.max_streak}}</view>
+        <view class="stat-num stat-num-warning font-bold">{{stats.maxStreak}}</view>
         <view class="stat-label">最长连续</view>
       </view>
+      <view class="stat-box">
+        <view class="stat-num stat-num-success font-bold">{{stats.totalEvents}}</view>
+        <view class="stat-label">参与活动</view>
+      </view>
     </view>
 
-    <view class="mini-calendar">
-      <view wx:for="{{item.calendar}}" wx:for-item="day" wx:key="date" class="mini-day {{day.checked ? 'checked' : ''}}"></view>
+    <!-- 空状态 -->
+    <view wx:if="{{feed.length === 0}}" class="empty">
+      <view class="empty-icon">空</view>
+      <view class="empty-title">还没有打卡记录</view>
+      <view class="empty-desc">参加活动并完成打卡后，记录会显示在这里</view>
     </view>
 
-    <view wx:if="{{item.records.length > 0}}" class="recent-records mt-3">
-      <view class="recent-records-title text-secondary mb-2">最近打卡</view>
-      <scroll-view scroll-x class="records-scroll">
-        <view class="records-list flex gap-2">
-          <view wx:for="{{item.records}}" wx:for-item="record" wx:key="id" class="record-item">
-            <image wx:if="{{record.image_url && record.media_type !== 'video'}}" class="record-image" src="{{baseUrl}}{{record.image_url}}" mode="aspectFill" />
-            <view wx:elif="{{record.image_url}}" class="record-placeholder record-video">▶</view>
-            <view wx:else class="record-placeholder">✓</view>
-            <view class="record-date">{{record.checkin_date.slice(5)}}</view>
-          </view>
-        </view>
-      </scroll-view>
+    <!-- 打卡时间流 -->
+    <view wx:for="{{feed}}" wx:key="id" class="timeline-item card" bindtap="goToEvent" data-id="{{item.event_id}}">
+      <view class="timeline-head">
+        <view class="timeline-event-name">{{item.event_name}}</view>
+        <view class="timeline-date">{{item.dateText}}</view>
+      </view>
+      <view wx:if="{{item.is_makeup}}" class="makeup-tag">补卡</view>
+      <view wx:if="{{item.note}}" class="timeline-note">{{item.note}}</view>
+      <block wx:if="{{item.image_url}}">
+        <image wx:if="{{item.media_type !== 'video'}}" class="timeline-image" src="{{baseUrl}}{{item.image_url}}" mode="aspectFill" />
+        <video wx:else class="timeline-video" src="{{baseUrl}}{{item.image_url}}" object-fit="cover" controls="{{true}}" />
+      </block>
     </view>
-  </view>
-
+  </block>
 </view>

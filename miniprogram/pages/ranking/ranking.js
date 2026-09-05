@@ -9,6 +9,7 @@ Page({
     eventNames: [],
     eventIndex: 0,
     ranking: [],
+    listRanking: [],
     myRank: null,
     loading: true,
     isLoggedIn: false,
@@ -118,7 +119,9 @@ Page({
           gap_to_previous: previous ? Math.max(0, previous.checkin_days - ranking[myIndex].checkin_days) : 0
         };
       }
-      this.setData({ ranking, myRank, brokenAvatars: {} });
+      // 前三名由领奖台展示，列表从第 4 名开始，避免重复
+      const listRanking = ranking.slice(3);
+      this.setData({ ranking, listRanking, myRank, brokenAvatars: {} });
     } catch (e) {
       wx.showToast({ title: '排行榜加载失败', icon: 'none' });
     } finally {
