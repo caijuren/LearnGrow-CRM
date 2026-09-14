@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, MessageCircle, BarChart3, Package,
-  GraduationCap, Library, Bell, Receipt, UserCog, Radio,
+  GraduationCap, Library, Bell,
   ChevronDown, Settings, LogOut, User, Sparkles, Sun, Moon,
 } from 'lucide-react';
 import { useStore } from '@/store';
@@ -54,10 +54,9 @@ export const Layout: React.FC = () => {
       ],
     },
     {
-      label: '交易管理',
+      label: '商品',
       items: [
         { to: '/products', label: '商品管理', icon: <Package size={16} strokeWidth={1.8} /> },
-        { to: '/orders', label: '订单管理', icon: <Receipt size={16} strokeWidth={1.8} /> },
       ],
     },
     {
@@ -68,15 +67,8 @@ export const Layout: React.FC = () => {
       ],
     },
     {
-      label: '直播',
-      items: [
-        { to: '/live', label: '直播工作台', icon: <Radio size={16} strokeWidth={1.8} /> },
-      ],
-    },
-    {
       label: '系统',
       items: [
-        { to: '/users', label: '账号管理', icon: <UserCog size={16} strokeWidth={1.8} /> },
         { to: '/settings', label: '设置', icon: <Settings size={16} strokeWidth={1.8} /> },
       ],
     },

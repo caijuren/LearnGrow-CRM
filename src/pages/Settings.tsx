@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { DatabaseBackup, Download, Loader2, RefreshCw, Clock, HardDriveDownload, Coins, Save } from 'lucide-react';
+import { DatabaseBackup, Download, Loader2, RefreshCw, Clock, HardDriveDownload, Coins, Save, UserCog, ArrowRight } from 'lucide-react';
 import { fetchBackups, createBackup, downloadBackup, type BackupFileInfo } from '@/lib/api';
 import { fetchPointsConfig, updatePointsConfig, resetPoints } from '@/lib/api';
 import type { PointsConfig } from '../../shared/types';
@@ -136,6 +137,14 @@ export default function Settings() {
             <h1 className="text-[28px] font-bold text-text-primary tracking-tight">系统设置</h1>
             <p className="text-sm text-text-tertiary mt-1">积分规则与数据备份</p>
           </motion.div>
+          <NavLink
+            to="/users"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover border border-border-subtle/50 transition-colors"
+          >
+            <UserCog size={16} strokeWidth={1.8} />
+            <span>账号管理</span>
+            <ArrowRight size={14} strokeWidth={1.8} />
+          </NavLink>
         </motion.div>
 
         {error && (

@@ -11,7 +11,6 @@ const GroupManagement = lazy(() => import('@/pages/GroupManagement'));
 const ProductList = lazy(() => import('@/pages/ProductList'));
 const OrderList = lazy(() => import('@/pages/OrderList'));
 const LearningPathConfig = lazy(() => import('@/pages/LearningPathConfig'));
-const LiveDesk = lazy(() => import('@/pages/LiveDesk'));
 const UserManagement = lazy(() => import('@/pages/UserManagement'));
 const MaterialLibrary = lazy(() => import('@/pages/MaterialLibrary'));
 const Login = lazy(() => import('@/pages/Login'));
@@ -78,9 +77,9 @@ export default function App() {
             <Route path="wx-users/:id/children/:childId" element={<ChildDetail />} />
             <Route path="groups" element={<GroupManagement />} />
             <Route path="products" element={<ProductList />} />
-            <Route path="orders" element={<OrderList />} />
+            {/* 订单管理暂隐藏，保留路由方便后续恢复 */}
+            {/* <Route path="orders" element={<OrderList />} /> */}
             <Route path="learning-paths" element={<LearningPathConfig />} />
-            <Route path="live" element={<LiveDesk />} />
             <Route path="users" element={<UserManagement />} />
             <Route path="customers" element={<LegacyCustomerRedirect />} />
             <Route path="customers/:id/*" element={<LegacyCustomerRedirect />} />
