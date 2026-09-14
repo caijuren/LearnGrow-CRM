@@ -464,7 +464,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
       SELECT u.id, COUNT(r.id) as cnt
       FROM wx_users u
       LEFT JOIN checkin_participants p ON p.wx_user_id = u.id
-      LEFT JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+      LEFT JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
         AND date(r.created_at) >= date('now', '-30 days')
       WHERE u.deleted_at IS NULL
       GROUP BY u.id
@@ -491,13 +491,14 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
 
   // 热门打卡活动排行
   const popularActivities = db.prepare(`
-    SELECT a.name, 
+    SELECT a.name,
            COUNT(DISTINCT p.wx_user_id) as participant_count,
            COUNT(r.id) as checkin_count,
            ROUND(CAST(COUNT(r.id) AS FLOAT) / MAX(COUNT(DISTINCT p.wx_user_id), 1), 1) as avg_checkins_per_user
     FROM checkin_events a
     JOIN checkin_participants p ON p.event_id = a.id
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
+    WHERE a.is_deleted = 0
     GROUP BY a.id
     ORDER BY checkin_count DESC
     LIMIT 10
