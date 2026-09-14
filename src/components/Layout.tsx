@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, MessageCircle, BarChart3, Package,
-  GraduationCap, Library, Bell, Search,
+  GraduationCap, Library, Bell, Receipt, UserCog, Radio,
   ChevronDown, Settings, LogOut, User, Sparkles, Sun, Moon,
 } from 'lucide-react';
 import { useStore } from '@/store';
@@ -20,41 +20,7 @@ interface NavSection {
   items: NavItem[];
 }
 
-const navSections: NavSection[] = [
-  {
-    label: '概览',
-    items: [
-      { to: '/', label: '驾驶舱', icon: <LayoutDashboard size={16} strokeWidth={1.8} /> },
-    ],
-  },
-  {
-    label: '用户运营',
-    items: [
-      { to: '/wx-users', label: '微信用户', icon: <Users size={16} strokeWidth={1.8} /> },
-      { to: '/groups', label: '微信群管理', icon: <MessageCircle size={16} strokeWidth={1.8} /> },
-      { to: '/checkin', label: '打卡统计', icon: <BarChart3 size={16} strokeWidth={1.8} /> },
-    ],
-  },
-  {
-    label: '交易管理',
-    items: [
-      { to: '/products', label: '商品管理', icon: <Package size={16} strokeWidth={1.8} /> },
-    ],
-  },
-  {
-    label: '内容中心',
-    items: [
-      { to: '/learning-paths', label: '学习路径', icon: <GraduationCap size={16} strokeWidth={1.8} /> },
-      { to: '/materials', label: '资料库', icon: <Library size={16} strokeWidth={1.8} /> },
-    ],
-  },
-  {
-    label: '系统',
-    items: [
-      { to: '/settings', label: '设置', icon: <Settings size={16} strokeWidth={1.8} /> },
-    ],
-  },
-];
+// navSections 在 Layout 组件内基于 dashboard 动态生成（含待审角标）
 
 export const Layout: React.FC = () => {
   const navigate = useNavigate();
@@ -64,7 +30,57 @@ export const Layout: React.FC = () => {
     const saved = localStorage.getItem('theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'light';
   });
-  const { isAuthenticated, restoreAuth, logout } = useStore();
+  const { isAuthenticated, restoreAuth, logout, currentUser, dashboard, loadDashboard } = useStore();
+
+  // 确保待审角标数据可用（驾驶舱数据含待审核打卡数）
+  useEffect(() => {
+    if (!dashboard) loadDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const navSections: NavSection[] = [
+    {
+      label: '概览',
+      items: [
+        { to: '/', label: '驾驶舱', icon: <LayoutDashboard size={16} strokeWidth={1.8} /> },
+      ],
+    },
+    {
+      label: '用户运营',
+      items: [
+        { to: '/wx-users', label: '微信用户', icon: <Users size={16} strokeWidth={1.8} /> },
+        { to: '/groups', label: '微信群管理', icon: <MessageCircle size={16} strokeWidth={1.8} /> },
+        { to: '/checkin', label: '打卡统计', icon: <BarChart3 size={16} strokeWidth={1.8} />, badge: dashboard?.pendingCheckinReviews ? String(dashboard.pendingCheckinReviews) : undefined },
+      ],
+    },
+    {
+      label: '交易管理',
+      items: [
+        { to: '/products', label: '商品管理', icon: <Package size={16} strokeWidth={1.8} /> },
+        { to: '/orders', label: '订单管理', icon: <Receipt size={16} strokeWidth={1.8} /> },
+      ],
+    },
+    {
+      label: '内容中心',
+      items: [
+        { to: '/learning-paths', label: '学习路径', icon: <GraduationCap size={16} strokeWidth={1.8} /> },
+        { to: '/materials', label: '资料库', icon: <Library size={16} strokeWidth={1.8} /> },
+      ],
+    },
+    {
+      label: '直播',
+      items: [
+        { to: '/live', label: '直播工作台', icon: <Radio size={16} strokeWidth={1.8} /> },
+      ],
+    },
+    {
+      label: '系统',
+      items: [
+        { to: '/users', label: '账号管理', icon: <UserCog size={16} strokeWidth={1.8} /> },
+        { to: '/settings', label: '设置', icon: <Settings size={16} strokeWidth={1.8} /> },
+      ],
+    },
+  ];
 
   useEffect(() => {
     const root = document.documentElement;
@@ -140,19 +156,7 @@ export const Layout: React.FC = () => {
         <header className="h-16 flex items-center justify-between px-6 border-b border-border-subtle/50
                            glass-strong sticky top-0 z-30">
           <div className="flex items-center gap-4">
-            <div className="relative w-80 group">
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md bg-bg-subtle flex items-center justify-center group-focus-within:bg-primary-soft transition-colors">
-                <Search size={14} strokeWidth={1.8} className="text-text-tertiary group-focus-within:text-primary transition-colors" />
-              </div>
-              <input
-                type="text"
-                placeholder="搜索用户、商品、订单..."
-                className="w-full h-10 pl-10 pr-3 rounded-xl bg-bg-subtle text-sm text-text-primary
-                           placeholder:text-text-tertiary border border-transparent
-                           focus:outline-none focus:bg-bg-surface focus:border-border-default focus:ring-2 focus:ring-primary/10
-                           transition-all duration-200 ease-out"
-              />
-            </div>
+            <span className="text-sm text-text-secondary font-medium">运营工作台</span>
           </div>
 
           <div className="flex items-center gap-1 pl-3 border-l border-border-subtle/50">
@@ -163,9 +167,8 @@ export const Layout: React.FC = () => {
             >
               {theme === 'dark' ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
             </button>
-            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all relative" aria-label="通知">
+            <button className="w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all" aria-label="通知">
               <Bell size={16} strokeWidth={1.8} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full ring-2 ring-bg-surface" />
             </button>
 
             <div className="relative ml-1">
@@ -175,11 +178,11 @@ export const Layout: React.FC = () => {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
               >
                 <div className="w-8 h-8 rounded-lg gradient-brand flex items-center justify-center text-white text-sm font-semibold shadow-glow">
-                  A
+                  {(currentUser?.display_name || currentUser?.username || 'A').charAt(0).toUpperCase()}
                 </div>
                 <div className="hidden md:block text-left">
-                  <div className="text-sm font-medium text-text-primary leading-none">管理员</div>
-                  <div className="text-[11px] text-text-tertiary mt-0.5">超级管理员</div>
+                  <div className="text-sm font-medium text-text-primary leading-none">{currentUser?.display_name || currentUser?.username || '管理员'}</div>
+                  <div className="text-[11px] text-text-tertiary mt-0.5">{currentUser?.role === 'admin' ? '超级管理员' : currentUser?.role === 'assistant' ? '运营助理' : '用户'}</div>
                 </div>
                 <ChevronDown size={14} strokeWidth={1.8} className={`text-text-tertiary hidden md:block transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -195,8 +198,8 @@ export const Layout: React.FC = () => {
                     className="dropdown absolute right-0 top-full mt-2 z-20 min-w-[200px]"
                   >
                     <div className="px-3 py-3 border-b border-border-subtle/50">
-                      <div className="text-sm font-medium text-text-primary">管理员</div>
-                      <div className="text-xs text-text-tertiary mt-0.5">admin@example.com</div>
+                      <div className="text-sm font-medium text-text-primary">{currentUser?.display_name || currentUser?.username || '管理员'}</div>
+                      <div className="text-xs text-text-tertiary mt-0.5">{currentUser?.username || '未登录'}</div>
                     </div>
                     <div className="py-1">
                       <button className="dropdown-item w-full text-left" onClick={() => { setUserMenuOpen(false); }}>

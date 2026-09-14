@@ -1,7 +1,7 @@
 <view class="login-container">
   <view class="login-header">
-    <view class="logo">源</view>
-    <view class="title">源来是糖</view>
+    <view class="logo">乐</view>
+    <view class="title">乐学长打卡</view>
     <view class="subtitle">每天坚持一点点，好习惯自然长出来</view>
     <view class="login-tags">
       <view class="login-tag">打卡成长</view>

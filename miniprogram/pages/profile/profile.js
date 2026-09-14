@@ -209,6 +209,15 @@ Page({
     wx.navigateTo({ url: '/pages/login/login' });
   },
 
+  showAbout() {
+    wx.showModal({
+      title: '关于「乐学长打卡」',
+      content: '「乐学长打卡」是面向家庭的成长打卡小程序，家长可为孩子创建或参与打卡活动，记录每日打卡，查看排行榜，积累积分与徽章，帮助孩子养成坚持的好习惯。\n\n当前版本：v' + this.data.appVersion,
+      showCancel: false,
+      confirmText: '知道了'
+    });
+  },
+
   handleLogout() {
     wx.showModal({
       title: '提示',

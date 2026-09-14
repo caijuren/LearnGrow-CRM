@@ -241,6 +241,7 @@ export const checkinEvents = sqliteTable('checkin_events', {
   startDate: text('start_date').notNull(),
   endDate: text('end_date').notNull(),
   signupDeadline: text('signup_deadline'),
+  signupDeadlineDays: integer('signup_deadline_days').notNull().default(0),
   requiredText: text('required_text'),
   rewardRules: text('reward_rules'),
   pointsPerCheckin: integer('points_per_checkin'),
@@ -250,6 +251,14 @@ export const checkinEvents = sqliteTable('checkin_events', {
   makeupRequiresReview: integer('makeup_requires_review', { mode: 'boolean' }).notNull().default(true),
   makeupCountsForStreak: integer('makeup_counts_for_streak', { mode: 'boolean' }).notNull().default(false),
   status: text('status', { enum: ['active', 'ended'] }).notNull().default('active'),
+  // v3.4.0 循环活动自动创建
+  isRecurring: integer('is_recurring', { mode: 'boolean' }).notNull().default(false),
+  cycleAdvanceDays: integer('cycle_advance_days').notNull().default(2), // v3.4.2 提前多少天创建下一轮
+  recurringDays: integer('recurring_days').notNull().default(10),
+  maxCycles: integer('max_cycles').notNull().default(0), // 0 = 无限
+  cycleIndex: integer('cycle_index').notNull().default(1),
+  sourceEventId: integer('source_event_id'),
+  lastCycleTriggeredAt: text('last_cycle_triggered_at'),
   isDeleted: integer('is_deleted', { mode: 'boolean' }).notNull().default(false),
   deletedAt: text('deleted_at'),
   createdAt: text('created_at').notNull().default('(datetime(\'now\'))'),

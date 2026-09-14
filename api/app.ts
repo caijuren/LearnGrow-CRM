@@ -132,7 +132,7 @@ function getParentName(name: string | null | undefined): string {
 function getWxUserSuggestions(wxUserId: number, user: WxUser): CustomerSuggestion[] {
   const suggestions: CustomerSuggestion[] = [];
   const pname = getParentName(displayName(user));
-  const orders = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier, p.related_product_ids FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC`).all(wxUserId) as any[];
+  const orders = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier, p.related_product_ids FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? AND o.deleted_at IS NULL ORDER BY o.purchase_date DESC`).all(wxUserId) as any[];
   const allProducts = (db.prepare('SELECT * FROM products WHERE is_on_sale = 1').all() as any[]).map(mapProduct);
 
   if (orders.length === 0) {
@@ -163,7 +163,7 @@ function getWxUserSuggestions(wxUserId: number, user: WxUser): CustomerSuggestio
       const daysSinceFollow = Math.floor((Date.now() - new Date(user.last_follow_date).getTime()) / 86400000);
       if (daysSinceFollow >= 15) suggestions.push({ type: 'reconnect', title: '好久没聊了，打个招呼', reason: `已经${Math.floor(daysSinceFollow)}天没联系了，问问孩子最近学习情况`, script: `${pname}好久没聊啦~孩子最近学习咋样？有没有遇到什么问题？我这边新到了点好资料，有空来直播间看看呀！` });
     }
-    const consideringFollowUp = db.prepare(`SELECT * FROM follow_ups WHERE wx_user_id = ? AND result = 'considering' AND date >= date('now', '-7 days') ORDER BY date DESC LIMIT 1`).get(wxUserId) as any;
+    const consideringFollowUp = db.prepare(`SELECT * FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL AND result = 'considering' AND date >= date('now', '-7 days') ORDER BY date DESC LIMIT 1`).get(wxUserId) as any;
     if (consideringFollowUp) {
       const daysSince = Math.floor((Date.now() - new Date(consideringFollowUp.date).getTime()) / 86400000);
       if (daysSince >= 3) suggestions.push({ type: 'considering', title: '上次说考虑的，回访一下', reason: `${Math.floor(daysSince)}天前说"考虑一下"，该回访了`, script: `${pname}，上次你说考虑的那个资料，现在想得咋样啦？孩子学习不等人，有啥疑问随时问我哈~` });
@@ -201,7 +201,7 @@ function needFollowClause(): { sql: string; params: string[] } {
 function getTodos(): TodoItem[] {
   const todos: TodoItem[] = [];
   const today = bjtToday();
-  const users = (db.prepare('SELECT * FROM wx_users').all() as any[]).map(mapWxUser);
+  const users = (db.prepare('SELECT * FROM wx_users WHERE deleted_at IS NULL').all() as any[]).map(mapWxUser);
 
   for (const u of users) {
     if (u.importance === 'vip') {
@@ -211,10 +211,10 @@ function getTodos(): TodoItem[] {
     }
   }
 
-  const reminders = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE f.next_follow_date IS NOT NULL AND date(f.next_follow_date) <= date(?) ORDER BY f.next_follow_date ASC`).all(today) as any[];
+  const reminders = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE u.deleted_at IS NULL AND f.next_follow_date IS NOT NULL AND date(f.next_follow_date) <= date(?) ORDER BY f.next_follow_date ASC`).all(today) as any[];
   for (const r of reminders) todos.push({ id: `reminder_${r.id}`, type: 'reminder', priority: 'high', wx_user_id: r.wx_user_id, wx_user_name: r.user_name, title: `${r.user_name} - 跟进提醒`, description: r.content, due_date: r.next_follow_date, follow_up_id: r.id });
 
-  const considering = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE f.result = 'considering' AND julianday('now') - julianday(f.date) >= 3 AND NOT EXISTS (SELECT 1 FROM follow_ups f2 WHERE f2.wx_user_id = f.wx_user_id AND f2.date > f.date)`).all() as any[];
+  const considering = db.prepare(`SELECT f.*, COALESCE(NULLIF(u.name, ''), u.nickname, u.child_name, '') AS user_name FROM follow_ups f JOIN wx_users u ON f.wx_user_id = u.id WHERE u.deleted_at IS NULL AND f.result = 'considering' AND julianday('now') - julianday(f.date) >= 3 AND NOT EXISTS (SELECT 1 FROM follow_ups f2 WHERE f2.wx_user_id = f.wx_user_id AND f2.date > f.date)`).all() as any[];
   for (const r of considering) {
     if (!todos.some(t => t.wx_user_id === r.wx_user_id && t.type === 'considering')) todos.push({ id: `considering_${r.id}`, type: 'considering', priority: 'medium', wx_user_id: r.wx_user_id, wx_user_name: r.user_name, title: `${r.user_name} - 说考虑中，该回访了`, description: r.content, follow_up_id: r.id, suggested_script: `${getParentName(r.user_name)}，上次你说考虑的那个资料，现在想得咋样啦？` });
   }
@@ -232,8 +232,8 @@ function getTodos(): TodoItem[] {
 }
 
 function updateWxUserStats(wxUserId: number) {
-  const orders = db.prepare("SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt, MAX(purchase_date) as last_date FROM orders WHERE wx_user_id = ?").get(wxUserId) as any;
-  const lastFollow = db.prepare("SELECT MAX(date) as last_date FROM follow_ups WHERE wx_user_id = ?").get(wxUserId) as any;
+  const orders = db.prepare("SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as cnt, MAX(purchase_date) as last_date FROM orders WHERE wx_user_id = ? AND deleted_at IS NULL").get(wxUserId) as any;
+  const lastFollow = db.prepare("SELECT MAX(date) as last_date FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL").get(wxUserId) as any;
   db.prepare("UPDATE wx_users SET total_spent = ?, order_count = ?, last_order_date = ?, last_follow_date = ?, updated_at = datetime('now') WHERE id = ?").run(orders.total || 0, orders.cnt || 0, orders.last_date || null, lastFollow.last_date || null, wxUserId);
 }
 
@@ -412,20 +412,20 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const thirtyDaysAgo = bjtDaysAgo(30);
 
   // 核心指标
-  const totalWxUsers = (db.prepare('SELECT COUNT(*) as c FROM wx_users').get() as any).c;
-  const todayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(today) as any).c;
-  const yesterdayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(yesterday) as any).c;
+  const totalWxUsers = (db.prepare('SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL').get() as any).c;
+  const todayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(today) as any).c;
+  const yesterdayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(yesterday) as any).c;
   
   // 打卡统计
-  const totalCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved'").get() as any).c;
-  const todayCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(today) as any).c;
-  const weekCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND checkin_date >= ?").get(sevenDaysAgo) as any).c;
+  const totalCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL").get() as any).c;
+  const todayCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND date(checkin_date) = ?").get(today) as any).c;
+  const weekCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND checkin_date >= ?").get(sevenDaysAgo) as any).c;
   
   // 活跃用户数（近 7 天有打卡的去重用户）
   const activeUsers7d = (db.prepare(`
     SELECT COUNT(DISTINCT p.wx_user_id) as c 
     FROM checkin_participants p
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
     WHERE r.checkin_date >= ?
   `).get(sevenDaysAgo) as any).c;
   
@@ -433,10 +433,10 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const todayCheckers = (db.prepare(`
     SELECT COUNT(DISTINCT p.wx_user_id) as c
     FROM checkin_participants p
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
     WHERE date(r.checkin_date) = ?
   `).get(today) as any).c;
-  const totalParticipants = (db.prepare("SELECT COUNT(DISTINCT wx_user_id) as c FROM checkin_participants").get() as any).c;
+  const totalParticipants = (db.prepare("SELECT COUNT(DISTINCT wx_user_id) as c FROM checkin_participants WHERE deleted_at IS NULL").get() as any).c;
   const checkinRate = totalParticipants > 0 ? Math.round((todayCheckers / totalParticipants) * 100 * 100) / 100 : 0;
 
   // 近 30 天趋势数据
@@ -444,26 +444,45 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const checkinTrend = [];
   for (let i = 29; i >= 0; i--) {
     const dateStr = bjtDaysAgo(i);
-    const newCount = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(dateStr) as any).c;
-    const checkinCount = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(dateStr) as any).c;
+    const newCount = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(dateStr) as any).c;
+    const checkinCount = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND date(checkin_date) = ?").get(dateStr) as any).c;
     newUserTrend.push({ date: dateStr.slice(5), count: newCount || 0 });
     checkinTrend.push({ date: dateStr.slice(5), count: checkinCount || 0 });
   }
 
-  // 用户阶段分布
-  const stageStatsRaw = db.prepare("SELECT stage, COUNT(*) as count FROM wx_users GROUP BY stage").all() as any[];
-  const allStages: CustomerStage[] = ['new_friend', 'initial_chat', 'interested', 'purchased', 'in_group', 'repurchased', 'silent'];
-  const stageStats = allStages.map(s => {
-    const found = stageStatsRaw.find(r => r.stage === s);
-    return { stage: s, count: found ? found.count : 0 };
-  });
+  // 用户活跃度分布（近 30 天打卡次数自动计算，替代手动 stage）
+  const activityRaw = db.prepare(`
+    SELECT
+      CASE
+        WHEN cnt = 0  THEN 'dormant'
+        WHEN cnt < 10 THEN 'low'
+        WHEN cnt < 20 THEN 'normal'
+        ELSE 'active'
+      END as level,
+      COUNT(*) as count
+    FROM (
+      SELECT u.id, COUNT(r.id) as cnt
+      FROM wx_users u
+      LEFT JOIN checkin_participants p ON p.wx_user_id = u.id
+      LEFT JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+        AND date(r.created_at) >= date('now', '-30 days')
+      WHERE u.deleted_at IS NULL
+      GROUP BY u.id
+    )
+    GROUP BY level
+  `).all() as { level: string; count: number }[];
+
+  const activityDistribution = (['active', 'normal', 'low', 'dormant'] as const).map(l => ({
+    level: l,
+    count: activityRaw.find(r => r.level === l)?.count || 0,
+  }));
 
   // 需跟进用户
   const needFollowWhere = needFollowClause();
   const needFollowRaw = db.prepare(`
     SELECT id, COALESCE(NULLIF(name, ''), nickname, child_name, '') as name, stage, wechat_id, wechat_account, importance, last_follow_date, next_talk_topic
     FROM wx_users
-    WHERE ${needFollowWhere.sql}
+    WHERE deleted_at IS NULL AND ${needFollowWhere.sql}
     ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
              last_follow_date IS NULL DESC,
              last_follow_date ASC
@@ -489,6 +508,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
     SELECT COALESCE(NULLIF(name, ''), nickname, child_name, '') as display_name,
            created_at, source, avatar_url
     FROM wx_users
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC
     LIMIT 5
   `).all() as any[];
@@ -518,7 +538,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
     JOIN checkin_participants p ON r.participant_id = p.id
     JOIN wx_users u ON p.wx_user_id = u.id
     JOIN checkin_events a ON p.event_id = a.id
-    WHERE date(r.checkin_date) = ?
+    WHERE r.deleted_at IS NULL AND date(r.checkin_date) = ?
     ORDER BY r.checkin_date DESC
     LIMIT 10
   `).all(today) as any[];
@@ -527,7 +547,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
   const sourceChannels = db.prepare(`
     SELECT source as channel, COUNT(*) as count
     FROM wx_users
-    WHERE source IS NOT NULL AND source != ''
+    WHERE deleted_at IS NULL AND source IS NOT NULL AND source != ''
     GROUP BY source
     ORDER BY count DESC
   `).all() as any[];
@@ -542,6 +562,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
     FROM wx_users u
     JOIN checkin_participants p ON p.wx_user_id = u.id
     JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    WHERE u.deleted_at IS NULL
     GROUP BY u.id
     ORDER BY checkin_count DESC
     LIMIT 10
@@ -575,7 +596,7 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
       checkin_rate: checkinRate,
       total_participants: totalParticipants,
     },
-    stageStats,
+    activityDistribution,
     needFollowUsers: needFollowRaw.map(c => ({
       ...c,
       stage: c.stage || 'new_friend',
@@ -589,6 +610,83 @@ app.get('/api/dashboard', { preHandler: [authMiddleware] }, async () => {
     sourceChannels,
     topCheckinUsers,
   } satisfies DashboardData);
+});
+
+// ===== 打卡时间热力图 =====
+app.get('/api/heatmap/checkin-times', { preHandler: [authMiddleware] }, async (request: any) => {
+  const { event_id } = request.query as any;
+
+  // 构建 SQL：weekday=0(周日)~6(周六), hour=0~23
+  let sql = `
+    SELECT
+      CAST(strftime('%w', date(created_at)) AS INTEGER) as weekday,
+      CAST(substr(created_at, 12, 2) AS INTEGER) as hour,
+      COUNT(*) as count
+    FROM checkin_records
+    WHERE status = 'approved'
+  `;
+  const params: any[] = [];
+
+  if (event_id && parseInt(event_id, 10)) {
+    sql += ' AND event_id = ?';
+    params.push(parseInt(event_id, 10));
+  }
+
+  sql += ' GROUP BY weekday, hour ORDER BY weekday, hour';
+
+  const rows = db.prepare(sql).all(...params) as { weekday: number; hour: number; count: number }[];
+
+  // 填成 7×24 二维数组
+  const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let maxCount = 0;
+  let total = 0;
+
+  for (const r of rows) {
+    grid[r.weekday][r.hour] = r.count;
+    total += r.count;
+    if (r.count > maxCount) maxCount = r.count;
+  }
+
+  // 算每个 hour 的合计（用于统计文字）
+  const hourTotals: number[] = Array(24).fill(0);
+  for (let w = 0; w < 7; w++) {
+    for (let h = 0; h < 24; h++) {
+      hourTotals[h] += grid[w][h];
+    }
+  }
+
+  // 找高峰时段
+  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
+  const peakCount = hourTotals[peakHour];
+
+  // 统计午休（11-14）占比
+  const lunchPeak = hourTotals.slice(11, 15).reduce((a, b) => a + b, 0);
+
+  return ok({
+    grid,                    // 7行×24列
+    maxCount,
+    total,
+    peakHour,
+    peakCount,
+    peakPercent: total > 0 ? Math.round((peakCount / total) * 100) : 0,
+    lunchPeak,
+    lunchPeakPercent: total > 0 ? Math.round((lunchPeak / total) * 100) : 0,
+    range: 'all',            // 暂固定全部历史
+  });
+});
+
+// ===== 活动列表（用于筛选器） =====
+app.get('/api/heatmap/events', { preHandler: [authMiddleware] }, async () => {
+  const rows = db.prepare(`
+    SELECT e.id, e.name,
+      COUNT(r.id) as checkin_count
+    FROM checkin_events e
+    LEFT JOIN checkin_records r ON r.event_id = e.id AND r.status = 'approved'
+    WHERE e.is_deleted = 0
+    GROUP BY e.id
+    ORDER BY checkin_count DESC, e.id DESC
+  `).all() as { id: number; name: string; checkin_count: number }[];
+  return ok(rows);
 });
 
 app.register(async function (router) {
@@ -623,7 +721,7 @@ app.register(async function (router) {
   };
 
   function buildWhere(f: WxUserQuery): { sql: string; params: any[] } {
-    let sql = ' WHERE 1=1';
+    let sql = ' WHERE deleted_at IS NULL';
     const params: any[] = [];
     if (f.search) { sql += ` AND ${SEARCH_COLS}`; params.push(...Array(SEARCH_PLACEHOLDERS).fill(`%${f.search}%`)); }
     if (f.importance) { sql += ' AND importance = ?'; params.push(f.importance); }
@@ -669,7 +767,7 @@ app.register(async function (router) {
   });
 
   router.get('/all-tags', async () => {
-    const all = db.prepare('SELECT tags FROM wx_users').all() as any[];
+    const all = db.prepare('SELECT tags FROM wx_users WHERE deleted_at IS NULL').all() as any[];
     const tagSet = new Set<string>();
     all.forEach(c => parseJson(c.tags, [] as string[]).forEach((t: string) => tagSet.add(t)));
     return ok(Array.from(tagSet).sort());
@@ -680,9 +778,9 @@ app.register(async function (router) {
     const row = db.prepare(`SELECT *, ${DISPLAY_NAME} AS display_name FROM wx_users WHERE id = ?`).get(id) as any;
     if (!row) return reply.code(404).send({ success: false, error: '用户不存在' });
     const user = mapWxUser(row);
-    const ordersRaw = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC`).all(id) as any[];
-    const followUps = (db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(id) as any[]).map(mapFollowUp);
-    const children = (db.prepare('SELECT * FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(id) as any[]).map((ch: any) => ({
+    const ordersRaw = db.prepare(`SELECT o.*, p.name as product_name, p.tier as product_tier FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? AND o.deleted_at IS NULL ORDER BY o.purchase_date DESC`).all(id) as any[];
+    const followUps = (db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY date DESC, created_at DESC').all(id) as any[]).map(mapFollowUp);
+    const children = (db.prepare('SELECT * FROM children WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC').all(id) as any[]).map((ch: any) => ({
       ...ch,
       weak_subjects: parseJson<string[]>(ch.weak_subjects, []),
     }));
@@ -843,11 +941,11 @@ app.register(async function (router) {
   router.get('/', async (request: any) => {
     const { wx_user_id, customer_id, page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
-    let sql = `SELECT o.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN wx_users c ON o.wx_user_id = c.id JOIN products p ON o.product_id = p.id WHERE 1=1`, params: any[] = [];
+    let sql = `SELECT o.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name, p.name as product_name, p.tier as product_tier FROM orders o JOIN wx_users c ON o.wx_user_id = c.id JOIN products p ON o.product_id = p.id WHERE o.deleted_at IS NULL AND 1=1`, params: any[] = [];
     const owner = wx_user_id || customer_id;
     if (owner) { sql += ' AND o.wx_user_id = ?'; params.push(owner); }
     sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?'; params.push(limitNum, offset);
-    return ok({ orders: db.prepare(sql).all(...params), total: (db.prepare('SELECT COUNT(*) as total FROM orders').get() as any).total });
+    return ok({ orders: db.prepare(sql).all(...params), total: (db.prepare('SELECT COUNT(*) as total FROM orders WHERE deleted_at IS NULL').get() as any).total });
   });
   router.delete('/:id', { preHandler: [adminOnly] }, async (request: any) => {
     const id = parseInt(request.params.id);
@@ -864,12 +962,12 @@ app.register(async function (router) {
 
 app.register(async function (router) {
   router.addHook('preHandler', authMiddleware);
-  router.get('/customer/:cid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(parseInt(request.params.cid)) as any[]).map(mapFollowUp)));
-  router.get('/wx-user/:uid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC, created_at DESC').all(parseInt(request.params.uid)) as any[]).map(mapFollowUp)));
+  router.get('/customer/:cid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY date DESC, created_at DESC').all(parseInt(request.params.cid)) as any[]).map(mapFollowUp)));
+  router.get('/wx-user/:uid', async (request: any) => ok((db.prepare('SELECT * FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY date DESC, created_at DESC').all(parseInt(request.params.uid)) as any[]).map(mapFollowUp)));
   router.get('/', async (request: any) => {
     const { page = '1', limit = '20' } = request.query as any;
     const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
-    return ok({ follow_ups: (db.prepare(`SELECT f.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name FROM follow_ups f JOIN wx_users c ON f.wx_user_id = c.id ORDER BY f.date DESC, f.created_at DESC LIMIT ? OFFSET ?`).all(limitNum, offset) as any[]).map(mapFollowUp) });
+    return ok({ follow_ups: (db.prepare(`SELECT f.*, COALESCE(NULLIF(c.name, ''), c.nickname, c.child_name, '') as wx_user_name FROM follow_ups f JOIN wx_users c ON f.wx_user_id = c.id WHERE f.deleted_at IS NULL ORDER BY f.date DESC, f.created_at DESC LIMIT ? OFFSET ?`).all(limitNum, offset) as any[]).map(mapFollowUp) });
   });
   router.put('/:id', async (request: any) => {
     const id = parseInt(request.params.id);
@@ -931,12 +1029,12 @@ app.register(async function (router) {
   router.get('/search', async (request: any) => {
     const q = (request.query as any).q || '';
     if (!q || q.length < 1) return ok([]);
-    const users = (db.prepare('SELECT * FROM wx_users WHERE name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ? LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as any[]).map(mapWxUser);
+    const users = (db.prepare('SELECT * FROM wx_users WHERE deleted_at IS NULL AND (name LIKE ? OR phone LIKE ? OR nickname LIKE ? OR douyin_nickname LIKE ?) LIMIT 20').all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as any[]).map(mapWxUser);
     const results: LiveCustomerCard[] = [];
     for (const u of users) {
-      const recentOrders = db.prepare('SELECT p.name as product_name, o.purchase_date, o.amount FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? ORDER BY o.purchase_date DESC LIMIT 3').all(u.id) as any[];
-      const recentFollowUp = db.prepare('SELECT content, date FROM follow_ups WHERE wx_user_id = ? ORDER BY date DESC LIMIT 1').get(u.id) as any;
-      const children = db.prepare('SELECT id, nickname, grade FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(u.id) as any[];
+      const recentOrders = db.prepare('SELECT p.name as product_name, o.purchase_date, o.amount FROM orders o JOIN products p ON o.product_id = p.id WHERE o.wx_user_id = ? AND o.deleted_at IS NULL ORDER BY o.purchase_date DESC LIMIT 3').all(u.id) as any[];
+      const recentFollowUp = db.prepare('SELECT content, date FROM follow_ups WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY date DESC LIMIT 1').get(u.id) as any;
+      const children = db.prepare('SELECT id, nickname, grade FROM children WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC').all(u.id) as any[];
       results.push({ id: u.id, name: displayName(u), nickname: u.nickname, avatar: u.avatar_url, importance: u.importance, tags: u.tags, total_spent: u.total_spent, order_count: u.order_count, last_order_date: u.last_order_date, last_follow_date: u.last_follow_date, recent_orders: recentOrders, recent_follow_up: recentFollowUp ? { content: recentFollowUp.content, date: recentFollowUp.date } : null, suggestions: getWxUserSuggestions(u.id, u).slice(0, 2), children: children.length > 0 ? children : undefined });
     }
     return ok(results);
@@ -1134,7 +1232,7 @@ app.register(async function (router) {
     const { wx_user_id, customer_id } = request.query as any;
     const owner = wx_user_id || customer_id;
     if (!owner) return ok([]);
-    return ok((db.prepare('SELECT * FROM children WHERE wx_user_id = ? ORDER BY created_at DESC').all(parseInt(owner)) as any[]).map(mapChild));
+    return ok((db.prepare('SELECT * FROM children WHERE wx_user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC').all(parseInt(owner)) as any[]).map(mapChild));
   });
 
   router.get('/:id', async (request: any, reply: any) => {
@@ -1155,12 +1253,12 @@ app.register(async function (router) {
       SELECT o.*, p.name as product_name, p.tier as product_tier
       FROM orders o
       LEFT JOIN products p ON o.product_id = p.id
-      WHERE o.child_id = ?
+      WHERE o.child_id = ? AND o.deleted_at IS NULL
       ORDER BY o.purchase_date DESC
     `).all(id) as any[];
     const orders = ordersRaw;
     const followUpsRaw = db.prepare(`
-      SELECT * FROM follow_ups WHERE child_id = ? ORDER BY date DESC
+      SELECT * FROM follow_ups WHERE child_id = ? AND deleted_at IS NULL ORDER BY date DESC
     `).all(id) as any[];
     const follow_ups = followUpsRaw.map(mapFollowUp);
     return ok({ ...child, learning_progress: progress, orders, follow_ups } satisfies ChildWithProgress);
@@ -1541,7 +1639,7 @@ app.register(async function (router) {
       group_id,
       start_date,
       end_date,
-      signup_deadline,
+      signup_deadline_days = 0,
       required_text,
       reward_rules,
       points_per_checkin,
@@ -1551,6 +1649,11 @@ app.register(async function (router) {
       makeup_requires_review = 1,
       makeup_counts_for_streak = 0,
       status = 'active',
+      // v3.4.0 循环活动
+      is_recurring = 0,
+      cycle_advance_days = 2,
+      recurring_days = 10,
+      max_cycles = 0,
     } = request.body;
     if (!name || !start_date || !end_date) return reply.code(400).send({ success: false, error: '活动名称、开始日期和结束日期不能为空' });
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -1558,19 +1661,26 @@ app.register(async function (router) {
     const pointsPerCheckin = (points_per_checkin === undefined || points_per_checkin === null || points_per_checkin === '')
       ? null
       : Number(points_per_checkin);
+    // v3.4.1 报名截止时间：从"活动开始后 N 天"自动计算绝对日期
+    const signupDeadlineDays = Math.max(0, Number(signup_deadline_days) || 0);
+    const signupDeadline = signupDeadlineDays > 0 ? addDays(start_date, signupDeadlineDays) : null;
+    const cycleAdvanceDays = Math.max(0, Number(cycle_advance_days) || 2);
     const r = db.prepare(`
       INSERT INTO checkin_events (
-        name, group_id, start_date, end_date, signup_deadline, required_text, reward_rules, points_per_checkin,
+        name, group_id, start_date, end_date, signup_deadline, signup_deadline_days,
+        required_text, reward_rules, points_per_checkin,
         allow_makeup, makeup_window_days, makeup_limit_per_user, makeup_requires_review, makeup_counts_for_streak,
-        status, created_at, updated_at
+        status, is_recurring, cycle_advance_days, recurring_days, max_cycles, cycle_index, source_event_id,
+        created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)
     `).run(
       name,
       group_id || null,
       start_date,
       end_date,
-      signup_deadline || start_date,
+      signupDeadline,
+      signupDeadlineDays,
       required_text || null,
       reward_rules || null,
       pointsPerCheckin,
@@ -1580,6 +1690,10 @@ app.register(async function (router) {
       normalizeBoolean(makeup_requires_review),
       normalizeBoolean(makeup_counts_for_streak),
       status,
+      normalizeBoolean(is_recurring),
+      cycleAdvanceDays,
+      Number(recurring_days) || 10,
+      Number(max_cycles) || 0,
       now,
       now
     );
@@ -1595,7 +1709,7 @@ app.register(async function (router) {
       group_id,
       start_date,
       end_date,
-      signup_deadline,
+      signup_deadline_days,
       required_text,
       reward_rules,
       points_per_checkin,
@@ -1605,13 +1719,28 @@ app.register(async function (router) {
       makeup_requires_review,
       makeup_counts_for_streak,
       status,
+      // v3.4.0 循环活动
+      is_recurring,
+      cycle_advance_days,
+      recurring_days,
+      max_cycles,
     } = request.body;
     const fields: string[] = [], params: any[] = [];
     if (name !== undefined) { fields.push('name = ?'); params.push(name); }
     if (group_id !== undefined) { fields.push('group_id = ?'); params.push(group_id); }
     if (start_date !== undefined) { fields.push('start_date = ?'); params.push(start_date); }
     if (end_date !== undefined) { fields.push('end_date = ?'); params.push(end_date); }
-    if (signup_deadline !== undefined) { fields.push('signup_deadline = ?'); params.push(signup_deadline || null); }
+    // v3.4.1 报名截止：接收 signup_deadline_days，自动计算 signup_deadline
+    if (signup_deadline_days !== undefined) {
+      const d = Math.max(0, Number(signup_deadline_days) || 0);
+      fields.push('signup_deadline_days = ?');
+      params.push(d);
+      // 同时更新 signup_deadline（绝对日期）
+      // 如果 start_date 在同一次请求里也会更新，使用新值；否则查当前值
+      const effectiveStart: string = start_date || (db.prepare('SELECT start_date FROM checkin_events WHERE id = ?').get(id) as { start_date: string }).start_date;
+      fields.push('signup_deadline = ?');
+      params.push(d > 0 ? addDays(effectiveStart, d) : null);
+    }
     if (required_text !== undefined) { fields.push('required_text = ?'); params.push(required_text); }
     if (reward_rules !== undefined) { fields.push('reward_rules = ?'); params.push(reward_rules); }
     if (points_per_checkin !== undefined) {
@@ -1624,6 +1753,11 @@ app.register(async function (router) {
     if (makeup_requires_review !== undefined) { fields.push('makeup_requires_review = ?'); params.push(normalizeBoolean(makeup_requires_review)); }
     if (makeup_counts_for_streak !== undefined) { fields.push('makeup_counts_for_streak = ?'); params.push(normalizeBoolean(makeup_counts_for_streak)); }
     if (status !== undefined) { fields.push('status = ?'); params.push(status); }
+    // v3.4.0 循环活动字段
+    if (is_recurring !== undefined) { fields.push('is_recurring = ?'); params.push(normalizeBoolean(is_recurring)); }
+    if (recurring_days !== undefined) { fields.push('recurring_days = ?'); params.push(Number(recurring_days) || 10); }
+    if (max_cycles !== undefined) { fields.push('max_cycles = ?'); params.push(Number(max_cycles) || 0); }
+    if (cycle_advance_days !== undefined) { fields.push('cycle_advance_days = ?'); params.push(Math.max(0, Number(cycle_advance_days) || 2)); }
     fields.push("updated_at = datetime('now')");
     params.push(id);
     db.prepare(`UPDATE checkin_events SET ${fields.join(', ')} WHERE id = ? AND is_deleted = 0`).run(...params);
@@ -2531,28 +2665,8 @@ app.get('/api/wx/checkin-events/:id/feed', { preHandler: [wxOptionalAuthMiddlewa
   `).all(eventId) as any[];
 
   const recordIds = records.map(r => r.id);
-  const likeCounts = new Map<number, number>();
-  const likedIds = new Set<number>();
-
-  if (recordIds.length > 0) {
-    const placeholders = recordIds.map(() => '?').join(',');
-    const counts = db.prepare(`
-      SELECT record_id, COUNT(*) as count
-      FROM checkin_record_likes
-      WHERE record_id IN (${placeholders})
-      GROUP BY record_id
-    `).all(...recordIds) as any[];
-    for (const row of counts) likeCounts.set(row.record_id, row.count);
-
-    if (user) {
-      const liked = db.prepare(`
-        SELECT record_id
-        FROM checkin_record_likes
-        WHERE wx_user_id = ? AND record_id IN (${placeholders})
-      `).all(user.id, ...recordIds) as any[];
-      for (const row of liked) likedIds.add(row.record_id);
-    }
-  }
+  // 点赞功能已废弃：不再查询 checkin_record_likes 表，固定返回 0 / false
+  void recordIds;
 
   return ok(records.map(r => ({
     id: r.id,
@@ -2565,29 +2679,12 @@ app.get('/api/wx/checkin-events/:id/feed', { preHandler: [wxOptionalAuthMiddlewa
     nickname: r.nickname,
     display_name: r.display_name,
     avatar_url: r.avatar_url,
-    like_count: likeCounts.get(r.id) || 0,
-    liked_by_me: likedIds.has(r.id),
+    like_count: 0,
+    liked_by_me: false,
   })));
 });
 
-app.post('/api/wx/checkin-records/:id/like', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
-  const user = request.wxUser;
-  const recordId = parseInt(request.params.id);
-  const record = db.prepare('SELECT id FROM checkin_records WHERE id = ? AND status = ?').get(recordId, 'approved') as any;
-  if (!record) return reply.code(404).send({ success: false, error: '打卡记录不存在或未通过审核' });
-
-  const existing = db.prepare('SELECT id FROM checkin_record_likes WHERE record_id = ? AND wx_user_id = ?').get(recordId, user.id) as any;
-  let liked = false;
-  if (existing) {
-    db.prepare('DELETE FROM checkin_record_likes WHERE id = ?').run(existing.id);
-  } else {
-    db.prepare('INSERT INTO checkin_record_likes (record_id, wx_user_id) VALUES (?, ?)').run(recordId, user.id);
-    liked = true;
-  }
-
-  const likeCount = (db.prepare('SELECT COUNT(*) as count FROM checkin_record_likes WHERE record_id = ?').get(recordId) as any).count;
-  return ok({ liked, like_count: likeCount });
-});
+// 点赞端点已废弃（小程序端已移除点赞功能，接口保留注释说明避免后续误用）
 
 app.get('/api/wx/checkin-events/:id/reminder', { preHandler: [wxAuthMiddleware] }, async (request: any, reply: any) => {
   const user = request.wxUser;
@@ -2910,8 +3007,8 @@ app.register(async function (router) {
 
   router.get('/:id/records', async (request: any, reply: any) => {
     const eventId = parseInt(request.params.id);
-    const { status, record_type, page = '1', limit = '20' } = request.query as any;
-    const pageNum = parseInt(page), limitNum = parseInt(limit), offset = (pageNum - 1) * limitNum;
+    const { search, page = '1', limit = '20' } = request.query as any;
+    const pageNum = parseInt(page), limitNum = Math.min(parseInt(limit), 100), offset = (pageNum - 1) * limitNum;
 
     let sql = `
       SELECT r.*, p.nickname, p.child_name, p.wx_user_id, wu.avatar_url
@@ -2921,19 +3018,23 @@ app.register(async function (router) {
       WHERE r.event_id = ?
     `;
     const params: any[] = [eventId];
-    if (status) { sql += ' AND r.status = ?'; params.push(status); }
-    if (record_type === 'makeup') { sql += ' AND r.is_makeup = 1'; }
-    if (record_type === 'normal') { sql += ' AND r.is_makeup = 0'; }
+    if (search) {
+      sql += ' AND (p.nickname LIKE ? OR p.child_name LIKE ? OR r.note LIKE ?)';
+      const like = `%${search}%`;
+      params.push(like, like, like);
+    }
     sql += ' ORDER BY r.checkin_date DESC, r.id DESC LIMIT ? OFFSET ?';
     params.push(limitNum, offset);
 
     const records = db.prepare(sql).all(...params);
 
-    let countSql = 'SELECT COUNT(*) as total FROM checkin_records WHERE event_id = ?';
+    let countSql = 'SELECT COUNT(*) as total FROM checkin_records r JOIN checkin_participants p ON r.participant_id = p.id WHERE r.event_id = ?';
     const countParams: any[] = [eventId];
-    if (status) { countSql += ' AND status = ?'; countParams.push(status); }
-    if (record_type === 'makeup') { countSql += ' AND is_makeup = 1'; }
-    if (record_type === 'normal') { countSql += ' AND is_makeup = 0'; }
+    if (search) {
+      countSql += ' AND (p.nickname LIKE ? OR p.child_name LIKE ? OR r.note LIKE ?)';
+      const like = `%${search}%`;
+      countParams.push(like, like, like);
+    }
     const total = (db.prepare(countSql).get(...countParams) as any).total;
 
     return ok({ records, total });
@@ -3286,8 +3387,23 @@ if (process.env.NODE_ENV !== 'test' && !globalThis.__checkinReminderTimerStarted
   setInterval(() => {
     runDueCheckinReminders().catch(err => app.log.error(err));
     maybeRunAutoBackup().catch(err => app.log.error(err));
+    autoEndCheckinEvents();
     archiveExpiredCheckinEvents();
+    maybeCreateNextCycleEvent();
   }, 60 * 1000);
+}
+
+/** v3.4.3 活动自动结束：end_date 已过且 status 还是 active 的，自动置为 ended */
+function autoEndCheckinEvents() {
+  try {
+    const today = bjtTodayStr();
+    const r = db.prepare("UPDATE checkin_events SET status = 'ended', updated_at = datetime('now') WHERE is_deleted = 0 AND status != 'ended' AND date(end_date) < ?").run(today);
+    if (r.changes > 0) {
+      app.log.info(`📌 自动结束 ${r.changes} 个过期活动`);
+    }
+  } catch (err) {
+    app.log.error(err, 'autoEndCheckinEvents 异常');
+  }
 }
 
 // 活动结束后在「已结束」保留 30 天，超过 30 天的自动移入回收站
@@ -3305,6 +3421,216 @@ function archiveExpiredCheckinEvents() {
   } catch (err) {
     app.log.error(err);
   }
+}
+
+/**
+ * v3.4.0 自动循环创建下一轮打卡活动
+ * 
+ * 逻辑：
+ * 1. 找到所有已结束且开启了循环的活动（is_recurring=1, end_date < 今天, is_deleted=0）
+ * 2. 检查该活动是否已经触发过循环（last_cycle_triggered_at 为空表示还没触发过）
+ * 3. 基于原活动模板创建下一轮：start_date = end_date + 1天, end_date = start_date + recurring_days - 1天
+ * 4. 从原活动复制配置（groupId, requiredText, rewardRules, makeup规则等）
+ * 5. cycle_index + 1, source_event_id 指向系列的第一个活动
+ * 6. 标记原活动的 last_cycle_triggered_at 防止重复触发
+ * 
+ * max_cycles = 0 表示无限循环
+ */
+function maybeCreateNextCycleEvent() {
+  try {
+    const today = bjtTodayStr();
+
+    // v3.4.2 找到需要触发循环的活动：开启循环、尚未触发过、end_date 在 [today, today + cycle_advance_days] 窗口内
+    // 即：结束前 N 天就可以提前创建
+    const candidates = db.prepare(`
+      SELECT *,
+        COALESCE(cycle_advance_days, 2) as advance_days,
+        date(end_date, '+' || COALESCE(cycle_advance_days, 2) || ' days') as trigger_by
+      FROM checkin_events
+      WHERE is_deleted = 0
+        AND is_recurring = 1
+        AND (last_cycle_triggered_at IS NULL OR last_cycle_triggered_at = '')
+        AND date(end_date) >= ?          -- 还没结束（含提前窗口）
+        AND date(end_date) <= date(?, '+' || COALESCE(cycle_advance_days, 2) || ' days')
+    `).all(today, today) as any[];
+
+    for (const src of candidates) {
+      try {
+        const sourceId = src.source_event_id || src.id;
+        const srcDays = Math.max(1, Number(src.recurring_days) || 10);
+        const newStart = addDays(src.end_date, 1);
+        const newEnd = addDays(newStart, srcDays - 1);
+
+        // v3.4.2 当月第几期 cycle_index
+        // 同月下一期 = 同系列中 start_date 在同一月份的最大 cycle_index + 1
+        // 跨月重置为 1
+        const newStartMonth = newStart.slice(0, 7); // YYYY-MM
+        const seriesInMonth = db.prepare(`
+          SELECT COALESCE(MAX(cycle_index), 0) as max_ci
+          FROM checkin_events
+          WHERE (source_event_id = ? OR id = ?)
+            AND is_deleted = 0
+            AND substr(start_date, 1, 7) = ?
+        `).get(sourceId, sourceId, newStartMonth) as any;
+
+        const isCrossMonth = src.start_date.slice(0, 7) !== newStartMonth;
+        const nextCycle = isCrossMonth ? 1 : ((seriesInMonth?.max_ci || 0) + 1);
+
+        // 最大循环次数检查（全局累计轮数，跨月也算）
+        const seriesTotal = db.prepare(`
+          SELECT COUNT(*) as total FROM checkin_events
+          WHERE (source_event_id = ? OR id = ?) AND is_deleted = 0
+        `).get(sourceId, sourceId) as any;
+        const totalSoFar = (seriesTotal?.total || 0);
+        if (src.max_cycles > 0 && totalSoFar >= src.max_cycles) {
+          app.log.info(`活动「${src.name}」已达到最大循环次数 (${src.max_cycles})，不再创建新轮次`);
+          db.prepare("UPDATE checkin_events SET last_cycle_triggered_at = datetime('now') WHERE id = ?").run(src.id);
+          continue;
+        }
+
+        // 防止重复创建：新活动日期窗口内已存在 active 状态的同系列活动
+        const existing = db.prepare(`
+          SELECT id FROM checkin_events
+          WHERE is_deleted = 0
+            AND source_event_id = ?
+            AND start_date = ?
+        `).get(sourceId, newStart);
+
+        if (existing) {
+          db.prepare("UPDATE checkin_events SET last_cycle_triggered_at = datetime('now') WHERE id = ?").run(src.id);
+          continue;
+        }
+
+        // v3.4.2 智能命名
+        const rootRow = db.prepare(`SELECT id FROM checkin_events WHERE (source_event_id = ? OR id = ?) AND is_deleted = 0 ORDER BY id ASC LIMIT 1`).get(sourceId, sourceId) as any;
+        const rootId = rootRow?.id || sourceId;
+        const rootName = (db.prepare(`SELECT name, start_date FROM checkin_events WHERE id = ?`).get(rootId) as any);
+        const newName = smartNextName(
+          rootName?.name || src.name,
+          rootName?.start_date || src.start_date,
+          newStart,
+          nextCycle
+        );
+
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const newSignupDeadlineDays = src.signup_deadline_days || 0;
+        const newSignupDeadline = newSignupDeadlineDays > 0 ? addDays(newStart, newSignupDeadlineDays) : null;
+
+        const r = db.prepare(`
+          INSERT INTO checkin_events (
+            name, group_id, start_date, end_date, signup_deadline, signup_deadline_days,
+            required_text, reward_rules, points_per_checkin,
+            allow_makeup, makeup_window_days, makeup_limit_per_user,
+            makeup_requires_review, makeup_counts_for_streak,
+            status, is_recurring, cycle_advance_days, recurring_days, max_cycles,
+            cycle_index, source_event_id,
+            created_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          newName,
+          src.group_id,
+          newStart,
+          newEnd,
+          newSignupDeadline,
+          newSignupDeadlineDays,
+          src.required_text,
+          src.reward_rules,
+          src.points_per_checkin,
+          src.allow_makeup,
+          src.makeup_window_days,
+          src.makeup_limit_per_user,
+          src.makeup_requires_review,
+          src.makeup_counts_for_streak,
+          'active',
+          src.is_recurring,
+          src.cycle_advance_days ?? 2,
+          src.recurring_days,
+          src.max_cycles,
+          nextCycle,
+          rootId,
+          now,
+          now,
+        );
+
+        // 标记原活动已触发循环
+        db.prepare("UPDATE checkin_events SET last_cycle_triggered_at = datetime('now') WHERE id = ?").run(src.id);
+
+        app.log.info(`🔄 自动创建循环活动：「${newName}」第${nextCycle}期 (${newStart} ~ ${newEnd})，ID=${r.lastInsertRowid}${isCrossMonth ? ' 【跨月重置期数】' : ''}`);
+      } catch (err) {
+        app.log.error(err, `创建循环活动失败，源活动 ID=${src.id}`);
+      }
+    }
+  } catch (err) {
+    app.log.error(err, 'maybeCreateNextCycleEvent 异常');
+  }
+}
+
+/** 日期加减天数辅助函数（基于 UTC 避免时区偏移） */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 北京时间 today (YYYY-MM-DD) */
+function bjtTodayStr(): string {
+  return new Date(Date.now() + BJT_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * v3.4.2 智能命名：解析原活动标题，生成下一期名称
+ * 
+ * 规则：
+ *   「9月第1期」  + 同月下一期  → 「9月第2期」
+ *   「9月第1期」  + 跨月（新活动 start_date 在 10 月） → 「10月第1期」
+ *   「ABC Reading 9月第2期打卡活动」 + 同月下一期 → 「ABC Reading 9月第3期打卡活动」
+ *   「ABC Reading 第2期」 + 同月下一期 → 「ABC Reading 第3期」（没有月份信息）
+ *   「简单打卡」 + 同月下一期 → 「简单打卡 第2期」（没有期数信息，追加）
+ */
+function smartNextName(srcName: string, srcStartDate: string, newStartDate: string, fallbackIndex: number): string {
+  // 正则提取：N月第M期 / N月第M轮 / 第M期 / 第M轮
+  const reMonthPeriod = /(\d+)月.*?第\s*(\d+)\s*[期轮]|\b第\s*(\d+)\s*[期轮]/;
+  const m = srcName.match(reMonthPeriod);
+
+  const newMonth = parseInt(newStartDate.slice(5, 7), 10); // 新活动 start_date 的月份
+  const srcMonth = parseInt(srcStartDate.slice(5, 7), 10); // 老活动 start_date 的月份
+  const crossMonth = newMonth !== srcMonth;
+
+  if (!m) {
+    // 原标题没有期数信息，直接追加
+    return `${srcName} 第${fallbackIndex}期`;
+  }
+
+  // 提取旧期数
+  const oldPeriod = parseInt(m[2] || m[3], 10);
+  let newPeriod: number;
+  let newMonthLabel: string | null = null;
+
+  // 检查原标题里有没有「N月」
+  const hasMonth = /\d+月/.test(srcName);
+
+  if (crossMonth) {
+    // 跨月：期数重置为 1
+    newPeriod = 1;
+    if (hasMonth) newMonthLabel = `${newMonth}月`;
+  } else {
+    // 同月下一期
+    newPeriod = oldPeriod + 1;
+    if (hasMonth) newMonthLabel = `${srcMonth}月`; // 月份不变
+  }
+
+  // 替换原标题里的「N月第M期/轮」 → 新的
+  let result: string;
+  if (hasMonth) {
+    // 把原来的「N月第M期」整体替换掉
+    result = srcName.replace(/\d+月.*?第\s*\d+\s*[期轮]/, `${newMonthLabel}第${newPeriod}期`);
+  } else {
+    // 只替换「第M期/轮」
+    result = srcName.replace(/第\s*\d+\s*[期轮]/, `第${newPeriod}期`);
+  }
+
+  return result;
 }
 
 // 每日自动备份：到达设定时间（北京时间，默认 03:30）且当天未备份时执行一次

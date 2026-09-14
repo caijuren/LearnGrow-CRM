@@ -130,22 +130,16 @@ if [ "$DRY_RUN" = true ]; then
   exit 0
 fi
 
-# ---------- Step 2: 备份数据库 ----------
-info "Step 2/7: 备份当前数据库"
-run_remote <<EOF
-mkdir -p $BACKUP_DIR $DEPLOY_DIR/data $RELEASES_DIR
+# ---------- Step 2: 完整备份（数据库 + uploads 媒体） ----------
+info "Step 2/7: 部署前完整备份（db + uploads）"
+if run_remote <<< "[ -f $DEPLOY_DIR/data/learngrow.db ]" && run_remote <<< "[ -d $DEPLOY_DIR/current/node_modules ]"; then
+  # 调用 createBackup() 生成完整 zip，同时自动清理旧备份
+  run_remote <<EOF || warn "完整备份失败，继续部署（凌晨已自动备份过）"
+cd $DEPLOY_DIR/current && NODE_ENV=production npx tsx scripts/backup.ts
 EOF
-if run_remote <<< "[ -f $DEPLOY_DIR/data/learngrow.db ]"; then
-  DB_BACKUP="$BACKUP_DIR/db_pre_deploy_$TIMESTAMP.db"
-  run_remote <<EOF || run_remote <<< "cp $DEPLOY_DIR/data/learngrow.db $DB_BACKUP"
-sqlite3 $DEPLOY_DIR/data/learngrow.db ".backup '$DB_BACKUP'"
-EOF
-  run_remote <<EOF >/dev/null || fail "数据库备份完整性校验失败，中止部署"
-cd $DEPLOY_DIR/current && node -e "const db=require('better-sqlite3')('$DB_BACKUP',{readonly:true});db.prepare('PRAGMA integrity_check').get();console.log('backup-ok')"
-EOF
-  ok "数据库备份完成: $DB_BACKUP"
+  ok "完整备份完成"
 else
-  warn "未找到现有数据库，跳过备份（首次部署）"
+  warn "跳过备份（首次部署或依赖未安装）"
 fi
 
 # ---------- Step 3: 同步代码 ----------

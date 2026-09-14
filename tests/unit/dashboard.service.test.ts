@@ -182,17 +182,17 @@ describe('Dashboard Service', () => {
       expect(data.checkinTrend.length).toBe(30);
     });
 
-    it('应该包含用户阶段分布', async () => {
+    it('应该包含用户活跃度分布', async () => {
       const data = await getDashboardData();
 
-      expect(data.stageStats).toBeDefined();
-      expect(Array.isArray(data.stageStats)).toBe(true);
-      // 应该包含所有预定义阶段
-      const stages = data.stageStats.map(s => s.stage);
-      expect(stages).toContain('new_friend');
-      expect(stages).toContain('initial_chat');
-      expect(stages).toContain('interested');
-      expect(stages).toContain('purchased');
+      expect(data.activityDistribution).toBeDefined();
+      expect(Array.isArray(data.activityDistribution)).toBe(true);
+      // 应该包含所有预定义活跃度档位
+      const levels = data.activityDistribution.map((s: any) => s.level);
+      expect(levels).toContain('active');
+      expect(levels).toContain('normal');
+      expect(levels).toContain('low');
+      expect(levels).toContain('dormant');
     });
 
     it('应该包含需跟进用户列表', async () => {

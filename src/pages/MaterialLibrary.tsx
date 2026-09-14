@@ -19,7 +19,7 @@ function getFileIcon(mimeType: string | null, filename: string) {
   if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return <FileImage className="w-8 h-8" />;
   if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv'].includes(ext)) return <FileVideo className="w-8 h-8" />;
   if (['pdf'].includes(ext)) return <FileText className="w-8 h-8 text-red-500" />;
-  if (['doc', 'docx'].includes(ext)) return <FileText className="w-8 h-8 text-blue-600" />;
+  if (['doc', 'docx'].includes(ext)) return <FileText className="w-8 h-8 text-violet-600" />;
   if (['xls', 'xlsx'].includes(ext)) return <FileText className="w-8 h-8 text-green-600" />;
   if (['zip', 'rar', '7z'].includes(ext)) return <FileArchive className="w-8 h-8 text-yellow-600" />;
   return <File className="w-8 h-8 text-slate-400" />;
@@ -30,7 +30,7 @@ function getIconColor(mimeType: string | null, filename: string): string {
   if (mimeType?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'text-pink-500';
   if (mimeType?.startsWith('video/') || ['mp4', 'avi', 'mov', 'wmv'].includes(ext)) return 'text-purple-500';
   if (['pdf'].includes(ext)) return 'text-red-500';
-  if (['doc', 'docx'].includes(ext)) return 'text-blue-600';
+  if (['doc', 'docx'].includes(ext)) return 'text-violet-600';
   if (['xls', 'xlsx'].includes(ext)) return 'text-green-600';
   if (['zip', 'rar', '7z'].includes(ext)) return 'text-yellow-600';
   return 'text-slate-400';
@@ -453,7 +453,7 @@ export default function MaterialLibrary() {
                     {selectedTags.map((tag, i) => (
                       <span key={i} className="badge bg-brand-50 text-brand-700">
                         {tag}
-                        <button onClick={() => toggleTag(tag)} className="hover:text-indigo-800">
+                        <button onClick={() => toggleTag(tag)} className="hover:text-violet-800">
                           <X className="w-3 h-3" />
                         </button>
                       </span>

@@ -713,7 +713,7 @@ export default function WxUserDetail() {
             <div className="space-y-3">
               {user.suggestions.map((suggestion, index) => {
                 const accents = [
-                  { gradient: 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)', iconBg: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
+                  { gradient: 'linear-gradient(90deg, #5B5CE2 0%, #8B5CF6 100%)', iconBg: 'var(--color-primary-soft)', iconColor: 'var(--color-primary)' },
                   { gradient: 'linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%)', iconBg: 'var(--color-warning-soft)', iconColor: 'var(--color-warning)' },
                   { gradient: 'linear-gradient(90deg, #22C55E 0%, #86EFAC 100%)', iconBg: 'var(--color-success-soft)', iconColor: 'var(--color-success)' },
                   { gradient: 'linear-gradient(90deg, #3B82F6 0%, #93C5FD 100%)', iconBg: 'rgb(59 130 246 / 0.12)', iconColor: 'rgb(37 99 235)' },

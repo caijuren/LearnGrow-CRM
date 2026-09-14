@@ -365,10 +365,9 @@ export async function recordMaterialDownload(id: number) {
 
 // ========== 打卡管理新接口 ==========
 
-export async function fetchCheckinRecords(eventId: number, params: { status?: string; record_type?: string; page?: number; limit?: number } = {}) {
+export async function fetchCheckinRecords(eventId: number, params: { search?: string; page?: number; limit?: number } = {}) {
   const qs = new URLSearchParams();
-  if (params.status) qs.set('status', params.status);
-  if (params.record_type) qs.set('record_type', params.record_type);
+  if (params.search) qs.set('search', params.search);
   if (params.page) qs.set('page', String(params.page));
   if (params.limit) qs.set('limit', String(params.limit));
   return request<{ records: any[]; total: number }>(`/checkin-events/${eventId}/records?${qs.toString()}`);
@@ -491,4 +490,15 @@ export async function updatePointsConfig(data: Partial<PointsConfig>) {
 
 export async function resetPoints() {
   return request<{ users: number; ledger: number }>('/settings/reset-points', { method: 'POST' });
+}
+
+
+// ===== 打卡时间热力图 =====
+export async function fetchHeatmap(eventId?: number) {
+  const qs = eventId ? `?event_id=${eventId}` : '';
+  return request<any>(`/heatmap/checkin-times${qs}`);
+}
+
+export async function fetchHeatmapEvents() {
+  return request<{ id: number; name: string; checkin_count: number }[]>('/heatmap/events');
 }

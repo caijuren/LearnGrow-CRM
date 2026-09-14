@@ -90,6 +90,14 @@
       </view>
     </view>
 
+    <view class="menu-group">
+      <view class="menu-item" bindtap="showAbout">
+        <view class="menu-icon">关</view>
+        <view class="menu-text">关于小程序</view>
+        <text class="menu-arrow text-muted">→</text>
+      </view>
+    </view>
+
     <button class="logout-btn" bindtap="handleLogout">退出登录</button>
   </block>
 </view>

@@ -1,4 +1,5 @@
 {
   "navigationBarTitleText": "打卡详情",
-  "backgroundColor": "#090B12"
+  "backgroundColor": "#090B12",
+  "enableShareAppMessage": true
 }
