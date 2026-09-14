@@ -12,7 +12,7 @@ import type { LearningPath, Product } from '../../shared/types';
 const SUBJECT_OPTIONS = [
   { value: '英语', label: '英语', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
   { value: '语文', label: '语文', color: 'bg-brand-100 text-brand-700 border-brand-200', dot: 'bg-brand-500' },
-  { value: '数学', label: '数学', color: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+  { value: '数学', label: '数学', color: 'bg-blue-100 text-violet-700 border-blue-200', dot: 'bg-violet-500' },
 ];
 
 interface StageForm {
@@ -220,10 +220,10 @@ export default function LearningPathConfig() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Route className="w-6 h-6 text-indigo-500" />
+              <Route className="w-6 h-6 text-violet-500" />
               学习路径配置
             </h1>
-            <p className="text-sm text-slate-500 mt-1">规划学科学习阶段，关联产品，驱动自动跟进</p>
+            <p className="text-sm text-slate-500 mt-1">规划学科学习阶段，关联产品</p>
           </div>
           <button
             onClick={handleNewPath}
@@ -252,7 +252,7 @@ export default function LearningPathConfig() {
                   <p className="text-sm text-slate-400">暂无学习路径</p>
                   <button
                     onClick={handleNewPath}
-                    className="mt-3 text-sm text-indigo-600 font-medium hover:text-indigo-700"
+                    className="mt-3 text-sm text-violet-600 font-medium hover:text-violet-700"
                   >
                     + 创建第一个路径
                   </button>
@@ -268,7 +268,7 @@ export default function LearningPathConfig() {
                         onClick={() => handleSelectPath(path)}
                         className={`w-full text-left p-3 rounded-xl transition-all group ${
                           isSelected
-                            ? 'bg-indigo-50 border-2 border-indigo-200'
+                            ? 'bg-violet-50 border-2 border-violet-200'
                             : 'hover:bg-slate-50 border-2 border-transparent'
                         }`}
                       >
@@ -276,7 +276,7 @@ export default function LearningPathConfig() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className={`w-2 h-2 rounded-full ${subjectConf.dot}`} />
-                              <span className={`text-sm font-semibold ${isSelected ? 'text-indigo-900' : 'text-slate-800'} truncate`}>
+                              <span className={`text-sm font-semibold ${isSelected ? 'text-violet-900' : 'text-slate-800'} truncate`}>
                                 {path.name}
                               </span>
                             </div>
@@ -295,7 +295,7 @@ export default function LearningPathConfig() {
                             </div>
                           </div>
                           {isSelected && (
-                            <ChevronUp className="w-4 h-4 text-indigo-400 rotate-90 shrink-0" />
+                            <ChevronUp className="w-4 h-4 text-violet-400 rotate-90 shrink-0" />
                           )}
                         </div>
                       </button>
@@ -309,8 +309,8 @@ export default function LearningPathConfig() {
           <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
             {!hasContent ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                <div className="w-20 h-20 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
-                  <Route className="w-10 h-10 text-indigo-300" />
+                <div className="w-20 h-20 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+                  <Route className="w-10 h-10 text-violet-300" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-700 mb-1">选择或创建学习路径</h3>
                 <p className="text-sm text-slate-400 max-w-xs">
@@ -341,7 +341,7 @@ export default function LearningPathConfig() {
                     <button
                       onClick={handleSave}
                       disabled={saving || !form.name.trim() || form.stages.some(s => !s.name.trim())}
-                      className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-violet-500 to-violet-500 hover:from-violet-600 hover:to-violet-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-violet-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       保存
@@ -356,7 +356,7 @@ export default function LearningPathConfig() {
                         路径名称 <span className="text-brand-500">*</span>
                       </label>
                       <input
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm"
                         placeholder="如：小学英语启蒙路径"
                         value={form.name}
                         onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -365,7 +365,7 @@ export default function LearningPathConfig() {
                     <div>
                       <label className="text-xs font-medium text-slate-600 mb-1.5 block">学科</label>
                       <select
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm bg-white"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm bg-white"
                         value={form.subject}
                         onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
                       >
@@ -379,7 +379,7 @@ export default function LearningPathConfig() {
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1.5 block">路径描述</label>
                     <textarea
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm resize-none"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm resize-none"
                       rows={2}
                       placeholder="描述此学习路径的适用人群、学习目标等..."
                       value={form.description}
@@ -395,7 +395,7 @@ export default function LearningPathConfig() {
                     <button
                       onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}
                       className={`relative w-12 h-6 rounded-full transition-colors ${
-                        form.is_active ? 'bg-indigo-500' : 'bg-slate-300'
+                        form.is_active ? 'bg-violet-500' : 'bg-slate-300'
                       }`}
                     >
                       <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
@@ -407,12 +407,12 @@ export default function LearningPathConfig() {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-indigo-500" />
+                        <Layers className="w-4 h-4 text-violet-500" />
                         学习阶段 ({form.stages.length})
                       </label>
                       <button
                         onClick={handleAddStage}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         添加阶段
@@ -430,7 +430,7 @@ export default function LearningPathConfig() {
                           <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden bg-white">
                             <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
                               <div className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-lg bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">
+                                <span className="w-6 h-6 rounded-lg bg-violet-500 text-white text-xs font-bold flex items-center justify-center">
                                   {idx + 1}
                                 </span>
                                 <span className="text-sm font-semibold text-slate-700 truncate max-w-[200px]">
@@ -468,7 +468,7 @@ export default function LearningPathConfig() {
                                   阶段名称 <span className="text-brand-500">*</span>
                                 </label>
                                 <input
-                                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+                                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm"
                                   placeholder="如：兴趣引导期"
                                   value={stage.name}
                                   onChange={e => handleStageChange(idx, 'name', e.target.value)}
@@ -477,7 +477,7 @@ export default function LearningPathConfig() {
                               <div>
                                 <label className="text-xs font-medium text-slate-600 mb-1 block">阶段描述</label>
                                 <textarea
-                                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm resize-none"
+                                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm resize-none"
                                   rows={2}
                                   placeholder="描述此阶段的学习重点..."
                                   value={stage.description}
@@ -489,7 +489,7 @@ export default function LearningPathConfig() {
                                   <label className="text-xs font-medium text-slate-600 mb-1 block">预计天数</label>
                                   <input
                                     type="number"
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm"
                                     placeholder="如：30"
                                     value={stage.duration_days}
                                     onChange={e => handleStageChange(idx, 'duration_days', e.target.value)}
@@ -498,7 +498,7 @@ export default function LearningPathConfig() {
                                 <div>
                                   <label className="text-xs font-medium text-slate-600 mb-1 block">关键里程碑</label>
                                   <input
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 outline-none transition-all text-sm"
                                     placeholder="如：完成自然拼读"
                                     value={stage.key_milestones}
                                     onChange={e => handleStageChange(idx, 'key_milestones', e.target.value)}
@@ -513,7 +513,7 @@ export default function LearningPathConfig() {
                                   <button
                                     type="button"
                                     onClick={() => setProductDropdownOpen(productDropdownOpen === idx ? null : idx)}
-                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-indigo-300 outline-none transition-all text-sm text-left bg-white hover:border-slate-300 flex items-center justify-between"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-violet-300 outline-none transition-all text-sm text-left bg-white hover:border-slate-300 flex items-center justify-between"
                                   >
                                     <span className={stage.target_product_ids.length === 0 ? 'text-slate-400' : 'text-slate-700'}>
                                       {stage.target_product_ids.length === 0
@@ -533,18 +533,18 @@ export default function LearningPathConfig() {
                                             type="button"
                                             onClick={() => toggleProduct(idx, product.id)}
                                             className={`w-full px-3 py-2.5 text-left text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                                              selected ? 'bg-indigo-50/50' : ''
+                                              selected ? 'bg-violet-50/50' : ''
                                             }`}
                                           >
                                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                               <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${
-                                                selected ? 'bg-indigo-500 border-indigo-500' : 'border-slate-300'
+                                                selected ? 'bg-violet-500 border-violet-500' : 'border-slate-300'
                                               }`}>
                                                 {selected && <Check className="w-3 h-3 text-white" />}
                                               </div>
                                               <span className="text-slate-700 truncate">{product.name}</span>
                                             </div>
-                                            <span className="text-xs font-semibold text-indigo-600 shrink-0 ml-2">
+                                            <span className="text-xs font-semibold text-violet-600 shrink-0 ml-2">
                                               ¥{product.price}
                                             </span>
                                           </button>
@@ -558,14 +558,14 @@ export default function LearningPathConfig() {
                                     {stage.target_product_ids.map(pid => (
                                       <span
                                         key={pid}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium border border-indigo-100"
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 rounded-lg text-xs font-medium border border-violet-100"
                                       >
                                         {getProductName(pid)}
-                                        <span className="text-indigo-400">¥{getProductPrice(pid)}</span>
+                                        <span className="text-violet-400">¥{getProductPrice(pid)}</span>
                                         <button
                                           type="button"
                                           onClick={() => toggleProduct(idx, pid)}
-                                          className="w-3.5 h-3.5 rounded-full hover:bg-indigo-200 flex items-center justify-center"
+                                          className="w-3.5 h-3.5 rounded-full hover:bg-violet-200 flex items-center justify-center"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>

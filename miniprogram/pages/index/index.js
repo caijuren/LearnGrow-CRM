@@ -166,13 +166,5 @@ Page({
 
   onPullDownRefresh() {
     this.loadEvents().then(() => wx.stopPullDownRefresh());
-  },
-
-  onShareAppMessage() {
-    return {
-      title: '源来是糖 · 每天坚持，养成好习惯',
-      path: '/pages/index/index',
-      imageUrl: `${this.data.baseUrl}/uploads/share_brand.png`,
-    };
   }
 });

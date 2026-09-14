@@ -55,7 +55,7 @@ const envVersion = resolveEnvVersion();
 const apiBaseUrl = API_BASE_URLS[envVersion] || PROD_BASE_URL;
 
 // 小程序本地版本号，独立于后端版本，用于"我的"页展示；升级小程序时同步更新
-const APP_VERSION = '3.6.0';
+const APP_VERSION = '3.9.0';
 
 // 硬校验：真机 / 审核环境绝不能使用 HTTP
 if (envVersion !== 'develop' && !apiBaseUrl.startsWith('https://')) {

@@ -876,7 +876,7 @@ export default function GroupManagement() {
                 <Upload className="w-4 h-4" />
                 使用方法
               </h4>
-              <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+              <ol className="text-xs text-violet-700 space-y-1 list-decimal list-inside">
                 <li>打开微信群聊 → 点右上角"..." → 查看全部群成员</li>
                 <li>把群成员昵称复制下来（或截图OCR识别）</li>
                 <li>粘贴到下面的输入框，每行一个昵称，或用逗号分隔</li>

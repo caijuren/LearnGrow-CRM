@@ -51,20 +51,20 @@ export async function getDashboardData(): Promise<DashboardData> {
   const thirtyDaysAgo = bjtDaysAgo(30);
 
   // 核心指标
-  const totalWxUsers = (db.prepare('SELECT COUNT(*) as c FROM wx_users').get() as any).c;
-  const todayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(today) as any).c;
-  const yesterdayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(yesterday) as any).c;
+  const totalWxUsers = (db.prepare('SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL').get() as any).c;
+  const todayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(today) as any).c;
+  const yesterdayNewWxUsers = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(yesterday) as any).c;
   
   // 打卡统计
-  const totalCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved'").get() as any).c;
-  const todayCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(today) as any).c;
-  const weekCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND checkin_date >= ?").get(sevenDaysAgo) as any).c;
+  const totalCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL").get() as any).c;
+  const todayCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND date(checkin_date) = ?").get(today) as any).c;
+  const weekCheckins = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND checkin_date >= ?").get(sevenDaysAgo) as any).c;
   
   // 活跃用户数（近 7 天有打卡的去重用户）
   const activeUsers7d = (db.prepare(`
     SELECT COUNT(DISTINCT p.wx_user_id) as c 
     FROM checkin_participants p
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
     WHERE r.checkin_date >= ?
   `).get(sevenDaysAgo) as any).c;
   
@@ -72,10 +72,10 @@ export async function getDashboardData(): Promise<DashboardData> {
   const todayCheckers = (db.prepare(`
     SELECT COUNT(DISTINCT p.wx_user_id) as c
     FROM checkin_participants p
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
     WHERE date(r.checkin_date) = ?
   `).get(today) as any).c;
-  const totalParticipants = (db.prepare("SELECT COUNT(DISTINCT wx_user_id) as c FROM checkin_participants").get() as any).c;
+  const totalParticipants = (db.prepare("SELECT COUNT(DISTINCT wx_user_id) as c FROM checkin_participants WHERE deleted_at IS NULL").get() as any).c;
   const checkinRate = totalParticipants > 0 ? Math.round((todayCheckers / totalParticipants) * 100 * 100) / 100 : 0;
 
   // 近 30 天趋势数据
@@ -83,26 +83,45 @@ export async function getDashboardData(): Promise<DashboardData> {
   const checkinTrend = [];
   for (let i = 29; i >= 0; i--) {
     const dateStr = bjtDaysAgo(i);
-    const newCount = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE date(created_at) = ?").get(dateStr) as any).c;
-    const checkinCount = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND date(checkin_date) = ?").get(dateStr) as any).c;
+    const newCount = (db.prepare("SELECT COUNT(*) as c FROM wx_users WHERE deleted_at IS NULL AND date(created_at) = ?").get(dateStr) as any).c;
+    const checkinCount = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'approved' AND deleted_at IS NULL AND date(checkin_date) = ?").get(dateStr) as any).c;
     newUserTrend.push({ date: dateStr.slice(5), count: newCount || 0 });
     checkinTrend.push({ date: dateStr.slice(5), count: checkinCount || 0 });
   }
 
-  // 用户阶段分布
-  const stageStatsRaw = db.prepare("SELECT stage, COUNT(*) as count FROM wx_users GROUP BY stage").all() as any[];
-  const allStages: CustomerStage[] = ['new_friend', 'initial_chat', 'interested', 'purchased', 'in_group', 'repurchased', 'silent'];
-  const stageStats = allStages.map(s => {
-    const found = stageStatsRaw.find(r => r.stage === s);
-    return { stage: s, count: found ? found.count : 0 };
-  });
+  // 用户活跃度分布（近 30 天打卡次数自动计算，替代手动 stage）
+  const activityRaw = db.prepare(`
+    SELECT
+      CASE
+        WHEN cnt = 0  THEN 'dormant'
+        WHEN cnt < 10 THEN 'low'
+        WHEN cnt < 20 THEN 'normal'
+        ELSE 'active'
+      END as level,
+      COUNT(*) as count
+    FROM (
+      SELECT u.id, COUNT(r.id) as cnt
+      FROM wx_users u
+      LEFT JOIN checkin_participants p ON p.wx_user_id = u.id
+      LEFT JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+        AND date(r.created_at) >= date('now', '-30 days')
+      WHERE u.deleted_at IS NULL
+      GROUP BY u.id
+    )
+    GROUP BY level
+  `).all() as { level: string; count: number }[];
+
+  const activityDistribution = (['active', 'normal', 'low', 'dormant'] as const).map(l => ({
+    level: l,
+    count: activityRaw.find(r => r.level === l)?.count || 0,
+  }));
 
   // 需跟进用户
   const needFollowWhere = needFollowClause();
   const needFollowRaw = db.prepare(`
     SELECT id, COALESCE(NULLIF(name, ''), nickname, child_name, '') as name, stage, wechat_id, wechat_account, importance, last_follow_date, next_talk_topic
     FROM wx_users
-    WHERE ${needFollowWhere.sql}
+    WHERE deleted_at IS NULL AND ${needFollowWhere.sql}
     ORDER BY CASE importance WHEN 'vip' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
              last_follow_date IS NULL DESC,
              last_follow_date ASC
@@ -117,7 +136,7 @@ export async function getDashboardData(): Promise<DashboardData> {
            ROUND(CAST(COUNT(r.id) AS FLOAT) / MAX(COUNT(DISTINCT p.wx_user_id), 1), 1) as avg_checkins_per_user
     FROM checkin_events a
     JOIN checkin_participants p ON p.event_id = a.id
-    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved' AND r.deleted_at IS NULL
     GROUP BY a.id
     ORDER BY checkin_count DESC
     LIMIT 10
@@ -128,6 +147,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     SELECT COALESCE(NULLIF(name, ''), nickname, child_name, '') as display_name,
            created_at, source, avatar_url
     FROM wx_users
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC
     LIMIT 5
   `).all() as any[];
@@ -157,7 +177,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     JOIN checkin_participants p ON r.participant_id = p.id
     JOIN wx_users u ON p.wx_user_id = u.id
     JOIN checkin_events a ON p.event_id = a.id
-    WHERE date(r.checkin_date) = ?
+    WHERE r.deleted_at IS NULL AND date(r.checkin_date) = ?
     ORDER BY r.checkin_date DESC
     LIMIT 10
   `).all(today) as any[];
@@ -166,7 +186,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const sourceChannels = db.prepare(`
     SELECT source as channel, COUNT(*) as count
     FROM wx_users
-    WHERE source IS NOT NULL AND source != ''
+    WHERE deleted_at IS NULL AND source IS NOT NULL AND source != ''
     GROUP BY source
     ORDER BY count DESC
   `).all() as any[];
@@ -181,6 +201,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     FROM wx_users u
     JOIN checkin_participants p ON p.wx_user_id = u.id
     JOIN checkin_records r ON r.participant_id = p.id AND r.status = 'approved'
+    WHERE u.deleted_at IS NULL
     GROUP BY u.id
     ORDER BY checkin_count DESC
     LIMIT 10
@@ -202,6 +223,9 @@ export async function getDashboardData(): Promise<DashboardData> {
     };
   });
 
+  // 待审核打卡记录数（用于后台导航角标）
+  const pendingCheckinReviews = (db.prepare("SELECT COUNT(*) as c FROM checkin_records WHERE status = 'pending' AND deleted_at IS NULL").get() as any).c;
+
   const dashboardData = {
     stats: {
       total_wx_users: totalWxUsers,
@@ -214,12 +238,13 @@ export async function getDashboardData(): Promise<DashboardData> {
       checkin_rate: checkinRate,
       total_participants: totalParticipants,
     },
-    stageStats,
+    activityDistribution,
     needFollowUsers: needFollowRaw.map(c => ({
       ...c,
       stage: c.stage || 'new_friend',
       wechat_account: c.wechat_account || 'main',
     })),
+    pendingCheckinReviews,
     newUserTrend,
     checkinTrend,
     popularActivities,

@@ -478,7 +478,7 @@
 
 .logout-btn {
   width: 100%;
-  margin-top: 28rpx;
+  margin-top: 80rpx;
   background: var(--surface);
   color: var(--primary);
   border-radius: 24rpx;

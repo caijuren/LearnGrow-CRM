@@ -22,7 +22,7 @@ type TabKey = 'checkin' | 'review' | 'badges' | 'rewards';
 
 const TABS: { key: TabKey; label: string; icon: any }[] = [
   { key: 'checkin', label: '打卡管理', icon: Calendar },
-  { key: 'review', label: '打卡审核', icon: Eye },
+  { key: 'review', label: '打卡记录', icon: FileText },
   { key: 'badges', label: '徽章管理', icon: Award },
   { key: 'rewards', label: '奖励发放', icon: Gift },
 ];
@@ -91,11 +91,11 @@ export default function CheckinDetail() {
   });
 
   // 审核相关
-  const [reviewStatus, setReviewStatus] = useState<string>('pending');
-  const [reviewRecordType, setReviewRecordType] = useState<string>('');
   const [reviewRecords, setReviewRecords] = useState<any[]>([]);
   const [reviewTotal, setReviewTotal] = useState(0);
   const [reviewPage, setReviewPage] = useState(1);
+  const [reviewLimit, setReviewLimit] = useState(20);
+  const [reviewSearch, setReviewSearch] = useState('');
   const [loadingReview, setLoadingReview] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
   const [showReviewModal, setShowReviewModal] = useState<{ record: any; action: 'approve' | 'reject' } | null>(null);
@@ -118,7 +118,7 @@ export default function CheckinDetail() {
   const loadReviewRecords = useCallback(async () => {
     setLoadingReview(true);
     try {
-      const data = await fetchCheckinRecords(eventId, { status: reviewStatus, record_type: reviewRecordType, page: reviewPage, limit: 20 });
+      const data = await fetchCheckinRecords(eventId, { search: reviewSearch, page: reviewPage, limit: reviewLimit });
       setReviewRecords(data.records);
       setReviewTotal(data.total);
     } catch (e: any) {
@@ -126,7 +126,7 @@ export default function CheckinDetail() {
     } finally {
       setLoadingReview(false);
     }
-  }, [eventId, reviewStatus, reviewRecordType, reviewPage]);
+  }, [eventId, reviewSearch, reviewPage, reviewLimit]);
 
   const loadBadges = useCallback(async () => {
     try {
@@ -162,11 +162,11 @@ export default function CheckinDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCheckinEvent]);
 
+  // 预加载打卡记录：进页面就悄悄拉，切 Tab 瞬间显示
   useEffect(() => {
-    if (activeTab === 'review' && eventId) {
-      loadReviewRecords();
-    }
-  }, [activeTab, reviewStatus, reviewRecordType, reviewPage, eventId, loadReviewRecords]);
+    if (eventId) loadReviewRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, reviewSearch, reviewPage, reviewLimit]);
 
   useEffect(() => {
     if (activeTab === 'badges' && eventId) {
@@ -414,7 +414,7 @@ export default function CheckinDetail() {
                   </span>
                 )}
                 <span className="text-[13px] text-gray-500 flex items-center gap-1.5">
-                  <Calendar size={13} strokeWidth={1.8} className="text-blue-600" />
+                  <Calendar size={13} strokeWidth={1.8} className="text-violet-600" />
                   {formatDate(event.start_date)} — {formatDate(event.end_date)}
                 </span>
                 <span className={`badge ${
@@ -455,7 +455,7 @@ export default function CheckinDetail() {
               subtext: `${formatDate(event.start_date)}起`,
               icon: Calendar, 
               iconBg: '#EFF6FF', 
-              iconColor: '#2563EB' 
+              iconColor: '#5B5CE2' 
             },
             { 
               label: '今日打卡', 
@@ -518,7 +518,7 @@ export default function CheckinDetail() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`px-3 py-1.5 text-[13px] font-medium rounded-lg transition-all flex items-center gap-1.5 ${
                     isActive
-                      ? 'bg-white text-blue-600 shadow-sm'
+                      ? 'bg-white text-violet-600 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -538,7 +538,7 @@ export default function CheckinDetail() {
           <div className="bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-100 overflow-hidden">
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-gray-100">
               <h3 className="text-[13px] font-semibold text-gray-900 flex items-center gap-1.5">
-                <Calendar size={14} strokeWidth={1.8} className="text-blue-600" />
+                <Calendar size={14} strokeWidth={1.8} className="text-violet-600" />
                 打卡日历
               </h3>
               <div className="flex items-center gap-0.5">
@@ -568,7 +568,7 @@ export default function CheckinDetail() {
                   
                   if (day.isSelected && day.isEventDay) {
                     bgColor = 'bg-blue-50';
-                    textColor = 'text-blue-600';
+                    textColor = 'text-violet-600';
                   } else if (!day.isEventDay) {
                     textColor = 'text-gray-300';
                   } else if (day.count && day.count > 0) {
@@ -594,7 +594,7 @@ export default function CheckinDetail() {
                           disabled={!day.isEventDay}
                           className={`w-full h-full rounded flex flex-col items-center justify-center transition-all duration-150 ${bgColor} ${textColor}
                             ${!day.isEventDay ? 'cursor-default' : 'cursor-pointer'}
-                            ${day.isSelected && day.isEventDay ? 'font-semibold ring-1 ring-blue-500' : ''}
+                            ${day.isSelected && day.isEventDay ? 'font-semibold ring-1 ring-violet-500' : ''}
                           `}
                         >
                           <span className="text-[11px] leading-none">{new Date(day.date).getDate()}</span>
@@ -713,10 +713,10 @@ export default function CheckinDetail() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-[14px] font-semibold text-gray-900 flex items-center gap-2">
-                    <Calendar size={15} strokeWidth={1.8} className="text-blue-600" />
+                    <Calendar size={15} strokeWidth={1.8} className="text-violet-600" />
                     {formatDate(selectedDate)} 周{getDayOfWeek(selectedDate)}
                     {isToday(selectedDate) && (
-                      <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full ml-1">今天</span>
+                      <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-violet-600 rounded-full ml-1">今天</span>
                     )}
                   </h3>
                   <p className="text-[11px] text-gray-400 mt-0.5">
@@ -732,7 +732,7 @@ export default function CheckinDetail() {
                       <button
                         onClick={handleBatchCheckin}
                         disabled={selectedParticipants.size === 0}
-                        className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                       >
                         <Check size={13} strokeWidth={1.8} />
                         批量 ({selectedParticipants.size})
@@ -746,7 +746,7 @@ export default function CheckinDetail() {
                       <button onClick={() => setBatchMode(true)} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
                         批量操作
                       </button>
-                      <button onClick={() => setShowAddParticipant(true)} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1">
+                      <button onClick={() => setShowAddParticipant(true)} className="px-2.5 py-1.5 text-[12px] font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors flex items-center gap-1">
                         <UserPlus size={13} strokeWidth={1.8} />
                         添加
                       </button>
@@ -770,7 +770,7 @@ export default function CheckinDetail() {
                     onClick={() => setParticipantFilter(f.key as any)}
                     className={`px-2.5 py-0.5 rounded text-[12px] font-medium transition-all ${
                       participantFilter === f.key
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-blue-50 text-violet-600'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -785,7 +785,7 @@ export default function CheckinDetail() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="搜索..."
-                  className="w-full pl-8 pr-2.5 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-8 pr-2.5 py-1.5 text-[12px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -834,7 +834,7 @@ export default function CheckinDetail() {
                             onClick={() => toggleSelectParticipant(p.participant.id)}
                             className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
                               selectedParticipants.has(p.participant.id)
-                                ? 'bg-blue-600 border-blue-600 text-white'
+                                ? 'bg-violet-600 border-violet-600 text-white'
                                 : 'bg-transparent border-gray-300'
                             }`}
                           >
@@ -929,159 +929,120 @@ export default function CheckinDetail() {
 
       {activeTab === 'review' && (
         <motion.div variants={fadeUp} className="clean-card overflow-hidden">
+          {/* 顶部搜索 + 统计 */}
           <div className="px-5 py-4 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1 p-1 bg-bg-subtle rounded-xl border border-border-default">
-                {['pending', 'approved', 'rejected', ''].map(s => (
-                  <button
-                    key={s || 'all'}
-                    onClick={() => { setReviewStatus(s); setReviewPage(1); }}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                      reviewStatus === s
-                        ? 'bg-bg-surface text-primary shadow-sm'
-                        : 'text-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    {s ? RECORD_STATUS_LABELS[s] : '全部'}
-                  </button>
-                ))}
-              </div>
-              <div className="h-5 w-px bg-border-subtle" />
-              {[
-                { value: '', label: '全部类型' },
-                { value: 'makeup', label: '补卡' },
-                { value: 'normal', label: '正常打卡' },
-              ].map(t => (
-                <button
-                  key={t.value || 'all-type'}
-                  onClick={() => { setReviewRecordType(t.value); setReviewPage(1); }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    reviewRecordType === t.value
-                      ? 'bg-bg-surface text-text-primary shadow-sm'
-                      : 'text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+            <div className="relative flex-1 max-w-sm">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <input
+                type="text"
+                placeholder="搜索昵称/孩子名/备注"
+                value={reviewSearch}
+                onChange={(e) => { setReviewSearch(e.target.value); setReviewPage(1); }}
+                className="w-full pl-9 pr-3 py-2 bg-bg-subtle border border-border-default rounded-lg text-sm outline-none focus:border-primary transition-colors"
+              />
             </div>
-            <div className="t-caption text-text-tertiary">共 {reviewTotal} 条记录</div>
+            <div className="flex items-center gap-3 text-[13px] text-text-tertiary">
+              <span>共 <span className="text-text-primary font-medium">{reviewTotal}</span> 条</span>
+              <select
+                value={reviewLimit}
+                onChange={(e) => { setReviewLimit(Number(e.target.value)); setReviewPage(1); }}
+                className="bg-bg-subtle border border-border-default rounded-lg px-2 py-1 text-sm outline-none focus:border-primary"
+              >
+                <option value={10}>10 条/页</option>
+                <option value={20}>20 条/页</option>
+                <option value={50}>50 条/页</option>
+              </select>
+            </div>
           </div>
 
+          {/* 列表 */}
           <div className="divide-y divide-border-subtle">
-            {loadingReview ? (
-              <div className="px-5 py-12 flex justify-center">
-                <Loading text="" size="sm" />
-              </div>
+            {loadingReview && reviewRecords.length === 0 ? (
+              // 骨架屏（只有首屏加载时显示）
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="px-5 py-4 flex items-start gap-4 animate-pulse">
+                  <div className="w-9 h-9 rounded-full bg-gray-200 shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-3 w-32 bg-gray-200 rounded" />
+                    <div className="h-3 w-20 bg-gray-200 rounded" />
+                  </div>
+                  <div className="w-24 h-24 rounded-lg bg-gray-200 shrink-0" />
+                </div>
+              ))
             ) : reviewRecords.length === 0 ? (
               <div className="px-5 py-20 text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center bg-gray-50">
                   <FileText size={32} strokeWidth={1.5} className="text-gray-300" />
                 </div>
                 <p className="text-[14px] font-medium text-gray-900 mb-1">暂无打卡记录</p>
-                <p className="text-[13px] text-gray-400">
-                  {reviewStatus ? '试试切换筛选条件' : '等待用户提交打卡'}
-                </p>
+                <p className="text-[13px] text-gray-400">等待用户提交打卡{reviewSearch ? '，或试试其他关键词' : ''}</p>
               </div>
             ) : (
               reviewRecords.map((r: any) => (
                 <div key={r.id} className="px-5 py-4 flex items-start gap-4 hover:bg-gray-50 transition-colors duration-150 group">
+                  {/* 头像 */}
                   <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0 relative">
                     {r.avatar_url ? (
-                      <>
-                        <img 
-                          src={r.avatar_url.startsWith('/uploads/') 
-                            ? r.avatar_url.replace('/uploads/', '/api/uploads/') 
-                            : r.avatar_url} 
-                          alt="" 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallbackDiv) {
-                              fallbackDiv.style.display = 'flex';
-                            }
-                          }}
-                        />
-                        <div 
-                          className="w-full h-full absolute inset-0 flex items-center justify-center font-semibold text-sm bg-gray-100 text-gray-400"
-                          style={{ display: 'none' }}
-                        >
-                          {r.nickname?.[0] || '?'}
-                        </div>
-                      </>
+                      <img
+                        src={r.avatar_url.startsWith('/uploads/')
+                          ? r.avatar_url.replace('/uploads/', '/api/uploads/')
+                          : r.avatar_url}
+                        loading="lazy"
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fb = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-semibold text-sm bg-blue-50 text-blue-600">
-                        {r.nickname?.[0] || '?'}
+                      <div className="w-full h-full flex items-center justify-center font-semibold text-sm bg-blue-50 text-violet-600">
+                        {(r.display_name || r.nickname)?.[0] || '?'}
                       </div>
                     )}
                   </div>
+
+                  {/* 文字内容 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="t-body-strong">{r.display_name || r.nickname}</span>
-                      {r.child_name && <span className="t-small">({r.child_name})</span>}
-                      <span className={`badge ${
-                        r.status === 'approved' ? 'badge-success' :
-                        r.status === 'rejected' ? 'badge-danger' : 'badge-warning'
-                      }`}>
-                        {RECORD_STATUS_LABELS[r.status]}
-                      </span>
                       {r.is_makeup && <span className="badge badge-warning">补卡</span>}
                     </div>
                     <div className="t-caption mb-2 text-text-tertiary">{r.checkin_date}</div>
-                    {r.note && <p className="t-body mb-2 text-text-secondary">{r.note}</p>}
-                    {r.image_url && (
-                      <div
-                        className="relative w-24 h-24 rounded-lg border border-border-subtle overflow-hidden shrink-0 cursor-zoom-in"
-                        onClick={() => {
-                          const url = r.image_url.startsWith('/uploads/')
-                            ? r.image_url.replace('/uploads/', '/api/uploads/')
-                            : r.image_url;
-                          setPreviewImage(url);
-                        }}
-                        title="点击查看大图"
-                      >
-                        <img
-                          src={r.image_url.startsWith('/uploads/') ? r.image_url.replace('/uploads/', '/api/uploads/') : r.image_url}
-                          alt="打卡图片"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallbackDiv = e.currentTarget.nextElementSibling as HTMLElement;
-                            if (fallbackDiv) fallbackDiv.style.display = 'flex';
-                          }}
-                        />
-                        <div
-                          className="w-full h-full absolute inset-0 flex flex-col items-center justify-center bg-bg-subtle text-text-tertiary gap-1"
-                          style={{ display: 'none' }}
-                        >
-                          <FileText size={20} strokeWidth={1.5} />
-                          <span className="text-[10px]">图片已丢失</span>
-                        </div>
-                      </div>
-                    )}
-                    {r.review_note && (
-                      <div className="mt-2 t-caption rounded-lg p-2 bg-bg-subtle text-text-secondary">
-                        审核备注：{r.review_note}
-                      </div>
-                    )}
+                    {r.note && <p className="t-body mb-2 text-text-secondary line-clamp-2">{r.note}</p>}
                   </div>
-                  {r.status === 'pending' && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => { setShowReviewModal({ record: r, action: 'approve' }); setReviewNote(''); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-success hover:bg-success-soft transition-colors"
-                        title="通过"
+
+                  {/* 图片缩略图（懒加载） */}
+                  {r.image_url && (
+                    <div
+                      className="relative w-24 h-24 rounded-lg border border-border-subtle overflow-hidden shrink-0 cursor-zoom-in"
+                      onClick={() => {
+                        const url = r.image_url.startsWith('/uploads/')
+                          ? r.image_url.replace('/uploads/', '/api/uploads/')
+                          : r.image_url;
+                        setPreviewImage(url);
+                      }}
+                      title="点击查看大图"
+                    >
+                      <img
+                        src={r.image_url.startsWith('/uploads/') ? r.image_url.replace('/uploads/', '/api/uploads/') : r.image_url}
+                        loading="lazy"
+                        alt="打卡图片"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const fb = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fb) fb.style.display = 'flex';
+                        }}
+                      />
+                      <div
+                        className="w-full h-full absolute inset-0 flex flex-col items-center justify-center bg-bg-subtle text-text-tertiary gap-1"
+                        style={{ display: 'none' }}
                       >
-                        <ThumbsUp size={15} strokeWidth={1.8} />
-                      </button>
-                      <button
-                        onClick={() => { setShowReviewModal({ record: r, action: 'reject' }); setReviewNote(''); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"
-                        title="拒绝"
-                      >
-                        <ThumbsDown size={15} strokeWidth={1.8} />
-                      </button>
+                        <FileText size={20} strokeWidth={1.5} />
+                        <span className="text-[10px]">图片已丢失</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1089,23 +1050,80 @@ export default function CheckinDetail() {
             )}
           </div>
 
-          {reviewTotal > 20 && (
-            <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-center gap-2">
-              <button
-                onClick={() => setReviewPage(p => Math.max(1, p - 1))}
-                disabled={reviewPage === 1}
-                className="btn btn-secondary disabled:opacity-50"
-              >
-                上一页
-              </button>
-              <span className="t-small text-text-tertiary">第 {reviewPage} 页</span>
-              <button
-                onClick={() => setReviewPage(p => p + 1)}
-                disabled={reviewPage * 20 >= reviewTotal}
-                className="btn btn-secondary disabled:opacity-50"
-              >
-                下一页
-              </button>
+          {/* 分页 */}
+          {reviewTotal > 0 && (
+            <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-between gap-3">
+              <div className="text-[13px] text-text-tertiary">
+                共 {reviewTotal} 条 · 第 {reviewPage} / {Math.max(1, Math.ceil(reviewTotal / reviewLimit))} 页
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setReviewPage(1)}
+                  disabled={reviewPage === 1}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:bg-bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  title="首页"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setReviewPage(p => Math.max(1, p - 1))}
+                  disabled={reviewPage === 1}
+                  className="h-8 px-3 rounded-lg text-[13px] text-text-secondary hover:bg-bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                >
+                  上一页
+                </button>
+
+                {/* 页码 */}
+                {(() => {
+                  const totalPages = Math.max(1, Math.ceil(reviewTotal / reviewLimit));
+                  const pages: (number | string)[] = [];
+                  const add = (p: number | string) => pages.push(p);
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) add(i);
+                  } else {
+                    add(1);
+                    if (reviewPage > 3) add('...');
+                    const start = Math.max(2, reviewPage - 1);
+                    const end = Math.min(totalPages - 1, reviewPage + 1);
+                    for (let i = start; i <= end; i++) add(i);
+                    if (reviewPage < totalPages - 2) add('...');
+                    add(totalPages);
+                  }
+                  return pages.map((p, i) =>
+                    typeof p === 'number' ? (
+                      <button
+                        key={i}
+                        onClick={() => setReviewPage(p)}
+                        className={`w-8 h-8 rounded-lg text-[13px] transition-colors ${
+                          p === reviewPage
+                            ? 'bg-primary text-white font-medium'
+                            : 'text-text-secondary hover:bg-bg-subtle'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ) : (
+                      <span key={i} className="w-8 h-8 flex items-center justify-center text-text-tertiary text-[12px]">{p}</span>
+                    )
+                  );
+                })()}
+
+                <button
+                  onClick={() => setReviewPage(p => p + 1)}
+                  disabled={reviewPage * reviewLimit >= reviewTotal}
+                  className="h-8 px-3 rounded-lg text-[13px] text-text-secondary hover:bg-bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                >
+                  下一页
+                </button>
+                <button
+                  onClick={() => setReviewPage(Math.max(1, Math.ceil(reviewTotal / reviewLimit)))}
+                  disabled={reviewPage * reviewLimit >= reviewTotal}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:bg-bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  title="末页"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </motion.div>
@@ -1147,7 +1165,7 @@ export default function CheckinDetail() {
                     setBadgeForm({ name: '', description: '', icon: '🏅', type: 'streak', target_days: 7 });
                     setShowBadgeForm(true);
                   }}
-                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 text-[13px] font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
                 >
                   添加徽章
                 </button>
@@ -1498,16 +1516,13 @@ export default function CheckinDetail() {
         <Modal
           isOpen={!!previewImage}
           onClose={() => setPreviewImage(null)}
-          title="打卡图片"
-          size="lg"
+          fullscreen
         >
-          <div className="flex items-center justify-center">
-            <img
-              src={previewImage}
-              alt="打卡图片预览"
-              className="max-w-full max-h-[70vh] object-contain rounded-lg"
-            />
-          </div>
+          <img
+            src={previewImage}
+            alt="打卡图片预览"
+            className="max-w-[92vw] max-h-[88vh] object-contain"
+          />
         </Modal>
       )}
       </div>

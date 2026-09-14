@@ -24,12 +24,6 @@ Page({
     showChildSetup: false,
     setupChildName: '',
     savingChildName: false,
-    showSuccessActions: false,
-    showShareModal: false,
-    shareLink: '',
-    sharingLink: false,
-    shareExpireText: '',
-    shareCardUrl: '',
     baseUrl: app.globalData.baseUrl,
     isLoggedIn: false,
     isJoined: false,
@@ -58,7 +52,6 @@ Page({
   },
 
   onLoad(options) {
-    wx.showShareMenu({ withShareTicket: true });
     let eventId = options.id ? parseInt(options.id) : null;
     // 通过小程序码扫码进入：scene 携带 id=活动ID
     if (!eventId && options.scene) {
@@ -191,21 +184,8 @@ Page({
         reminder,
         brokenAvatars: {}
       });
-
-      this.loadShareCard();
     } catch (e) {
       this.setData({ networkError: true });
-    }
-  },
-
-  async loadShareCard() {
-    try {
-      const res = await api.getEventShareCard(this.data.eventId);
-      if (res && res.image_url) {
-        this.setData({ shareCardUrl: this.data.baseUrl + res.image_url });
-      }
-    } catch (e) {
-      // 分享卡片生成失败时静默回退到品牌图
     }
   },
 
@@ -391,33 +371,7 @@ Page({
     }
   },
 
-  async toggleFeedLike(e) {
-    if (!app.requireLogin()) return;
-    const { id } = e.currentTarget.dataset;
-    const feed = this.data.feed.map(item => {
-      if (item.id !== id) return item;
-      const liked = !item.liked_by_me;
-      return {
-        ...item,
-        liked_by_me: liked,
-        like_count: Math.max(0, (item.like_count || 0) + (liked ? 1 : -1))
-      };
-    });
-    this.setData({ feed });
-    try {
-      const result = await api.toggleRecordLike(id);
-      this.setData({
-        feed: this.data.feed.map(item => item.id === id ? {
-          ...item,
-          liked_by_me: result.liked,
-          like_count: result.like_count
-        } : item)
-      });
-    } catch (err) {
-      wx.showToast({ title: '操作失败，请重试', icon: 'none' });
-      this.loadData();
-    }
-  },
+
 
   async chooseMedia() {
     if (!app.requireLogin()) return;
@@ -529,7 +483,6 @@ Page({
       wx.showToast({ title: '请上传打卡图片或视频', icon: 'error' });
       return;
     }
-    const wasMakeup = !!this.data.makeupDate;
     this.setData({ submitting: true });
     try {
       let result;
@@ -572,256 +525,11 @@ Page({
       });
       this.setData({ checkinNote: '', checkinImage: '', checkinImageUrl: '', checkinImageHash: '', checkinMediaType: 'image', makeupDate: '', isEditingTodayRecord: false, editingRecordId: null });
       this.loadData();
-      if (!this.data.isEditingTodayRecord && !result.pending_review && !wasMakeup) {
-        setTimeout(() => this.showSharePrompt(), 600);
-      }
     } catch (e) {
       wx.showToast({ title: '提交失败，请重试', icon: 'none' });
     } finally {
       this.setData({ submitting: false });
     }
-  },
-
-  showSharePrompt() {
-    this.setData({ showSuccessActions: true });
-  },
-
-  closeSuccessActions() {
-    this.setData({ showSuccessActions: false });
-  },
-
-  async openShareModal() {
-    if (this.data.sharingLink) return;
-    this.setData({ sharingLink: true });
-    try {
-      const { scheme, expire_at } = await api.getEventShareLink(this.data.eventId);
-      const expireText = expire_at ? expire_at.split(' ')[0].replace(/-/g, '.') : '';
-      this.setData({
-        shareLink: scheme,
-        shareExpireText: expireText ? `${expireText} 前有效` : '',
-        showShareModal: true
-      });
-    } catch (e) {
-      // api.js 已展示具体错误信息
-    } finally {
-      this.setData({ sharingLink: false });
-    }
-  },
-
-  closeShareModal() {
-    this.setData({ showShareModal: false });
-  },
-
-  copyShareLink() {
-    if (!this.data.shareLink) return;
-    wx.setClipboardData({
-      data: this.data.shareLink,
-      success: () => {
-        wx.showToast({ title: '链接已复制', icon: 'success' });
-        this.setData({ showShareModal: false });
-      }
-    });
-  },
-
-  onCreatePoster() {
-    this.setData({ showSuccessActions: false });
-    this.createPoster();
-  },
-
-  createPoster() {
-    const event = this.data.event || {};
-    const stats = this.data.myStats || {};
-    const user = app.globalData.userInfo || {};
-    const ctx = wx.createCanvasContext('checkinPoster', this);
-    const width = 640;
-    const height = 1100;
-    const today = api.getChinaTodayStr();
-    const nickname = user.nickname || '我';
-    const checkinDays = stats.checkin_days || 0;
-    const streakDays = stats.current_streak || 0;
-
-    // 背景：深空渐变
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
-    bgGradient.addColorStop(0, '#090B12');
-    bgGradient.addColorStop(0.45, '#111522');
-    bgGradient.addColorStop(1, '#1a0b1a');
-    ctx.setFillStyle(bgGradient);
-    ctx.fillRect(0, 0, width, height);
-
-    // 装饰光斑
-    this._drawGlow(ctx, 520, 160, 240, 'rgba(244, 63, 94, 0.22)');
-    this._drawGlow(ctx, 120, 420, 280, 'rgba(139, 92, 246, 0.18)');
-    this._drawGlow(ctx, 480, 760, 200, 'rgba(244, 63, 94, 0.14)');
-
-    // 顶部细线装饰
-    ctx.setStrokeStyle('rgba(244, 63, 94, 0.6)');
-    ctx.setLineWidth(3);
-    ctx.beginPath();
-    ctx.moveTo(60, 84);
-    ctx.lineTo(180, 84);
-    ctx.stroke();
-
-    ctx.setFillStyle('rgba(255, 255, 255, 0.55)');
-    ctx.setFontSize(24);
-    ctx.setTextAlign('left');
-    ctx.fillText(today, 60, 132);
-
-    // 活动名称
-    ctx.setFillStyle('#ffffff');
-    ctx.setFontSize(48);
-    ctx.setTextAlign('left');
-    this.drawWrappedText(ctx, event.name || '学习打卡', 60, 196, 520, 64, 2);
-
-    // 核心数据卡片背景
-    this._drawRoundedRect(ctx, 48, 320, width - 96, 420, 28, 'rgba(17, 21, 34, 0.72)');
-    ctx.setStrokeStyle('rgba(255, 255, 255, 0.08)');
-    ctx.setLineWidth(2);
-    ctx.stroke();
-
-    // 累计打卡大数字
-    const numGradient = ctx.createLinearGradient(0, 360, 0, 520);
-    numGradient.addColorStop(0, '#F43F7A');
-    numGradient.addColorStop(1, '#ec4899');
-    ctx.setFillStyle(numGradient);
-    ctx.setTextAlign('center');
-    ctx.setFontSize(172);
-    ctx.fillText(String(checkinDays), width / 2, 510);
-
-    ctx.setFillStyle('rgba(255, 255, 255, 0.7)');
-    ctx.setFontSize(30);
-    ctx.fillText('累计打卡天数', width / 2, 564);
-
-    // 分隔线
-    ctx.setStrokeStyle('rgba(255, 255, 255, 0.12)');
-    ctx.setLineWidth(2);
-    ctx.beginPath();
-    ctx.moveTo(80, 610);
-    ctx.lineTo(width - 80, 610);
-    ctx.stroke();
-
-    // 连续打卡
-    ctx.setFillStyle('#F59E0B');
-    ctx.setFontSize(64);
-    ctx.fillText(String(streakDays), width / 2, 692);
-
-    ctx.setFillStyle('rgba(255, 255, 255, 0.7)');
-    ctx.setFontSize(26);
-    ctx.fillText('当前连续打卡', width / 2, 736);
-
-    // 进度条
-    const totalDays = event.total_days || 1;
-    const progress = Math.min(checkinDays / totalDays, 1);
-    const barY = 780;
-    const barW = width - 136;
-    const barX = 68;
-    ctx.setFillStyle('rgba(255, 255, 255, 0.12)');
-    this._drawRoundedRect(ctx, barX, barY, barW, 18, 9, 'rgba(255, 255, 255, 0.12)');
-    if (progress > 0) {
-      const progGradient = ctx.createLinearGradient(barX, 0, barX + barW * progress, 0);
-      progGradient.addColorStop(0, '#F43F7A');
-      progGradient.addColorStop(1, '#8B5CF6');
-      this._drawRoundedRect(ctx, barX, barY, barW * progress, 18, 9, progGradient);
-    }
-    ctx.setFillStyle('rgba(255, 255, 255, 0.65)');
-    ctx.setFontSize(22);
-    ctx.setTextAlign('right');
-    ctx.fillText(`${checkinDays}/${totalDays} 天`, width - 68, barY + 46);
-
-    // 鼓励语
-    ctx.setTextAlign('center');
-    ctx.setFillStyle('#ffffff');
-    ctx.setFontSize(34);
-    ctx.fillText(`${nickname} 正在坚持学习`, width / 2, 868);
-
-    ctx.setFillStyle('rgba(255, 255, 255, 0.6)');
-    ctx.setFontSize(26);
-    const slogan = event.required_text || '每天一点进步，看得见的成长';
-    this.drawWrappedText(ctx, slogan, width / 2, 914, 520, 40, 2);
-
-    // 底部品牌区
-    const footerY = 1010;
-    ctx.setStrokeStyle('rgba(255, 255, 255, 0.1)');
-    ctx.beginPath();
-    ctx.moveTo(60, footerY);
-    ctx.lineTo(width - 60, footerY);
-    ctx.stroke();
-
-    ctx.setTextAlign('left');
-    ctx.setFillStyle('#ffffff');
-    ctx.setFontSize(32);
-    ctx.fillText('源来是糖', 60, 1064);
-
-    ctx.setFillStyle('rgba(255, 255, 255, 0.55)');
-    ctx.setFontSize(22);
-    ctx.fillText('长按识别小程序，一起打卡', 60, 1100);
-
-    // 小程序码占位框
-    ctx.setStrokeStyle('rgba(255, 255, 255, 0.2)');
-    ctx.setLineWidth(2);
-    ctx.strokeRect(width - 132, 1032, 80, 80);
-    ctx.setFillStyle('rgba(255, 255, 255, 0.9)');
-    ctx.setFontSize(16);
-    ctx.setTextAlign('center');
-    ctx.fillText('扫码', width - 92, 1078);
-
-    ctx.draw(false, () => {
-      wx.canvasToTempFilePath({
-        canvasId: 'checkinPoster',
-        width,
-        height,
-        destWidth: width * 2,
-        destHeight: height * 2,
-        success: (res) => {
-          wx.saveImageToPhotosAlbum({
-            filePath: res.tempFilePath,
-            success: () => wx.showToast({ title: '海报已保存', icon: 'success' }),
-            fail: () => wx.showToast({ title: '保存失败，请检查相册权限', icon: 'none' })
-          });
-        },
-        fail: () => wx.showToast({ title: '海报生成失败', icon: 'none' })
-      }, this);
-    });
-  },
-
-  _drawGlow(ctx, x, y, r, color) {
-    const glow = ctx.createCircularGradient(x, y, 0, x, y, r);
-    glow.addColorStop(0, color);
-    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.setFillStyle(glow);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  },
-
-  _drawRoundedRect(ctx, x, y, w, h, r, fill) {
-    ctx.setFillStyle(fill);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y + r, x + w, y, r);
-    ctx.closePath();
-    ctx.fill();
-  },
-
-  drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
-    const chars = String(text || '').split('');
-    let line = '';
-    let lines = 0;
-    for (let i = 0; i < chars.length; i++) {
-      const testLine = line + chars[i];
-      if (ctx.measureText(testLine).width > maxWidth && line) {
-        lines++;
-        ctx.fillText(lines >= maxLines ? `${line.slice(0, Math.max(0, line.length - 1))}...` : line, x, y);
-        if (lines >= maxLines) return;
-        line = chars[i];
-        y += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-    if (line && lines < maxLines) ctx.fillText(line, x, y);
   },
 
   openMaterial(e) {
@@ -863,6 +571,17 @@ Page({
     wx.switchTab({ url: '/pages/ranking/ranking' });
   },
 
+  // 分享给好友/群聊：直接打开当前活动详情
+  onShareAppMessage() {
+    const event = this.data.event;
+    const eventId = this.data.eventId;
+    return {
+      title: event ? `${event.name} · 一起来打卡吧` : '一起来打卡吧',
+      path: `/pages/event-detail/event-detail?id=${eventId}`,
+      imageUrl: event ? event.cover_url || '' : ''
+    };
+  },
+
   goToLogin() {
     wx.navigateTo({ url: '/pages/login/login' });
   },
@@ -875,15 +594,5 @@ Page({
     const url = e.currentTarget.dataset.url;
     if (!url) return;
     wx.previewImage({ urls: [url], current: url });
-  },
-
-  onShareAppMessage() {
-    const event = this.data.event;
-    const imageUrl = this.data.shareCardUrl || `${this.data.baseUrl}/uploads/share_brand.png`;
-    return {
-      title: event ? `我正在坚持「${event.name}」打卡` : '一起来打卡',
-      path: `/pages/event-detail/event-detail?id=${this.data.eventId}`,
-      imageUrl,
-    };
   }
 });

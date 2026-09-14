@@ -598,12 +598,13 @@ export default function WxUserList() {
                 activeValue={currentImportance}
                 onSelect={handleImportanceFilter}
               />
-              <FilterRow
+              {/* 用户阶段筛选暂时隐藏（stage 字段未实际使用） */}
+              {false && <FilterRow
                 label="用户阶段"
                 options={stageOptions}
                 activeValue={currentStage}
                 onSelect={handleStageFilter}
-              />
+              />}
               <FilterRow
                 label="跟进状态"
                 options={needFollowOptions}

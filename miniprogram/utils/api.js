@@ -191,14 +191,6 @@ function saveEventReminder(eventId, data) {
   });
 }
 
-function toggleRecordLike(recordId) {
-  return request({
-    url: `/api/wx/checkin-records/${recordId}/like`,
-    method: 'POST',
-    data: {}
-  });
-}
-
 function getEventMaterials(eventId) {
   return request({ url: `/api/wx/checkin-events/${eventId}/materials` });
 }
@@ -265,7 +257,6 @@ module.exports = {
   getEventFeed,
   getEventReminder,
   saveEventReminder,
-  toggleRecordLike,
   getEventMaterials,
   getEventBadges,
   getEventShareLink,

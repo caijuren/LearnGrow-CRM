@@ -762,8 +762,55 @@ if (!existingCheckinEventCols.includes('deleted_at')) {
 if (!existingCheckinEventCols.includes('points_per_checkin')) {
   sqlite.exec("ALTER TABLE checkin_events ADD COLUMN points_per_checkin INTEGER");
 }
+// v3.4.0 循环活动自动创建
+if (!existingCheckinEventCols.includes('is_recurring')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0");
+}
+if (!existingCheckinEventCols.includes('recurring_days')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN recurring_days INTEGER NOT NULL DEFAULT 10");
+}
+if (!existingCheckinEventCols.includes('max_cycles')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN max_cycles INTEGER NOT NULL DEFAULT 0");
+}
+if (!existingCheckinEventCols.includes('cycle_index')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN cycle_index INTEGER NOT NULL DEFAULT 1");
+}
+if (!existingCheckinEventCols.includes('source_event_id')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN source_event_id INTEGER");
+}
+if (!existingCheckinEventCols.includes('last_cycle_triggered_at')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN last_cycle_triggered_at TEXT");
+}
+// v3.4.1 报名截止时间从绝对日期改为"活动开始后 N 天"
+if (!existingCheckinEventCols.includes('signup_deadline_days')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN signup_deadline_days INTEGER NOT NULL DEFAULT 0");
+  // 迁移：根据已有 signup_deadline 反推 signup_deadline_days
+  sqlite.exec(`UPDATE checkin_events 
+    SET signup_deadline_days = CAST(julianday(signup_deadline) - julianday(start_date) AS INTEGER)
+    WHERE signup_deadline IS NOT NULL AND signup_deadline != '' AND signup_deadline >= start_date`);
+}
+// v3.4.2 提前创建下一轮的天数（默认结束前 2 天）
+if (!existingCheckinEventCols.includes('cycle_advance_days')) {
+  sqlite.exec("ALTER TABLE checkin_events ADD COLUMN cycle_advance_days INTEGER NOT NULL DEFAULT 2");
+}
 if (!existingCheckinEventCols.includes('is_deleted')) {
   sqlite.exec("CREATE INDEX IF NOT EXISTS idx_checkin_events_is_deleted ON checkin_events(is_deleted)");
+}
+
+// P2-D: 补全软删除列。
+// user-delete.service.ts 的软删逻辑会对下列表标记 deleted_at，但运行时 schema 此前缺失该列，
+// 导致软删在首条 UPDATE 即抛 'no such column: deleted_at'（承诺可删但实际删不掉 = 合规事故）。
+// 此处幂等补齐，已存在则跳过；与 checkin_events 既有 is_deleted/deleted_at 并存，互不影响。
+const softDeleteTables = [
+  'wx_users', 'children', 'orders', 'follow_ups',
+  'checkin_records', 'checkin_participants',
+  'points_ledger', 'checkin_record_likes', 'checkin_badge_achievements',
+];
+for (const t of softDeleteTables) {
+  const existingCols = (sqlite.prepare(`PRAGMA table_info(${t})`).all() as any[]).map((c: any) => c.name);
+  if (!existingCols.includes('deleted_at')) {
+    sqlite.exec(`ALTER TABLE ${t} ADD COLUMN deleted_at TEXT`);
+  }
 }
 
 sqlite.exec(`

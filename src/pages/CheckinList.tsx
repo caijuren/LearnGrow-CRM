@@ -27,7 +27,7 @@ interface EventForm {
   name: string;
   start_date: string;
   end_date: string;
-  signup_deadline?: string;
+  signup_deadline_days: number; // 活动开始后几天内可报名（0=不限）
   required_text: string;
   reward_rules: string;
   points_per_checkin: string;
@@ -37,13 +37,18 @@ interface EventForm {
   makeup_requires_review: boolean;
   makeup_counts_for_streak: boolean;
   status: CheckinEventStatus;
+  // v3.4.0 循环活动
+  is_recurring: boolean;
+  cycle_advance_days: number;
+  recurring_days: number;
+  max_cycles: number;
 }
 
 const emptyForm: EventForm = {
   name: '',
   start_date: new Date().toISOString().split('T')[0],
   end_date: '',
-  signup_deadline: '',
+  signup_deadline_days: 0, // 默认不限报名时间
   required_text: '',
   reward_rules: '',
   points_per_checkin: '',
@@ -53,7 +58,18 @@ const emptyForm: EventForm = {
   makeup_requires_review: true,
   makeup_counts_for_streak: false,
   status: 'active',
+  is_recurring: false,
+  cycle_advance_days: 2,
+  recurring_days: 10,
+  max_cycles: 0,
 };
+
+function addDaysStr(dateStr: string, days: number): string {
+  // UTC 加减天数，避免时区偏移
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 function getDaysLeft(endDate: string): number {
   const today = new Date();
@@ -124,7 +140,7 @@ export default function CheckinList() {
     try {
       const payload = {
         ...form,
-        signup_deadline: form.signup_deadline || undefined,
+        // 不再传 signup_deadline，后端会根据 signup_deadline_days + start_date 自动计算
         points_per_checkin: form.points_per_checkin === '' ? null : Number(form.points_per_checkin),
       };
       if (editingEvent) {
@@ -143,11 +159,18 @@ export default function CheckinList() {
   const handleEditClick = (e: React.MouseEvent, event: CheckinEvent) => {
     e.stopPropagation();
     setEditingEvent(event);
+    // 从绝对日期反推 signup_deadline_days
+    let signupDeadlineDays = 0;
+    if (event.signup_deadline && event.start_date && event.signup_deadline >= event.start_date) {
+      const a = new Date(event.start_date + 'T00:00:00Z');
+      const b = new Date(event.signup_deadline + 'T00:00:00Z');
+      signupDeadlineDays = Math.round((b.getTime() - a.getTime()) / 86400000);
+    }
     setForm({
       name: event.name,
       start_date: event.start_date,
       end_date: event.end_date,
-      signup_deadline: event.signup_deadline || '',
+      signup_deadline_days: signupDeadlineDays,
       required_text: event.required_text || '',
       reward_rules: event.reward_rules || '',
       points_per_checkin: event.points_per_checkin !== null && event.points_per_checkin !== undefined
@@ -159,6 +182,11 @@ export default function CheckinList() {
       makeup_requires_review: !!event.makeup_requires_review,
       makeup_counts_for_streak: !!event.makeup_counts_for_streak,
       status: event.status,
+      // v3.4.0 循环活动
+      is_recurring: !!event.is_recurring,
+      cycle_advance_days: event.cycle_advance_days ?? 2,
+      recurring_days: event.recurring_days ?? 10,
+      max_cycles: event.max_cycles ?? 0,
     });
     setShowForm(true);
   };
@@ -196,7 +224,18 @@ export default function CheckinList() {
     }
   };
 
-  const displayedEvents = isRecycleBinView ? deletedCheckinEvents : checkinEvents;
+  const todayBjt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  // v3.4.3 前端双保险：进行中 tab 只显示 start <= today <= end 的活动，已结束 tab 包含 end < today 的
+  const rawEvents = isRecycleBinView ? deletedCheckinEvents : checkinEvents;
+  const displayedEvents = rawEvents.filter(e => {
+    if (isRecycleBinView) return true;
+    // 已结束 tab：只展示真的已过期的（end < today）
+    if (checkinFilter.status === 'ended') return e.end_date < todayBjt;
+    // 进行中 tab：只展示 start <= today 且 end >= today 的
+    if (checkinFilter.status === 'active') return e.start_date <= todayBjt && e.end_date >= todayBjt;
+    return true;
+  });
 
   return (
     <div className="min-h-full bg-bg-page p-6 md:p-8">
@@ -336,12 +375,12 @@ export default function CheckinList() {
                 >
                   <div
                     className="absolute top-0 left-0 right-0 h-[2px] rounded-t-[20px]"
-                    style={{ background: isRecycleBinView ? 'linear-gradient(90deg, #9CA3AF 0%, #D1D5DB 100%)' : 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)' }}
+                    style={{ background: isRecycleBinView ? 'linear-gradient(90deg, #9CA3AF 0%, #D1D5DB 100%)' : 'linear-gradient(90deg, #5B5CE2 0%, #8B5CF6 100%)' }}
                   />
                   <div className="p-5 pt-[22px]">
                     {/* Card Header */}
                     <div className="flex items-start gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: '#EFF6FF', color: '#5B5CE2' }}>
                         <Award size={20} strokeWidth={1.8} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -357,6 +396,19 @@ export default function CheckinList() {
                           <div className="flex items-center gap-1 text-xs text-text-tertiary">
                             <Users size={11} strokeWidth={1.8} style={{ color: '#8B5CF6' }} />
                             <span className="truncate">{event.group_name}</span>
+                          </div>
+                        )}
+                        {/* v3.4.0 循环活动标识 */}
+                        {event.is_recurring && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5B5CE2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                            <span style={{ color: '#5B5CE2' }}>
+                              {event.cycle_index && event.cycle_index > 1
+                                ? `第 ${event.cycle_index} 轮`
+                                : event.max_cycles && event.max_cycles > 0
+                                  ? `循环 · 共 ${event.max_cycles} 轮`
+                                  : '循环中 · 无限'}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -416,7 +468,7 @@ export default function CheckinList() {
                       <div className="w-full h-1.5 bg-bg-subtle rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all"
-                          style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #2563EB 0%, #60A5FA 100%)' }}
+                          style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #5B5CE2 0%, #8B5CF6 100%)' }}
                         />
                       </div>
                       <div className="text-[11px] text-text-tertiary mt-1.5">
@@ -542,14 +594,22 @@ export default function CheckinList() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-text-primary mb-1.5">报名截止时间</label>
-                  <input
-                    type="date"
-                    value={form.signup_deadline || ''}
-                    onChange={(e) => setForm({ ...form, signup_deadline: e.target.value })}
-                    className="input"
-                  />
-                  <p className="text-xs text-text-tertiary mt-1.5">留空则与开始日期相同；截止当天及之后不可报名，未报名者无法打卡</p>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">报名截止（活动开始后 N 天）</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={form.signup_deadline_days}
+                      onChange={(e) => setForm({ ...form, signup_deadline_days: Math.max(0, parseInt(e.target.value) || 0) })}
+                      className="input flex-1"
+                    />
+                    <span className="text-sm text-text-secondary">天</span>
+                  </div>
+                  <p className="text-xs text-text-tertiary mt-1.5">
+                    填 0 表示不限报名时间；填 2 表示活动开始后 2 天内可报名。
+                    {form.signup_deadline_days > 0 && form.start_date && ` 预计截止：${addDaysStr(form.start_date, form.signup_deadline_days)}`}
+                  </p>
                 </div>
               </div>
 
@@ -648,6 +708,67 @@ export default function CheckinList() {
                   </>
                 )}
               </div>
+
+              {/* v3.4.0 循环活动自动创建 */}
+              <label className="flex items-start justify-between gap-4 border-t border-border-border pt-4 mt-4 cursor-pointer">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                    <div className="text-sm font-semibold text-text-primary">循环活动</div>
+                  </div>
+                  <div className="text-xs text-text-tertiary mt-0.5">开启后，活动结束自动创建下一轮，日期紧接而上</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={form.is_recurring}
+                  onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })}
+                  className="h-5 w-5 accent-primary mt-0.5"
+                />
+              </label>
+              {form.is_recurring && (
+                <div className="space-y-3 pt-3 mb-1">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">每轮周期（天）</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={form.recurring_days}
+                        onChange={(e) => setForm({ ...form, recurring_days: Math.max(1, parseInt(e.target.value) || 10) })}
+                        className="w-full input text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">提前创建（天）</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={form.cycle_advance_days}
+                        onChange={(e) => setForm({ ...form, cycle_advance_days: Math.max(0, parseInt(e.target.value) || 2) })}
+                        className="w-full input text-sm"
+                      />
+                      <p className="text-xs text-text-tertiary mt-1">结束前 N 天生成下一轮</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1.5">循环次数</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={999}
+                        value={form.max_cycles}
+                        onChange={(e) => setForm({ ...form, max_cycles: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="w-full input text-sm"
+                      />
+                      <p className="text-xs text-text-tertiary mt-1">填 0 表示无限循环</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-tertiary bg-primary/5 rounded-md p-2.5 border border-primary/10">
+                    自动复制当前活动的打卡规则、补卡配置等；报名截止时间按"活动开始后 N 天"自动计算。标题智能递增（9月第1期 → 9月第2期 → 10月第1期）。奖励规则可随时手动修改。
+                  </p>
+                </div>
+              )}
             </div>
           </Modal>
         )}

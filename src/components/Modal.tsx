@@ -9,6 +9,7 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
+  fullscreen?: boolean;
 }
 
 const sizeClasses = {
@@ -36,6 +37,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   size = 'md',
+  fullscreen = false,
 }) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -51,40 +53,61 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  const overlayBg = fullscreen ? 'rgba(0,0,0,0.92)' : undefined;
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
           className="modal-overlay"
+          style={overlayBg ? { backgroundColor: overlayBg, backdropFilter: 'none' } : undefined}
           variants={overlayVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
           onClick={onClose}
         >
-          <motion.div
-            className={`modal-content ${sizeClasses[size]}`}
-            variants={contentVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {title && (
-              <div className="modal-header">
-                <h3 className="modal-title">{title}</h3>
-                <button
-                  onClick={onClose}
-                  className="btn btn-icon-sm"
-                  aria-label="关闭"
-                >
-                  <X size={15} strokeWidth={1.8} />
-                </button>
+          {fullscreen ? (
+            <>
+              <button
+                onClick={onClose}
+                className="fixed top-6 right-6 z-[60] w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                aria-label="关闭"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+              <div
+                className="relative z-[55] w-full h-full flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {children}
               </div>
-            )}
-            <div className="modal-body">{children}</div>
-            {footer && <div className="modal-footer">{footer}</div>}
-          </motion.div>
+            </>
+          ) : (
+            <motion.div
+              className={`modal-content ${sizeClasses[size]}`}
+              variants={contentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {title && (
+                <div className="modal-header">
+                  <h3 className="modal-title">{title}</h3>
+                  <button
+                    onClick={onClose}
+                    className="btn btn-icon-sm"
+                    aria-label="关闭"
+                  >
+                    <X size={15} strokeWidth={1.8} />
+                  </button>
+                </div>
+              )}
+              <div className="modal-body">{children}</div>
+              {footer && <div className="modal-footer">{footer}</div>}
+            </motion.div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

@@ -279,8 +279,9 @@ export interface DashboardData {
     checkin_rate: number;
     total_participants: number;
   };
-  stageStats: { stage: CustomerStage; count: number }[];
+  activityDistribution: { level: 'active' | 'normal' | 'low' | 'dormant'; count: number }[];
   needFollowUsers: Pick<WxUser, 'id' | 'name' | 'stage' | 'wechat_id' | 'wechat_account' | 'last_follow_date' | 'next_talk_topic' | 'importance'>[];
+  pendingCheckinReviews?: number;
   newUserTrend: { date: string; count: number }[];
   checkinTrend: { date: string; count: number }[];
   popularActivities: {
@@ -553,6 +554,7 @@ export interface CheckinEvent {
   start_date: string;
   end_date: string;
   signup_deadline?: string | null;
+  signup_deadline_days?: number; // v3.4.1 活动开始后 N 天内可报名（0=不限）
   required_text: string | null;
   reward_rules: string | null;
   points_per_checkin?: number | null;
@@ -562,6 +564,14 @@ export interface CheckinEvent {
   makeup_requires_review?: number | boolean;
   makeup_counts_for_streak?: number | boolean;
   status: CheckinEventStatus;
+  // v3.4.0 循环活动自动创建
+  is_recurring?: number | boolean;
+  cycle_advance_days?: number;
+  recurring_days?: number;
+  max_cycles?: number;
+  cycle_index?: number;
+  source_event_id?: number | null;
+  last_cycle_triggered_at?: string | null;
   is_deleted?: number | boolean;
   deleted_at?: string | null;
   participant_count?: number;

@@ -381,7 +381,7 @@ export default function LiveDesk() {
                     {customer.recent_follow_up && (
                       <div className="mb-4 p-4 bg-blue-50/50 rounded-xl">
                         <div className="flex items-center gap-2 mb-2">
-                          <MessageCircle className="w-4 h-4 text-blue-500" />
+                          <MessageCircle className="w-4 h-4 text-violet-500" />
                           <span className="text-sm font-bold text-slate-700">上次聊</span>
                           <span className="text-xs text-slate-400 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
