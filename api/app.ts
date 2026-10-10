@@ -3502,16 +3502,11 @@ function maybeCreateNextCycleEvent() {
           continue;
         }
 
-        // v3.4.2 智能命名
+        // v3.4.3 智能命名：以上一期（src）为参照，同月递增期数、跨月重置为第1期
+        // 注意不能用系列首个活动命名——否则起点月份会让每期都被误判为跨月，期数永远停在第1期
         const rootRow = db.prepare(`SELECT id FROM checkin_events WHERE (source_event_id = ? OR id = ?) AND is_deleted = 0 ORDER BY id ASC LIMIT 1`).get(sourceId, sourceId) as any;
         const rootId = rootRow?.id || sourceId;
-        const rootName = (db.prepare(`SELECT name, start_date FROM checkin_events WHERE id = ?`).get(rootId) as any);
-        const newName = smartNextName(
-          rootName?.name || src.name,
-          rootName?.start_date || src.start_date,
-          newStart,
-          nextCycle
-        );
+        const newName = smartNextName(src.name, src.start_date, newStart, nextCycle);
 
         const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
         const newSignupDeadlineDays = src.signup_deadline_days || 0;
